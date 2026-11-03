@@ -1,4 +1,4 @@
-package io.github.poseybutter.reberu;
+package reberu;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
