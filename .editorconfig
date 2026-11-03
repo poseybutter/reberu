@@ -12,7 +12,7 @@ indent_size = 4
 indent_size = 2
 
 [*.md]
-# Markdown은 줄 끝 공백 두 칸이 줄바꿈 의미를 가질 수 있어 지우지 않는다.
+# 줄 끝 공백 두 칸이 줄바꿈이라 유지
 trim_trailing_whitespace = false
 
 [*.bat]
