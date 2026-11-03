@@ -1,3 +1,8 @@
-/gradlew text eol=lf
+# core.autocrlf 설정과 무관하게 LF 고정
+* text=auto eol=lf
+
+# Windows 배치 파일만 CRLF
 *.bat text eol=crlf
+*.cmd text eol=crlf
+
 *.jar binary
