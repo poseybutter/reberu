@@ -126,3 +126,4 @@ team/
 
 - `JAVA_HOME`이 JDK 17 이상을 가리켜야 Gradle이 실행됩니다. 빌드에 쓰는 JDK 17은 Gradle toolchain이 찾습니다.
 - 실패하면 오류 원문을 그대로 보고합니다.
+- CI는 `.github/workflows/ci.yml`에서 `main` push와 모든 PR마다 `./gradlew test bootJar`를 실행합니다. Ubuntu 러너의 Docker로 Testcontainers를 띄우고, 실패하면 테스트 리포트를 artifact로 남깁니다.

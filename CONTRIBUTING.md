@@ -145,3 +145,5 @@ PR을 올리기 전에 다음 명령이 통과해야 합니다. 테스트에는 
 ./gradlew test
 ./gradlew bootJar
 ```
+
+PR을 올리면 CI([`.github/workflows/ci.yml`](.github/workflows/ci.yml))가 같은 명령을 실행합니다. CI가 통과한 PR만 병합합니다.
