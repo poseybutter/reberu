@@ -1,7 +1,10 @@
 name: 기술 작업
 description: 리팩터링, 테스트, 문서, CI, 빌드 설정처럼 기능이 아닌 작업입니다.
-labels: ["technical-task"]
+title: "type: "
 body:
+  - type: markdown
+    attributes:
+      value: 제목 앞의 `type:`을 아래에서 고른 작업 타입(refactor, test, docs, ci, chore)으로 바꿔 주세요. 라벨은 같은 이름으로 직접 붙입니다.
   - type: dropdown
     id: type
     attributes:
@@ -14,6 +17,13 @@ body:
         - chore
     validations:
       required: true
+  - type: checkboxes
+    id: title-check
+    attributes:
+      label: 제목 확인
+      options:
+        - label: 제목의 `type:`을 고른 작업 타입으로 바꿨다
+          required: true
   - type: textarea
     id: purpose
     attributes:

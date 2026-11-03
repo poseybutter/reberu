@@ -1,7 +1,7 @@
-name: 버그
+name: 버그 수정
 description: 잘못된 동작을 알립니다.
 title: "fix: "
-labels: ["bug"]
+labels: ["fix"]
 body:
   - type: textarea
     id: problem
