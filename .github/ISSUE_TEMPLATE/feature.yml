@@ -1,0 +1,48 @@
+name: 기능
+description: 새 기능을 제안합니다.
+title: "feat: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: purpose
+    attributes:
+      label: 목적
+      description: 누가 왜 이 기능이 필요한지 적습니다.
+    validations:
+      required: true
+  - type: textarea
+    id: work
+    attributes:
+      label: 작업 내용
+      placeholder: |
+        - API:
+        - DB 변경:
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: 완료 조건
+      placeholder: "- [ ] "
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 중요도
+      options:
+        - 높음
+        - 보통
+        - 낮음
+    validations:
+      required: true
+  - type: dropdown
+    id: size
+    attributes:
+      label: 규모
+      options:
+        - S (반나절 이하)
+        - M (하루 정도)
+        - L (이틀 이상)
+    validations:
+      required: true
