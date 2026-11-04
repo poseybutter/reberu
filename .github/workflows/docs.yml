@@ -1,0 +1,33 @@
+name: Docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".github/scripts/check_doc_headers.py"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  doc-headers:
+    name: 문서 머리말 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 기준 브랜치와 비교하려면 전체 이력 필요
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # 커밋 값은 env로 넘겨 스크립트 인자에 직접 끼워 넣지 않음
+      - name: 버전·수정일 확인
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/check_doc_headers.py "$BASE_SHA" "$HEAD_SHA"
