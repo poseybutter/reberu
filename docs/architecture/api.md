@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.1.0\
+> 버전: v0.2.0\
 > 수정일: 2026-11-05
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -92,7 +92,7 @@
 | --- | --- | --- |
 | API-CON-01 | 잠금(`version`)이 있는 자원의 수정 요청은 본문에 읽은 `version`을 담는다. 다르면 `409 VERSION_CONFLICT`이고 화면은 최신 값을 다시 불러온다 | 필수 |
 | API-CON-02 | 이미 다른 사람이 처리한 승인·거절·취소·수락에는 `409 ALREADY_PROCESSED`로 응답한다(UX-SCR-012). 같은 사람이 같은 행동을 다시 보내도 같다 | 필수 |
-| API-CON-03 | 자원을 만드는 `POST`(조직, 팀, 초대, 초대 링크, 직무 유형)는 `Idempotency-Key` 헤더(UUID)를 받는다. 같은 계정·같은 키의 두 번째 요청은 처음 응답을 그대로 돌려주고 다시 만들지 않는다(OQ-60). 키에 다른 본문을 보내면 `400 INVALID_REQUEST`다 | 필수 |
+| API-CON-03 | 자원을 만드는 `POST`(조직, 팀, 초대, 초대 링크, 직무 유형)는 `Idempotency-Key` 헤더(UUID)를 받는다. 같은 계정·같은 키의 두 번째 요청은 처음 응답을 그대로 돌려주고 다시 만들지 않는다. 키에 다른 본문을 보내면 `400 INVALID_REQUEST`다 | 필수 |
 | API-CON-05 | 토큰 원문이 담긴 응답(초대 링크 만들기)은 중복 요청 기록에 저장하지 않는다. 같은 키의 두 번째 요청에는 `409 ALREADY_PROCESSED`로 응답하고 토큰을 다시 보내지 않는다(TEN-LINK-04) | 필수 |
 | API-CON-04 | 마지막 관리자를 없애는 요청은 `409 LAST_ADMIN_REQUIRED`로 거부한다(TEN-INV-20). 화면은 이 코드로 "관리자가 한 명은 있어야 해요"를 보인다 | 필수 |
 
@@ -109,7 +109,7 @@
 | 조직 관리자 | 그 조직의 조직 관리자 |
 | 팀 멤버 | TeamContext 통과(그 팀 멤버십, 또는 조직 관리자) |
 | 팀 관리자 | 그 팀의 `TEAM_ADMIN` 또는 조직 관리자 |
-| 운영자 | 배포 설정으로 정한 운영자 계정(OQ-26) |
+| 운영자 | 배포 설정(환경 변수)으로 정한 운영자 계정 |
 | 🔒 | 최근 인증 필요(SEC-SESS-10). 지났으면 `401 REAUTH_REQUIRED` |
 | 제한 | 적용하는 요청 제한 ID([architecture/security.md](security.md) §13.2). 표에 없으면 SEC-RATE-08 |
 
@@ -187,7 +187,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/orgs` | 조직 만들기. 본문 `name`, `tagline`, `visibility`, `timeZone`, `firstTeam { name, jobTypeKey }`(`jobTypeKey`는 기본 직무 유형, OQ-16). 처리는 [architecture/tenancy.md](tenancy.md) §8.1 | 계정 | `201`, 제한 SEC-RATE-05, `409 LIMIT_EXCEEDED`, `Idempotency-Key` |
+| `POST` | `/api/orgs` | 조직 만들기. 본문 `name`, `tagline`, `visibility`, `timeZone`, `firstTeam { name, jobTypeKey }`(`jobTypeKey`는 기본 직무 유형, [architecture/tenancy.md](tenancy.md) §12). 처리는 [architecture/tenancy.md](tenancy.md) §8.1 | 계정 | `201`, 제한 SEC-RATE-05, `409 LIMIT_EXCEEDED`, `Idempotency-Key` |
 | `GET` | `/api/default-job-types` | 조직 만들기에서 고를 기본 직무 유형 목록(key, 이름, 설명) | 계정 | A4 |
 | `GET` | `/api/public-orgs?q=` | 공개 조직 찾기. 두 글자 이상, 최대 20개, 이름·한 줄 소개·가입 방식만(SEC-ORG-03). `PUBLIC`·`ACTIVE`이고 가입 요청이 켜진 조직만 | 계정 | 제한 SEC-RATE-06 |
 | `POST` | `/api/public-orgs/{orgId}/join` | 가입 요청 또는 바로 가입. 결과 `REQUESTED` 또는 `JOINED` | 계정 | 제한 SEC-RATE-04, 재요청 대기 중이면 `409 REQUEST_COOLDOWN` |
@@ -218,7 +218,7 @@
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/remove` | 조직에서 내보내기 | 조직 관리자 🔒 | 마지막 관리자 `409` |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/grant-org-admin`, `/revoke-org-admin` | 조직 관리자 지정·해제. 손님은 지정 불가(TEN-INV-07) | 조직 관리자 🔒 | 지정 직후 대상의 세션 ID 재발급(SEC-SESS-03) |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/convert-to-member` | 손님을 구성원으로 바꾸기(TEN-GUEST-07) | 조직 관리자 🔒 | |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/extend-guest` | 손님 이용 기간 연장. 본문 `teamId`, `days`(상한 TEN-GUEST-03) | 조직 관리자 🔒 | OQ-61 |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/extend-guest` | 손님 이용 기간 연장. 본문 `teamId`, `days`(상한 TEN-GUEST-03) | 조직 관리자 🔒 | 연장 요청 API는 없다. 팀 관리자는 조직 관리자에게 직접 알린다 |
 | `GET` | `/api/orgs/{orgId}/join-requests` | 조직 가입 요청과 팀 관리자 링크로 온 새 구성원 확인 대기(TEN-ADM-01) | 조직 관리자 | F5 |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/approve` | 승인. 선택 `teamId`, `role`(`TEAM_MEMBER`·`VIEWER`) | 조직 관리자 | `409 ALREADY_PROCESSED` |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/reject` | 거절 | 조직 관리자 | |
@@ -300,7 +300,7 @@ v0.2 이후 API는 그 단계를 시작할 때 이 문서에 더한다. 주소�
 | `POST` | `/api/operator/orgs/{orgId}/suspend` | 조직 정지. 본문 `reason`(운영 기록용, 200자) | 운영자 🔒 | SEC-ORG-12 |
 | `POST` | `/api/operator/orgs/{orgId}/unsuspend` | 정지 해제 | 운영자 🔒 | |
 
-- API-OPS-01 (필수): 운영자 API는 조직 식별자와 상태만 다룬다. 조직·팀의 업무 데이터, 구성원 목록, 이메일을 돌려주지 않는다(SEC-ORG-12, OQ-26). 운영자 행동은 모두 활동 기록에 남긴다.
+- API-OPS-01 (필수): 운영자 API는 조직 식별자와 상태만 다룬다. 조직·팀의 업무 데이터, 구성원 목록, 이메일을 돌려주지 않는다(SEC-ORG-12). 운영자 행동은 모두 활동 기록에 남긴다.
 - API-OPS-02 (필수): 운영자가 아닌 계정이 운영자 API를 부르면 `404 NOT_FOUND`다.
 
 ## 13. 검증

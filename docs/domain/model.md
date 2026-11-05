@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.3.0\
+> 버전: v0.4.0\
 > 수정일: 2026-11-05
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -145,7 +145,7 @@ erDiagram
 | `id` | `UUID` | ○ | |
 | `google_sub` | `TEXT(255)` | ○ | Google `sub`. 유일. 탈퇴 시 되돌릴 수 없는 해시로 바꾼다(SEC-PRIV-02) |
 | `email` | `TEXT(254)` | 탈퇴 전 ○ | 확인된 이메일, 소문자. 탈퇴 시 지운다 |
-| `display_name` | `TEXT(30)` | ○ | 표시 이름(OQ-09). 탈퇴 시 지운다 |
+| `display_name` | `TEXT(30)` | ○ | 표시 이름. 처음 값은 Google 이름이다. 탈퇴 시 지운다 |
 | `display_name_custom` | `BOOL` | ○ | 사용자가 바꿨는지. 참이면 로그인 때 Google 이름으로 덮지 않는다(TEN-AUTH-04) |
 | `picture_url` | `TEXT(1024)` | | 프로필 사진 주소 |
 | `workspace_domain` | `TEXT(253)` | | ID 토큰의 `hd`. 없으면 개인 계정(TEN-ACC-01~04) |
@@ -212,7 +212,7 @@ erDiagram
 
 ### api_idempotency_key
 
-만드는 요청의 중복 처리를 막는다([architecture/api.md](../architecture/api.md) API-CON-03, OQ-60).
+만드는 요청의 중복 처리를 막는다([architecture/api.md](../architecture/api.md) API-CON-03).
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
@@ -264,7 +264,7 @@ erDiagram
 | `ownerless` | `BOOL` | ○ | 혼자뿐인 조직 관리자가 탈퇴해 보관된 조직(기본 거짓). 참이면 복원하지 않는다([architecture/tenancy.md](../architecture/tenancy.md) §5.1) |
 | `created_by` | `UUID` | ○ | 만든 계정 |
 | `state_before_suspend` | `CODE` | | 감사용. 해제는 늘 `ACTIVE`([architecture/tenancy.md](../architecture/tenancy.md) §5.2) |
-| `deletion_scheduled_at` | `UTC_TIMESTAMP` | | 삭제 예약 시각(30일 유예, OQ-28) |
+| `deletion_scheduled_at` | `UTC_TIMESTAMP` | | 삭제 예약 시각(30일 유예, v0.3) |
 | `version` | `INT` | ○ | 잠금 |
 
 - 인덱스 후보: (`visibility`, `state`, `name`) 공개 조직 찾기(이름 앞부분 일치, TEN-DB-02).
@@ -374,7 +374,7 @@ erDiagram
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
-| `org_id` | `UUID` | ○ | 조직을 만들 때 기본 직무 유형을 복사한다(OQ-16) |
+| `org_id` | `UUID` | ○ | 조직을 만들 때 기본 직무 유형을 복사한다([architecture/tenancy.md](../architecture/tenancy.md) §12) |
 | `name` | `TEXT(40)` | ○ | |
 | `description` | `TEXT(200)` | | |
 | `hidden` | `BOOL` | ○ | 쓰는 팀이 있으면 지우지 않고 숨긴다 |
@@ -708,7 +708,7 @@ erDiagram
 | 시즌 마감 | (`team_id`, `season`, `category`) | 기록 존재 확인 + 유일 제약 |
 | 정해진 시각 알림 | (`recipient_id`, `dedupe_key`) | 유일 제약(RULE-NOTI-01) |
 | 이벤트 구독자 처리 | 구독자마다 `event_publication` 한 행 + 구독자 쪽 멱등 키(위 표의 키) | 라이브러리 완료 표시 + 유일 제약(ARCH-EVT-03, DOM-LIB-01) |
-| 만드는 API 요청 | (`account_id`, `idempotency_key`) | 유일 제약(API-CON-03, OQ-60) |
+| 만드는 API 요청 | (`account_id`, `idempotency_key`) | 유일 제약(API-CON-03) |
 | 모닝 브리핑 | (`team_id`, `account_id`, `day`) | 유일 제약(RULE-BRF-01) |
 | D-day 확인 | (`item_id`, `account_id`, `stage`, `ack_day`) | 유일 제약(RULE-CERT-01) |
 | 퀘스트 배정 | (`team_id`, `account_id`, `day`, `quest_code`) | 유일 제약 |

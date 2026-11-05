@@ -1,6 +1,6 @@
 # 프론트엔드 설계
 
-> 버전: v0.1.0\
+> 버전: v0.2.0\
 > 수정일: 2026-11-05
 
 브라우저 화면의 구조, 상태 관리, 새로고침 없이 오래 열어 두는 페이지에서 생기는 결함을 막는 규칙, 화면 쪽 보안을 정한다. 기술 선택의 근거는 [ADR-0019](../adr/0019-spa-frontend.md)다. 화면 내용은 [product/screens.md](../product/screens.md), API는 [architecture/api.md](api.md), 실시간 채널은 [architecture/realtime.md](realtime.md), 보안 요구사항은 [architecture/security.md](security.md)를 따른다. 요구사항 ID 접두어는 `FE`다.
@@ -163,7 +163,7 @@ sequenceDiagram
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
-| FE-REAUTH-01 | 🔒 행동의 확인 대화상자를 열기 전에 `GET /api/auth/session`의 인증 시각을 확인한다. 기준(OQ-29: 1시간)에서 5분 안쪽만 남았거나 지났으면 입력을 받기 전에 재인증부터 한다. 입력한 뒤에 재인증으로 페이지를 떠나 내용을 잃지 않게 한다 | 필수 |
+| FE-REAUTH-01 | 🔒 행동의 확인 대화상자를 열기 전에 `GET /api/auth/session`의 인증 시각을 확인한다. 기준(1시간, SEC-SESS-10)에서 5분 안쪽만 남았거나 지났으면 입력을 받기 전에 재인증부터 한다. 입력한 뒤에 재인증으로 페이지를 떠나 내용을 잃지 않게 한다 | 필수 |
 | FE-REAUTH-02 | 재인증은 전체 이동(`/oauth2/authorization/google?reauth=true&next=...`)으로 한다. `next`는 지금 주소이며 서버 허용 목록에 없으면 서버가 버린다(SEC-AUTH-08) | 필수 |
 | FE-REAUTH-03 | 재인증에서 돌아온 뒤 행동을 자동으로 다시 보내지 않는다. 같은 화면을 다시 열고 사용자가 다시 누른다([architecture/security.md](security.md) §7.2) | 필수 |
 
