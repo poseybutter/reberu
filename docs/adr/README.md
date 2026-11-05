@@ -1,6 +1,6 @@
 # 설계 결정 기록 (ADR)
 
-> 버전: v0.1.0\
+> 버전: v0.2.0\
 > 수정일: 2026-11-04
 
 되돌리기 어렵거나 여러 문서에 영향을 주는 결정을 남긴다. 본문 설계 문서는 "무엇을"을, ADR은 "왜 그렇게 정했는가"를 맡는다.
@@ -22,6 +22,7 @@
 | [ADR-0011](0011-no-exp-for-rest.md) | 휴식에 EXP를 주지 않음 | Accepted |
 | [ADR-0012](0012-chat-webhook-notifications.md) | 외부 알림: Google Chat 웹훅, 계정 종류 구분 | Accepted |
 | [ADR-0013](0013-shared-db-portable-sql.md) | DB: 공유 테이블, 세 DB 호환, 조직 단위 이관 | Accepted |
+| [ADR-0014](0014-module-architecture.md) | 모듈 구조: 단방향 의존, 이벤트 저장소, 시작 검증 | Accepted |
 
 ## 2. 규칙
 
