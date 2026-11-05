@@ -1,33 +1,36 @@
 # 백엔드 규칙
 
+> 버전: v0.1.0\
+> 수정일: 2026-11-04
+
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
 
 ## 1. 확정한 기술 결정
 
 - Java 17 (Microsoft Build of OpenJDK), Spring Boot 4.1.2, Gradle Kotlin DSL
 - 패키징은 JAR, 내장 Tomcat 사용
-- PostgreSQL, Spring Data JPA, Flyway
+- DB는 PostgreSQL을 기준으로 하고 MySQL·MariaDB와 호환되게 씁니다([ADR-0013](../adr/0013-shared-db-portable-sql.md)). 관리형 PostgreSQL은 DB 서버로만 씁니다
+- Spring Data JPA, Flyway
 - Spring Security, Google OAuth2 로그인, 서버 세션 방식
 - 브라우저는 REST API만 호출하고 DB에 직접 접근하지 않음
-- 테스트는 JUnit과 Testcontainers로 실제 PostgreSQL을 사용
+- 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. 지금은 PostgreSQL이고, MySQL·MariaDB 테스트는 의존성 추가 승인 뒤 CI에 더합니다
 - Lombok, Spotless는 현재 사용하지 않음
 
-이 목록을 바꾸려면 먼저 이슈로 논의하고, 바뀐 내용을 이 문서에 반영합니다.
+이 목록을 바꾸려면 [`docs/adr/`](../adr/README.md)에 ADR을 남기고, 바뀐 내용을 이 문서에 반영합니다. 의존성 추가·변경은 따로 승인을 받습니다.
 
 ## 2. 패키지와 계층
 
-최상위 패키지 `reberu` 아래를 도메인별로 나눕니다.
+최상위 패키지 `reberu` 아래를 core, 고정 기능, 모듈 세 단위로 나눕니다. 전체 패키지 목록, 의존 방향, 도메인 이벤트, 모듈 계약은 [`architecture/modules.md`](../architecture/modules.md)를 따릅니다([ADR-0014](../adr/0014-module-architecture.md)).
 
-| 패키지 | 내용 |
-| --- | --- |
-| `auth` | 로그인, 세션, 현재 사용자 |
-| `team` | 팀과 팀원 |
-| `project` | 프로젝트 |
-| `task` | 업무 |
-| `score` | 점수, 레벨 같은 게임 요소 |
-| `global` | 보안 설정, 전역 예외 처리, 공통 응답처럼 도메인에 속하지 않는 것 |
+| 단위 | 패키지 | 내용 |
+| --- | --- | --- |
+| core | `reberu.core.*` | 계정, 조직·팀·멤버십, 인증, 권한 판정, 모듈 레지스트리, 도메인 이벤트, 알림 전달, 실시간, 근무일, 활동 기록, 공통 응답·예외·보안 설정 |
+| 고정 기능 | `reberu.task`, `reberu.project`, `reberu.todo`, `reberu.report`, `reberu.attendance`, `reberu.progression` | 모든 팀에 늘 있는 업무 기능 |
+| 모듈 | `reberu.module.*` | 켜고 끄는 기능(칭찬, 공간, 외부 알림 등) |
 
-각 도메인 안은 계층별로 나눕니다. 필요한 계층만 만듭니다.
+- 의존은 모듈 → 고정 기능 → core 한 방향만 허용합니다. 아키텍처 테스트가 이를 검사합니다.
+
+각 단위 안은 계층별로 나눕니다. 필요한 계층만 만듭니다.
 
 ```text
 team/
@@ -40,7 +43,9 @@ team/
 ```
 
 - controller는 repository를 직접 부르지 않습니다.
-- 다른 도메인의 기능이 필요하면 그 도메인의 service를 부릅니다. 다른 도메인의 repository와 entity 내부를 직접 다루지 않습니다.
+- 다른 단위의 기능이 필요하면 그 단위 최상위 패키지의 공개 API(조회 인터페이스, 이벤트 레코드)만 씁니다. 다른 단위의 service 구현, repository, entity를 직접 다루지 않습니다.
+- 다른 단위의 데이터 변화에 반응할 때는 직접 호출하지 않고 도메인 이벤트를 구독합니다.
+- 엔티티는 다른 단위의 엔티티를 연관관계로 가리키지 않고 식별자로만 가리킵니다.
 - 비즈니스 규칙은 가능하면 entity 메서드에 둡니다. service는 흐름을 조립합니다.
 
 ## 3. JPA와 트랜잭션
@@ -71,7 +76,7 @@ team/
 
 ## 6. 테스트
 
-- DB가 필요한 테스트는 Testcontainers로 실제 PostgreSQL을 띄웁니다. H2 같은 임베디드 DB는 쓰지 않습니다. 운영과 같은 DB에서 Flyway 마이그레이션까지 함께 검증하기 위해서입니다.
+- DB가 필요한 테스트는 Testcontainers로 실제 DB를 띄웁니다. H2 같은 임베디드 DB는 쓰지 않습니다. 운영과 같은 DB에서 Flyway 마이그레이션까지 함께 검증하기 위해서입니다.
 - 테스트 종류별 기준은 다음과 같습니다.
 
 | 종류 | 도구 | 쓰는 경우 |
@@ -96,7 +101,8 @@ team/
 ### service
 - 트랜잭션 경계와 `readOnly` 설정이 맞는가
 - 다른 사람의 팀이나 업무에 접근하는 경우를 막는가
-- 다른 도메인의 repository를 직접 쓰지 않는가
+- 다른 단위의 repository·entity를 직접 쓰지 않는가, 의존 방향(모듈 → 고정 기능 → core)을 지키는가
+- 팀 소속 자원을 팀 식별자와 함께 조회하는가
 
 ### repository
 - 목록 조회에서 N+1이 생기지 않는가
