@@ -1,6 +1,6 @@
 # 보안 설계
 
-> 버전: v0.2.0\
+> 버전: v0.3.0\
 > 수정일: 2026-11-05
 
 reberu의 보안 요구사항과 검증 기준을 정한다. 요구사항 ID 접두어는 `SEC`다. 테넌시·멤버십 규칙은 [architecture/tenancy.md](tenancy.md), 실시간 채널 규칙은 [architecture/realtime.md](realtime.md)를 따른다.
@@ -251,7 +251,7 @@ flowchart TD
 | SEC-AUTHZ-07 | 역할 변경, 조직 관리자 지정, 정지는 각각 전용 API로만 한다. 일반 수정 API로 역할·관리자 여부·소속을 바꿀 수 없다 | 필수 |
 | SEC-AUTHZ-08 | 손님 제약(초대받은 팀만, 관리자 불가, 조직 정보·공개 팀 목록·조직 구성원 목록 불가, 이용 기간)은 역할 확인보다 먼저 적용한다 | 필수 |
 | SEC-AUTHZ-09 | 조직 관리자 권한은 자기 조직 안에서만 유효하다. 다른 조직에는 아무 권한이 없다 | 필수 |
-| SEC-AUTHZ-10 | 저장 시 참조 무결성을 확인한다: 업무의 프로젝트·담당자, 회의 참석자, 초대의 팀은 모두 같은 팀(또는 같은 조직)의 것이어야 한다 | 필수 |
+| SEC-AUTHZ-10 | 저장 시 참조 무결성을 확인한다: 업무의 프로젝트·담당자, 프로젝트 멤버, 초대의 팀은 모두 같은 팀(또는 같은 조직)의 것이어야 한다 | 필수 |
 | SEC-AUTHZ-11 | "마지막 조직 관리자", "마지막 팀 관리자"를 없애는 변경은 거부한다. 동시에 두 요청이 와도 지켜지도록 잠금 또는 조건부 갱신으로 처리한다 | 필수 |
 | SEC-AUTHZ-12 | 화면에서 숨긴 버튼과 별개로 서버가 모든 권한을 다시 확인한다 | 필수 |
 
@@ -346,13 +346,15 @@ flowchart TD
 | --- | --- | --- |
 | SEC-OUTPUT-01 | 화면은 사용자 글을 텍스트로 렌더링한다. 서식 있는 글만 정리된 HTML로 렌더링한다 | 필수 |
 | SEC-OUTPUT-02 | 사용자가 넣은 링크는 `rel="noopener noreferrer"`와 새 창으로 연다 | 필수 |
-| SEC-OUTPUT-03 | 오류 응답은 `{ code, message, traceId }`만 담는다. 예외 메시지, 스택, SQL, 경로, 클래스 이름을 담지 않는다 | 필수 |
+| SEC-OUTPUT-03 | 오류 응답은 `{ code, message, traceId }`만 담는다. `400 INVALID_REQUEST`만 칸별 오류 `fields`(칸 이름과 정해진 사유 코드)를 더 담는다([architecture/api.md](api.md) §3.2). 예외 메시지, 스택, SQL, 경로, 클래스 이름, 입력 값을 담지 않는다 | 필수 |
 | SEC-OUTPUT-04 | 응답에 다른 사람의 이메일은 필요한 화면(관리 화면, 초대 목록)에서만 담는다. 동료 카드·공간·조직 공간 응답에는 이메일을 담지 않는다 | 필수 |
 | SEC-OUTPUT-05 | 오류 코드는 아래 표의 것만 쓴다. 다른 문서가 정한 오류도 이 표에 모은다 | 필수 |
 
 | HTTP | `code` | 쓰는 경우 | 정한 곳 |
 | --- | --- | --- | --- |
+| 400 | `INVALID_REQUEST` | 형식·길이·허용 값 위반, DTO에 없는 필드, 잘못된 JSON·커서, 같은 중복 방지 키에 다른 본문 | SEC-INPUT-01, SEC-AUTHZ-06, [architecture/api.md](api.md) §3 |
 | 401 | `UNAUTHENTICATED` | 로그인하지 않음, 세션 만료 | §7 |
+| 401 | `CONSENT_REQUIRED` | 가입 대기 세션으로 동의 밖의 API를 부름 | TEN-AUTH-02 |
 | 401 | `REAUTH_REQUIRED` | 최근 인증이 필요한 행동인데 인증 시각이 기준을 넘음 | §7.2 |
 | 403 | `CSRF_INVALID` | 상태를 바꾸는 요청에 CSRF 토큰이 없거나 틀림 | SEC-SESS-09 |
 | 403 | `FORBIDDEN_ACTION` | 볼 수 있는 자원에 허용되지 않은 행동 | §9.2 |
@@ -361,8 +363,12 @@ flowchart TD
 | 409 | `VERSION_CONFLICT` | 요청의 버전이 저장된 버전과 다름 (업무, 리포트 공지 칸) | [domain/rules.md](../domain/rules.md) RULE-TASK-05 |
 | 409 | `REPORT_LOCKED` | 편집 마감이 지난 리포트 공지 칸 쓰기 | [domain/rules.md](../domain/rules.md) RULE-RPT-05 |
 | 409 | `LIMIT_EXCEEDED` | 개수 상한 초과 (계정당 조직 수 등) | [architecture/tenancy.md](tenancy.md) §8.1 |
+| 409 | `ALREADY_PROCESSED` | 이미 처리된 승인·거절·취소·수락, 토큰 응답의 중복 요청 | [architecture/api.md](api.md) API-CON-02·05 |
+| 409 | `LAST_ADMIN_REQUIRED` | 마지막 조직·팀 관리자를 없애는 변경 | TEN-INV-20 |
+| 409 | `REQUEST_COOLDOWN` | 거절 뒤 7일 안의 가입 재요청 | TEN-REQ-02 |
 | 413 | `PAYLOAD_TOO_LARGE` | 요청 본문 상한 초과 | SEC-INPUT-03 |
 | 429 | `RATE_LIMITED` | 요청 제한 초과 | §13.2 |
+| 500 | `INTERNAL_ERROR` | 예상하지 못한 서버 오류. 원인은 서버 로그에만 남긴다 | SEC-OUTPUT-03 |
 
 실시간 명령의 오류(`RATE_LIMITED`, `SPACE_FULL`, `SEAT_TAKEN` 등)는 [architecture/realtime.md](realtime.md) §3.3을 따른다.
 
@@ -370,7 +376,7 @@ flowchart TD
 
 | ID | 헤더 | 값 | 수준 |
 | --- | --- | --- | --- |
-| SEC-HDR-02 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' wss://<배포 호스트>; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'` (인라인 스크립트 금지) | 필수 |
+| SEC-HDR-02 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self'; worker-src 'self'; connect-src 'self' wss://<배포 호스트>; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types reberu-html` (인라인 스크립트·`eval` 금지. Trusted Types 정책은 서식 있는 글 하나, [architecture/frontend.md](frontend.md) FE-XSS-02) | 필수 |
 | SEC-HDR-03 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | 필수 |
 | SEC-HDR-04 | `X-Content-Type-Options` | `nosniff` | 필수 |
 | SEC-HDR-05 | `Referrer-Policy` | `strict-origin-when-cross-origin` | 필수 |

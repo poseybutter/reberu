@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.2.0\
+> 버전: v0.3.0\
 > 수정일: 2026-11-05
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -59,7 +59,7 @@
 | --- | --- | --- |
 | 지우지 않음(상태로 표현) | 조직, 팀, 멤버십, 초대, 프로젝트(보관), 직무 유형(숨김) | 상태 전이로만 바꾼다 |
 | 소프트 삭제(`deleted_at`) | 업무, 업무 세부 항목, 오늘의 할 일, 산길 돌탑 말 | 목록에서 빠지고 활동 기록·원장의 참조는 남는다 |
-| 물리 삭제 | 완료된 이벤트 발행 기록·보낸 외부 발송 행(보관 기간 뒤), 만료된 세션과 가입 대기 세션, 30일 지난 돌탑 말(OQ-23), 조직이 `DELETED`가 될 때 그 조직의 모든 데이터 | 서버 작업으로만 지운다 |
+| 물리 삭제 | 완료된 이벤트 발행 기록·보낸 외부 발송 행(보관 기간 뒤), 만료된 세션과 가입 대기 세션, 만료된 중복 요청 방지 키, 30일 지난 돌탑 말(OQ-23), 조직이 `DELETED`가 될 때 그 조직의 모든 데이터 | 서버 작업으로만 지운다 |
 | 추가만 함 | EXP 원장, 출석, 활동 기록, 약관 동의, 휴식 기록 | 고치거나 지우는 코드 경로가 없다(RULE-ATT-05, SEC-LOG-03) |
 
 ## 2. 소속과 단위
@@ -71,6 +71,7 @@
 | 알림 설정 | `account_notification_pref` | 계정 | core.notification |
 | 세션 | `auth_session` | 계정 | core.auth |
 | 가입 대기 세션 | `auth_pending_signup` | 계정(만들기 전) | core.auth |
+| 중복 요청 방지 키 | `api_idempotency_key` | 계정 | core.support |
 | 조직 | `organization` | 조직 | core.tenancy |
 | 확인한 도메인 | `verified_domain` | 조직 | core.tenancy |
 | 조직 멤버십 | `org_membership` | 조직 | core.tenancy |
@@ -110,8 +111,6 @@
 | 업적 획득 | `achievement_unlock` | 팀 | progression |
 | 칭찬 | `praise_message` | 팀 | module.praise |
 | 꾸미기 선택 | `space_decoration` | 팀 | module.space |
-| 팀 회의 | `space_meeting` | 팀 | module.space |
-| 회의 참석 | `space_meeting_attendee` | 팀 | module.space |
 | 휴식 기록 | `healing_rest` | 팀 | module.healing |
 | 산길 걷기 | `healing_walk` | 팀 | module.healing |
 | 산길 일별 거리 | `healing_walk_daily` | 팀 | module.healing |
@@ -124,12 +123,6 @@
 | D-day 확인 | `certificate_ack` | 팀 | module.certificate |
 | 외부 알림 연결 | `outbound_connection` | 팀 | module.outbound |
 | 외부 발송 대기열 | `outbound_message` | 팀 | module.outbound |
-| 연회장 모임 | `orgspace_assembly` | 조직 | module.orgspace |
-| 모임 안건 | `orgspace_agenda` | 조직 | module.orgspace |
-| 모임 질문 | `orgspace_question` | 조직 | module.orgspace |
-| 질문 공감 | `orgspace_question_vote` | 조직 | module.orgspace |
-| 공용 회의 | `orgspace_meeting` | 조직 | module.orgspace |
-| 공용 회의 참석자 | `orgspace_meeting_attendee` | 조직 | module.orgspace |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
@@ -217,6 +210,22 @@ erDiagram
 | `invite_link_id` | `UUID` | | 링크로 들어온 경우 동의 직후 처리한다([architecture/tenancy.md](../architecture/tenancy.md) §6.3) |
 | `expires_at` | `UTC_TIMESTAMP` | ○ | |
 
+### api_idempotency_key
+
+만드는 요청의 중복 처리를 막는다([architecture/api.md](../architecture/api.md) API-CON-03, OQ-60).
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `account_id` | `UUID` | ○ | |
+| `idempotency_key` | `TEXT(36)` | ○ | 화면이 만든 UUID |
+| `request_hash` | `HASH` | ○ | 메서드, 경로, 본문의 SHA-256. 같은 키에 다른 본문이면 거부한다 |
+| `response_status` | `INT` | | 처리 중이면 비어 있다 |
+| `response_body` | `LONG_TEXT` | | 처음 응답. 토큰이 담긴 응답은 저장하지 않는다(API-CON-05) |
+| `expires_at` | `UTC_TIMESTAMP` | ○ | 만든 뒤 24시간 |
+
+- 유일: (`account_id`, `idempotency_key`). 같은 키의 동시 요청은 유일 제약으로 하나만 처리한다(TEN-DB-07).
+- 만료된 행은 서버 작업이 지운다(§1.4).
+
 ## 4. core.tenancy
 
 ```mermaid
@@ -247,7 +256,7 @@ erDiagram
 | `time_zone` | `TEXT(64)` | ○ | IANA 시간대 이름 |
 | `join_link_enabled` | `BOOL` | ○ | 초대 링크 켜기(기본 거짓, TEN-ORG-01) |
 | `member_admission_review` | `BOOL` | ○ | 팀 관리자가 들이는 새 구성원에 조직 관리자 확인(기본 참, TEN-ADM-01) |
-| `join_request_mode` | `CODE` | ○ | `OFF`·`APPROVAL`·`INSTANT`(`PUBLIC`만 켤 수 있음) |
+| `join_request_mode` | `CODE` | ○ | `OFF`(기본)·`APPROVAL`·`INSTANT`. `PUBLIC`일 때만 켤 수 있고, 공개로 바꿔도 `OFF`로 남는다. `PRIVATE`로 바꾸면 `OFF`로 되돌린다. 이미 들어온 `REQUESTED`는 조직 관리자가 처리할 때까지 남는다(TEN-JOIN-05) |
 | `guest_approval_required` | `BOOL` | ○ | 손님 초대에 조직 관리자 승인(기본 참) |
 | `guest_default_days`, `guest_max_days` | `INT` | ○ | 30, 90 |
 | `guest_orgspace_allowed` | `BOOL` | ○ | 손님 조직 공간 출입(기본 거짓) |
@@ -401,7 +410,7 @@ erDiagram
 | `org_module_setting`, `team_module_setting` | 소속 id, `module_key`, `setting_key` `TEXT(60)`, `setting_value` `TEXT(2000)`, `version` | 유일 (소속 id, `module_key`, `setting_key`). 값의 형식과 기본값은 ModuleDefinition의 설정 스키마([architecture/modules.md](../architecture/modules.md) §5.1)가 검사한다 |
 | `org_holiday` | `org_id`, `day` `LOCAL_DATE`, `name` `TEXT(40)`, `created_by` | 유일 (`org_id`, `day`) |
 | `org_activity_log`, `team_activity_log` | 소속 id, `actor_id`(계정 또는 시스템이면 비움), `action` `CODE`, `target_type` `CODE`, `target_id` `UUID`, `before_value`·`after_value` `TEXT(2000)`, `occurred_at` | 추가만(SEC-LOG-03). 인덱스 (소속 id, `occurred_at`), (소속 id, `actor_id`) |
-| `member_presence_status` | `team_id`, `account_id`, `status` `CODE`(`AVAILABLE`·`FOCUS`·`MEETING`·`AWAY`), `status_before_meeting` `CODE`, `away_by_idle` `BOOL`, `changed_at` | 유일 (`team_id`, `account_id`). 마지막 상태만 저장한다([architecture/realtime.md](../architecture/realtime.md) `status.changed`) |
+| `member_presence_status` | `team_id`, `account_id`, `status` `CODE`(`AVAILABLE`·`FOCUS`·`MEETING`·`AWAY`), `away_by_idle` `BOOL`(무활동으로 생긴 `AWAY`. 입력이 생기면 `AVAILABLE`로, UX-FLOW-12), `changed_at` | 유일 (`team_id`, `account_id`). 마지막 상태만 저장한다([architecture/realtime.md](../architecture/realtime.md) `status.changed`) |
 
 - 모듈 켜짐 기록이 있는데 배포에 모듈 코드가 없으면 꺼진 것으로 다룬다(ARCH-MOD-04). 행은 지우지 않는다.
 - 활동 기록의 값 열에 토큰, 세션, 웹훅 주소, 이메일 초대 전체 목록을 넣지 않는다(TEN-LOG-03, SEC-HOOK-03).
@@ -595,8 +604,7 @@ erDiagram
 ```mermaid
 erDiagram
     TEAM ||--o{ PRAISE_MESSAGE : "칭찬"
-    TEAM ||--o{ SPACE_MEETING : "팀 회의"
-    SPACE_MEETING ||--o{ SPACE_MEETING_ATTENDEE : "참석"
+    TEAM ||--o{ SPACE_DECORATION : "꾸미기"
     TEAM ||--o{ HEALING_REST : "휴식"
     TEAM ||--o{ HEALING_WALK : "걷기"
     TEAM ||--o{ HEALING_CAIRN : "돌탑 말"
@@ -604,9 +612,6 @@ erDiagram
     CERTIFICATE_ITEM ||--o{ CERTIFICATE_ACK : "D-day 확인"
     TEAM ||--o{ OUTBOUND_CONNECTION : "웹훅"
     OUTBOUND_CONNECTION ||--o{ OUTBOUND_MESSAGE : "발송"
-    ORGANIZATION ||--o{ ORGSPACE_ASSEMBLY : "연회장 모임"
-    ORGSPACE_ASSEMBLY ||--o{ ORGSPACE_QUESTION : "질문"
-    ORGANIZATION ||--o{ ORGSPACE_MEETING : "공용 회의"
 ```
 
 ### 8.1 praise (칭찬)
@@ -623,8 +628,8 @@ erDiagram
 | 엔티티 | 필드 | 제약 |
 | --- | --- | --- |
 | `space_decoration` | `team_id`, `account_id`, `slot` `CODE`(아바타 테두리, 이름표, 칭호, 책상 소품), `item_code` `CODE` | 유일 (`team_id`, `account_id`, `slot`). 고를 수 있는 값은 `level_reward_unlock`이 정한다 |
-| `space_meeting` | `team_id`, `title` `TEXT(100)`, `external_url` `TEXT(1024)`(`https`만), `state` `CODE`(`READY`·`IN_PROGRESS`·`ENDED`), `agenda` `LONG_TEXT`, `memo` `LONG_TEXT`, `summary` `LONG_TEXT`, `started_at`, `ended_at`, `scheduled_on` `LOCAL_DATE`(오늘 회의, 브리핑), `created_by`, `version` | 메모 동시 편집은 OQ-08. 공간 모듈 소속(OQ-42) |
-| `space_meeting_attendee` | `team_id`, `meeting_id`, `account_id`, `joined_at`, `left_at` | 유일 (`meeting_id`, `account_id`) |
+
+- 회의 기록 테이블은 없다(ADR-0015). 회의실(B4)의 외부 회의 링크는 팀 설정 값이다(E4, `team_module_setting`의 `space`, `meeting_url`). 주소는 `https`만 받는다(SEC-INPUT-05).
 
 ### 8.3 healing (힐링 존)
 
@@ -677,14 +682,7 @@ erDiagram
 
 ### 8.9 orgspace (조직 공간)
 
-| 엔티티 | 필드 | 제약 |
-| --- | --- | --- |
-| `orgspace_assembly` | `org_id`, `title` `TEXT(100)`, `starts_at`, `host_id`, `presenter_ids` `TEXT(400)`, `external_url`, `state` `CODE`(`SCHEDULED`·`IN_PROGRESS`·`ENDED`·`CANCELLED`), `current_agenda` `INT`, `summary` `LONG_TEXT`, `attendee_count` `INT`, `version` | 조직 소속. 팀 데이터를 가리키지 않는다(TEN-ISO-05) |
-| `orgspace_agenda` | `org_id`, `assembly_id`, `sort_order` `INT`, `title` `TEXT(100)` | |
-| `orgspace_question` | `org_id`, `assembly_id`, `author_id`, `anonymous` `BOOL`, `body` `TEXT(300)`, `answered` `BOOL`, `vote_count` `INT` | 익명이어도 `author_id`는 저장한다(남용 대응). 화면에는 보이지 않는다 |
-| `orgspace_question_vote` | `org_id`, `question_id`, `account_id` | 유일 (`question_id`, `account_id`) |
-| `orgspace_meeting` | `org_id`, `title`, `external_url`, `state`, `agenda`, `memo`, `summary`, `created_by`, `version` | 참석자와 조직 관리자만 본다 |
-| `orgspace_meeting_attendee` | `org_id`, `meeting_id`, `account_id`, `team_name_snapshot` `TEXT(40)` | 유일 (`meeting_id`, `account_id`). 팀은 이름 값만 담는다(DOM-OWN-02) |
+- 테이블이 없다. 광장(B9)과 연회장(B10)의 위치, 앉은 자리, 리액션, 건배는 저장하지 않는다(§9, ADR-0015). 조직 공간 설정(정원 등)은 `org_module_setting`(`orgspace`)이다.
 
 ## 9. 저장하지 않는 것
 
@@ -693,8 +691,7 @@ erDiagram
 | 아바타 위치·앉은 자리 | 서버 메모리 | ADR-0010, [architecture/realtime.md](../architecture/realtime.md) §7 |
 | 접속 여부, 지금 있는 공간 | 서버 메모리 | `presence.*` |
 | 라운지 채팅 | 서버 메모리, 당일만 | OQ-10 |
-| 리액션, 차 마시기, 장작, 요가 동작, 건배, 손들기, 단상 | 저장 안 함 | `reaction.sent` 등 |
-| 회의 메모 편집 중 표시 | 저장 안 함 | `meeting.note-editing` |
+| 리액션, 차 마시기, 장작, 요가 동작, 건배 | 저장 안 함 | `reaction.sent`, `hall.toast` 등 |
 | 산길 자동 걷기 진행도 | 서버 메모리 | `trail.progress`. 거리만 일별로 쌓는다 |
 | 업적 정의, 레벨 보상 목록, 퀘스트 목록, 직무 유형 기본 묶음 | 코드 | 버전과 함께 배포된다 |
 | 리포트 집계, 퇴근 요약, 모닝 브리핑 내용, 오늘 요약 | 계산 | RULE-RPT-02, RULE-LEAVE-02, 이 문서 §8.6 |
@@ -710,7 +707,8 @@ erDiagram
 | 업적 | (`team_id`, `account_id`, `achievement_code`) | 유일 제약 |
 | 시즌 마감 | (`team_id`, `season`, `category`) | 기록 존재 확인 + 유일 제약 |
 | 정해진 시각 알림 | (`recipient_id`, `dedupe_key`) | 유일 제약(RULE-NOTI-01) |
-| 이벤트 구독자 처리 | (`event_id`, `subscriber`) | 유일 제약(ARCH-EVT-03) |
+| 이벤트 구독자 처리 | 구독자마다 `event_publication` 한 행 + 구독자 쪽 멱등 키(위 표의 키) | 라이브러리 완료 표시 + 유일 제약(ARCH-EVT-03, DOM-LIB-01) |
+| 만드는 API 요청 | (`account_id`, `idempotency_key`) | 유일 제약(API-CON-03, OQ-60) |
 | 모닝 브리핑 | (`team_id`, `account_id`, `day`) | 유일 제약(RULE-BRF-01) |
 | D-day 확인 | (`item_id`, `account_id`, `stage`, `ack_day`) | 유일 제약(RULE-CERT-01) |
 | 퀘스트 배정 | (`team_id`, `account_id`, `day`, `quest_code`) | 유일 제약 |
