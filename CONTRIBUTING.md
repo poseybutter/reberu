@@ -77,10 +77,11 @@ GitHub 라벨도 이 7개만 씁니다. 이슈와 PR에는 제목의 타입과 �
 | 위치 | 주인 | 버전 규칙 |
 | --- | --- | --- |
 | `src/main/resources/db/migration/core` | 업스트림 | 정수 버전만 사용: `V1__`, `V2__`, `V3__` |
+| `src/main/resources/db/migration/vendor/{postgresql,mysql,mariadb}` | 업스트림 | core와 같은 정수 버전 순서. 세 DB의 문법이 달라 공통으로 쓸 수 없는 변경만 둡니다. 한 버전은 core에 있거나, 세 DB 폴더 모두에 있습니다 |
 | `src/main/resources/db/migration/company` | 복사한 저장소 | 마지막 core 버전 뒤에 소수 버전: `V2_1__`, `V2_2__` |
 
-- 업스트림의 `application.yml`에는 `core` 위치만 있습니다. 복사한 저장소는 이 파일을 고치지 않고, 아래 두 방법 중 하나로 `company` 위치를 추가합니다.
-  - 환경 변수: 실행 환경에 `SPRING_FLYWAY_LOCATIONS=classpath:db/migration/core,classpath:db/migration/company`를 설정합니다. `core`도 함께 적어야 합니다. 이 값이 `application.yml`의 값을 대신하기 때문입니다.
+- 업스트림의 `application.yml`에는 `core`와 `vendor/{vendor}` 위치만 있습니다. `{vendor}`는 Spring Boot가 연결한 DB 종류로 바꿉니다. 복사한 저장소는 이 파일을 고치지 않고, 아래 두 방법 중 하나로 `company` 위치를 추가합니다.
+  - 환경 변수: 실행 환경에 `SPRING_FLYWAY_LOCATIONS=classpath:db/migration/core,classpath:db/migration/vendor/{vendor},classpath:db/migration/company`를 설정합니다. `core`와 `vendor/{vendor}`도 함께 적어야 합니다. 이 값이 `application.yml`의 값을 대신하기 때문입니다.
   - 전용 프로필: 복사한 저장소에만 `src/main/resources/application-company.yml`을 만들고, 실행할 때 `SPRING_PROFILES_ACTIVE=company`로 켭니다.
 
     ```yaml
@@ -88,10 +89,11 @@ GitHub 라벨도 이 7개만 씁니다. 이슈와 PR에는 제목의 타입과 �
       flyway:
         locations:
           - classpath:db/migration/core
+          - classpath:db/migration/vendor/{vendor}
           - classpath:db/migration/company
     ```
 
-- company 마이그레이션은 작성 시점의 마지막 core 버전에 소수 버전을 붙입니다. 마지막 core가 `V2`라면 `V2_1__`, `V2_2__` 순서로 씁니다. 나중에 업스트림이 `V3`를 내도 `V3`가 더 크므로 순서가 꼬이지 않습니다.
+- company 마이그레이션은 작성 시점의 마지막 업스트림 버전(core와 vendor 중 가장 큰 정수 버전)에 소수 버전을 붙입니다. 마지막 core가 `V2`라면 `V2_1__`, `V2_2__` 순서로 씁니다. 나중에 업스트림이 `V3`를 내도 `V3`가 더 크므로 순서가 꼬이지 않습니다.
 - 이미 적용된 마이그레이션 파일은 수정하지 않습니다. 고쳐야 하면 새 버전 파일을 추가합니다. 적용된 파일을 바꾸면 Flyway가 checksum 불일치로 실행을 멈춥니다.
 
 ## 4. 코드 작성
@@ -118,7 +120,10 @@ GitHub 라벨도 이 7개만 씁니다. 이슈와 PR에는 제목의 타입과 �
 - 테스트 본문은 Given-When-Then 순서로 나눕니다.
 - 내부 구현이 아니라 관찰할 수 있는 동작(응답, 저장된 상태, 발생한 예외)을 검증합니다.
 - 버그를 고칠 때는 그 버그를 재현하는 회귀 테스트를 먼저 추가합니다.
-- 테스트 이름은 무엇을 검증하는지 한국어로 드러나게 씁니다. 예: `@DisplayName("이미 출석한 날에는 다시 출석할 수 없다")`
+- 테스트 이름은 `@DisplayName`에 무엇을 검증하는지 한국어 명사형으로 씁니다. 메서드 이름은 영어 camelCase입니다.
+  - 권장: `@DisplayName("이미 출석한 날 재출석 거부")`
+  - 지양: `@DisplayName("이미 출석한 날에는 다시 출석할 수 없다")`(문장형)
+- 예외 메시지, 검증 실패 설명(`as(...)`), 빌드 오류 메시지처럼 코드 안에 쓰는 한국어 문구도 명사형으로 짧게 씁니다.
 
 ## 7. 예외와 로그
 

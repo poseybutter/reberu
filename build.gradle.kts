@@ -58,6 +58,12 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+val testDb = providers.gradleProperty("testDb").getOrElse("postgresql")
+require(testDb in setOf("postgresql", "mysql", "mariadb")) {
+    "testDb 값 오류(postgresql, mysql, mariadb 중 하나): $testDb"
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
+    systemProperty("reberu.test.db", testDb)
 }
