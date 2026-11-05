@@ -1,9 +1,9 @@
 # 모듈 구조
 
-> 버전: v0.1.0\
-> 수정일: 2026-11-04
+> 버전: v0.2.0\
+> 수정일: 2026-11-05
 
-백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md)와 [ADR-0014](../adr/0014-module-architecture.md)를 따른다. 요구사항 ID 접두어는 `ARCH`다.
+백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
 ## 1. 원칙
 
@@ -121,24 +121,28 @@ flowchart BT
 
 ### 4.1 발행과 전달
 
+이벤트 저장소와 전달은 Spring Modulith의 이벤트 발행 기록으로 구현한다([ADR-0016](../adr/0016-spring-modulith-events.md)). 표 구조는 [domain/model.md](../domain/model.md) §6 `event_publication`이다.
+
 ```mermaid
 sequenceDiagram
     participant S as 발행하는 서비스
     participant DB as DB
-    participant D as core 이벤트 전달기
+    participant D as 이벤트 발행 기록(Spring Modulith)
+    participant G as core 모듈 켜짐 확인
     participant L as 구독자(다른 단위)
     S->>DB: 업무 상태 변경 (트랜잭션 시작)
-    S->>DB: 같은 트랜잭션에서 이벤트 기록(이벤트 저장소)
+    S->>D: 이벤트 발행
+    D->>DB: 같은 트랜잭션에서 구독자마다 발행 기록
     S->>DB: 커밋
-    D->>DB: 커밋된 미처리 이벤트 읽기
-    D->>D: 구독자마다 모듈 켜짐 확인
-    alt 구독자의 모듈이 그 팀에서 켜짐
-        D->>L: 이벤트 전달
+    D->>G: 커밋 뒤 구독자마다 전달
+    alt 구독자의 모듈이 그 범위에서 켜짐
+        G->>L: 이벤트 전달
         L->>DB: 구독자 트랜잭션에서 처리(멱등)
         L-->>D: 성공
-        D->>DB: 그 구독자에 대해 완료 기록
+        D->>DB: 그 구독자의 기록을 완료로 표시
     else 꺼짐
-        D->>DB: 건너뜀으로 기록
+        G-->>D: 처리 없이 성공
+        D->>DB: 완료로 표시
     end
 ```
 
@@ -152,8 +156,20 @@ sequenceDiagram
 | ARCH-EVT-06 | 이벤트 본문은 불변 레코드이고, 다른 단위의 엔티티가 아니라 식별자와 값만 담는다 | 필수 |
 | ARCH-EVT-07 | 실시간 메시지([architecture/realtime.md](realtime.md))는 도메인 이벤트의 구독자 하나로 보낸다. 실시간 전송 실패가 도메인 처리를 되돌리지 않는다 | 필수 |
 | ARCH-EVT-08 | 이벤트 저장소는 세 DB에서 같게 동작해야 한다([architecture/tenancy.md](tenancy.md) §11.4). 처리된 이벤트는 보관 기간이 지나면 정리한다 | 필수 |
+| ARCH-EVT-09 | 이벤트 레코드는 JSON으로 직렬화할 수 있는 값만 담고, 이름과 필드를 공개 계약으로 다룬다. 필드를 지우거나 뜻을 바꾸지 않고 더하기만 한다. 나중에 외부 메시지 브로커로 내보낼 때 레코드를 고치지 않기 위해서다(§4.2) | 필수 |
+| ARCH-EVT-10 | 발행하는 쪽은 Spring의 이벤트 발행 인터페이스만 쓰고, 구독하는 쪽은 core가 정한 구독 표시만 쓴다. 이벤트 저장소 구현의 클래스를 업무 코드에서 직접 부르지 않는다 | 필수 |
 
-### 4.2 주요 이벤트
+### 4.2 외부 메시지 브로커로 옮기는 경로
+
+지금은 외부 메시지 브로커(Kafka 등)를 쓰지 않는다([ADR-0014](../adr/0014-module-architecture.md)). 다음 가운데 하나가 생기면 다시 검토한다.
+
+- 모듈을 별도 서버로 떼어 내야 할 때
+- 다른 시스템이 reberu의 이벤트를 받아야 할 때
+- 이벤트 양 때문에 DB의 이벤트 발행 기록이 병목이 될 때
+
+옮길 때는 Spring Modulith의 이벤트 외부 발행 기능으로 선택한 이벤트만 브로커에 함께 내보낸다. 앱 안 구독자는 그대로 두므로 발행하는 코드와 이벤트 레코드는 바뀌지 않는다(ARCH-EVT-09, ARCH-EVT-10).
+
+### 4.3 주요 이벤트
 
 | 이벤트 | 발행 | 구독 |
 | --- | --- | --- |
@@ -261,21 +277,25 @@ flowchart TD
 
 | ID | 검증 | 방법 | 수준 |
 | --- | --- | --- | --- |
-| ARCH-TEST-01 | 의존 방향(§3.1), 순환 없음, 내부 패키지 참조 없음 | 아키텍처 테스트(ArchUnit 또는 Spring Modulith 검증) | 필수 |
+| ARCH-TEST-01 | 의존 방향(§3.1), 순환 없음, 내부 패키지 참조 없음 | Spring Modulith 구조 검증. 단위마다 허용 의존을 선언하고, 세 단위의 한 방향 규칙은 ArchUnit 규칙으로 함께 검사한다 | 필수 |
 | ARCH-TEST-02 | 모든 컨트롤러 메서드에 권한 선언, 모듈 API에는 모듈 key 선언 | 시작 검증 + 테스트 | 필수 |
 | ARCH-TEST-03 | 엔티티 소속 선언, 팀 식별자 없는 조회 메서드 없음 | 아키텍처 테스트 | 필수 |
 | ARCH-TEST-04 | 모듈마다 "꺼진 팀"에서 API 404, 이벤트 미전달, 작업 미실행, 알림·EXP 없음 | 통합 테스트 | 필수 |
 | ARCH-TEST-05 | 모듈 하나를 빼고 빌드·테스트(모듈 수만큼). 빼도 나머지가 통과 | CI 정기 작업 | 권장 |
 | ARCH-TEST-06 | 이벤트 구독자 멱등: 같은 이벤트 두 번 전달 시 결과 같음 | 통합 테스트 | 필수 |
 | ARCH-TEST-07 | 테스트용 가짜 모듈로 등록·허용·켜기·끄기·제거(PRD-MVP-12) | 통합 테스트 | 필수 |
+| ARCH-TEST-08 | 이벤트 발행 기록: 원인 롤백 시 기록 없음, 구독자 실패 시 미완료로 남고 다시 보내면 완료, 서버를 다시 켜도 미완료 기록을 이어서 전달 | 통합 테스트(세 DB) | 필수 |
+
+- Spring Modulith는 기본으로 최상위 패키지 바로 아래 패키지를 한 단위로 본다. `reberu.core.*`와 `reberu.module.*`의 하위 패키지를 각각 한 단위로 다루도록 단위 선언을 명시한다.
 
 ## 9. 단계
 
-- v0.1: core 전체 골격, 모듈 계약·레지스트리·시작 검증, 이벤트 저장소와 전달기, 테스트용 가짜 모듈, 경계 테스트(ARCH-TEST-01~03, 07).
+- v0.1: core 전체 골격, 모듈 계약·레지스트리·시작 검증, 이벤트 발행 기록과 모듈 켜짐 확인, 테스트용 가짜 모듈, 경계 테스트(ARCH-TEST-01~03, 07, 08).
 - v0.2: 고정 기능(task, project, todo, attendance, progression)과 이벤트 연결.
 - v0.3: 첫 실제 모듈(praise, outbound)과 ARCH-TEST-04·06.
 - 이후: 모듈을 더할 때마다 ARCH-TEST-04를 그 모듈에 대해 추가한다.
 
-## 10. 미결 사항
+## 10. 도구
 
-- 경계 검증과 이벤트 저장소를 Spring Modulith로 할지 직접 만들지는 OQ-55다. Spring Modulith 2.1은 Spring Boot 4.1과 맞는 판이지만, 이벤트 저장소의 MySQL·MariaDB 지원은 도입 전에 확인한다. 쓰지 않으면 ArchUnit과 직접 만든 이벤트 저장소로 같은 요구사항을 지킨다.
+- Spring Modulith 2.1.x를 쓴다. 2.1.2는 Spring Boot 4.1.2를 기준으로 만든 판이고, 이벤트 발행 기록 표를 PostgreSQL, MySQL, MariaDB마다 제공한다([ADR-0016](../adr/0016-spring-modulith-events.md)).
+- 이벤트 발행 기록 표의 DDL은 우리 Flyway 마이그레이션에 둔다. 라이브러리의 자동 스키마 생성은 쓰지 않는다(DOM-LIB-01).

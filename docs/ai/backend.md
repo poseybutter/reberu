@@ -1,7 +1,7 @@
 # 백엔드 규칙
 
-> 버전: v0.1.0\
-> 수정일: 2026-11-04
+> 버전: v0.2.0\
+> 수정일: 2026-11-05
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
 
@@ -11,9 +11,12 @@
 - 패키징은 JAR, 내장 Tomcat 사용
 - DB는 PostgreSQL을 기준으로 하고 MySQL·MariaDB와 호환되게 씁니다([ADR-0013](../adr/0013-shared-db-portable-sql.md)). 관리형 PostgreSQL은 DB 서버로만 씁니다
 - Spring Data JPA, Flyway
-- Spring Security, Google OAuth2 로그인, 서버 세션 방식
+- Spring Security, Google OAuth2 로그인, 서버 세션 방식. 세션 저장소는 Spring Session 인터페이스 위에 직접 만든 JDBC 구현이며 세션 ID를 해시로만 저장합니다([ADR-0018](../adr/0018-hashed-session-store.md))
 - 브라우저는 REST API만 호출하고 DB에 직접 접근하지 않음
 - 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. 지금은 PostgreSQL이고, MySQL·MariaDB 테스트는 의존성 추가 승인 뒤 CI에 더합니다
+- 도메인 이벤트 저장소와 경계 검증은 Spring Modulith를 씁니다([ADR-0016](../adr/0016-spring-modulith-events.md)). 외부 메시지 브로커(Kafka 등)는 쓰지 않습니다
+- 지표는 Micrometer로 내보내고 Prometheus·Grafana로 봅니다([ADR-0017](../adr/0017-prometheus-grafana.md)). 두 도구는 Compose 선택 프로필입니다
+- Spring Session, Spring Modulith, Micrometer Prometheus 의존성은 아직 추가하지 않았습니다. 구현을 시작할 때 승인을 받고 더합니다
 - Lombok, Spotless는 현재 사용하지 않음
 
 이 목록을 바꾸려면 [`docs/adr/`](../adr/README.md)에 ADR을 남기고, 바뀐 내용을 이 문서에 반영합니다. 의존성 추가·변경은 따로 승인을 받습니다.

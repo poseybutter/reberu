@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.1.0\
-> 수정일: 2026-11-04
+> 버전: v0.2.0\
+> 수정일: 2026-11-05
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -11,7 +11,7 @@
 
 | 논리 타입 | 뜻 | PostgreSQL | MySQL | MariaDB |
 | --- | --- | --- | --- | --- |
-| `UUID` | 앱이 만드는 UUID v7 | `CHAR(36)` (OQ-56) | `CHAR(36)` (OQ-56) | `CHAR(36)` (OQ-56) |
+| `UUID` | 앱이 만드는 UUID v7. 하이픈을 넣은 소문자 36자 | `CHAR(36)` | `CHAR(36)` | `CHAR(36)` |
 | `TEXT(n)` | 최대 n자 문자열. n은 [architecture/security.md](../architecture/security.md) §12.1 | `VARCHAR(n)` | `VARCHAR(n)` | `VARCHAR(n)` |
 | `LONG_TEXT` | 긴 글(정리된 서식 있는 글 등) | `TEXT` | `MEDIUMTEXT` | `MEDIUMTEXT` |
 | `INT` | 32비트 정수 | `INTEGER` | `INT` | `INT` |
@@ -59,7 +59,7 @@
 | --- | --- | --- |
 | 지우지 않음(상태로 표현) | 조직, 팀, 멤버십, 초대, 프로젝트(보관), 직무 유형(숨김) | 상태 전이로만 바꾼다 |
 | 소프트 삭제(`deleted_at`) | 업무, 업무 세부 항목, 오늘의 할 일, 산길 돌탑 말 | 목록에서 빠지고 활동 기록·원장의 참조는 남는다 |
-| 물리 삭제 | 처리된 이벤트 저장소 행·보낸 외부 발송 행(보관 기간 뒤), 만료된 세션과 가입 대기 세션, 30일 지난 돌탑 말(OQ-23), 조직이 `DELETED`가 될 때 그 조직의 모든 데이터 | 서버 작업으로만 지운다 |
+| 물리 삭제 | 완료된 이벤트 발행 기록·보낸 외부 발송 행(보관 기간 뒤), 만료된 세션과 가입 대기 세션, 30일 지난 돌탑 말(OQ-23), 조직이 `DELETED`가 될 때 그 조직의 모든 데이터 | 서버 작업으로만 지운다 |
 | 추가만 함 | EXP 원장, 출석, 활동 기록, 약관 동의, 휴식 기록 | 고치거나 지우는 코드 경로가 없다(RULE-ATT-05, SEC-LOG-03) |
 
 ## 2. 소속과 단위
@@ -89,8 +89,7 @@
 | 팀 모듈 설정 | `team_module_setting` | 팀 | core.module |
 | 팀 활동 기록 | `team_activity_log` | 팀 | core.audit |
 | 현재 상태 | `member_presence_status` | 팀 | core.realtime |
-| 도메인 이벤트 | `domain_event` | 조직 또는 팀 | core.event |
-| 이벤트 구독자 처리 | `domain_event_delivery` | 조직 또는 팀 | core.event |
+| 도메인 이벤트 발행 기록 | `event_publication` | 조직 또는 팀(이벤트 본문에 담음) | core.event |
 | 알림 | `notification` | 팀 또는 조직 | core.notification |
 | 프로젝트 | `project` | 팀 | project |
 | 프로젝트 멤버 | `project_member` | 팀 | project |
@@ -189,15 +188,22 @@ erDiagram
 
 ### auth_session
 
-서버 세션 저장소다. 구현(예: Spring Session JDBC)은 OQ-57이며, 필요한 속성만 정한다(SEC-SESS-06).
+서버 세션 저장소다. Spring Session의 저장소 인터페이스를 우리 JDBC 구현으로 채운다([ADR-0018](../adr/0018-hashed-session-store.md)). 정해진 열만 두고 임의 속성은 저장하지 않는다(SEC-SESS-06, SEC-SESS-13).
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
-| `session_id_hash` | `HASH` | ○ | 세션 ID의 해시. 원문은 저장하지 않는다 |
-| `account_id` | `UUID` | ○ | 인덱스(계정별 즉시 무효화, SEC-SESS-07) |
-| `authenticated_at` | `UTC_TIMESTAMP` | ○ | 최근 인증 판정(SEC-SESS-10) |
+| `session_id_hash` | `HASH` | ○ | 기본 키. 세션 ID의 SHA-256. 원문은 저장하지 않는다(SEC-SESS-12) |
+| `account_id` | `UUID` | | 로그인 전에는 비어 있다. 인덱스(계정별 즉시 무효화, SEC-SESS-07, 동시 세션 상한 SEC-SESS-11) |
+| `authenticated_at` | `UTC_TIMESTAMP` | | 최근 인증 판정(SEC-SESS-10) |
+| `created_at` | `UTC_TIMESTAMP` | ○ | 최대 수명의 기준 |
 | `last_used_at` | `UTC_TIMESTAMP` | ○ | 유휴 만료 |
-| `expires_at` | `UTC_TIMESTAMP` | ○ | 최대 수명 |
+| `expires_at` | `UTC_TIMESTAMP` | ○ | 유휴 만료와 최대 수명 중 이른 시각 |
+| `login_state_hash`, `login_nonce`, `login_code_verifier` | `HASH`, `TEXT(64)`, `TEXT(128)` | | 로그인 진행 값. 10분 뒤 무효, 쓰면 지운다(SEC-SESS-14) |
+| `login_return_path` | `TEXT(200)` | | 로그인 뒤 돌아갈 앱 안 경로. 상대 경로만(SEC-AUTH) |
+| `login_started_at` | `UTC_TIMESTAMP` | | |
+
+- 인덱스 후보: (`account_id`), (`expires_at`) 만료 정리.
+- 만료된 행은 서버 작업이 지운다(§1.4).
 
 ### auth_pending_signup
 
@@ -239,19 +245,21 @@ erDiagram
 | `visibility` | `CODE` | ○ | `PRIVATE`(기본)·`PUBLIC` |
 | `state` | `CODE` | ○ | `ACTIVE`·`SUSPENDED`·`ARCHIVED`·`DELETION_SCHEDULED`·`DELETED`([architecture/tenancy.md](../architecture/tenancy.md) §5.2) |
 | `time_zone` | `TEXT(64)` | ○ | IANA 시간대 이름 |
-| `join_link_enabled` | `BOOL` | ○ | 초대 링크 켜기 |
+| `join_link_enabled` | `BOOL` | ○ | 초대 링크 켜기(기본 거짓, TEN-ORG-01) |
+| `member_admission_review` | `BOOL` | ○ | 팀 관리자가 들이는 새 구성원에 조직 관리자 확인(기본 참, TEN-ADM-01) |
 | `join_request_mode` | `CODE` | ○ | `OFF`·`APPROVAL`·`INSTANT`(`PUBLIC`만 켤 수 있음) |
 | `guest_approval_required` | `BOOL` | ○ | 손님 초대에 조직 관리자 승인(기본 참) |
 | `guest_default_days`, `guest_max_days` | `INT` | ○ | 30, 90 |
 | `guest_orgspace_allowed` | `BOOL` | ○ | 손님 조직 공간 출입(기본 거짓) |
-| `invitation_ttl_days` | `INT` | ○ | 이메일 초대 수락 기한(기본 30, 최대 30) |
+| `invitation_ttl_days` | `INT` | ○ | 이메일 초대 수락 기한(기본 7, 최대 30, TEN-INVT-03) |
+| `ownerless` | `BOOL` | ○ | 혼자뿐인 조직 관리자가 탈퇴해 보관된 조직(기본 거짓). 참이면 복원하지 않는다([architecture/tenancy.md](../architecture/tenancy.md) §5.1) |
 | `created_by` | `UUID` | ○ | 만든 계정 |
 | `state_before_suspend` | `CODE` | | 감사용. 해제는 늘 `ACTIVE`([architecture/tenancy.md](../architecture/tenancy.md) §5.2) |
 | `deletion_scheduled_at` | `UTC_TIMESTAMP` | | 삭제 예약 시각(30일 유예, OQ-28) |
 | `version` | `INT` | ○ | 잠금 |
 
 - 인덱스 후보: (`visibility`, `state`, `name`) 공개 조직 찾기(이름 앞부분 일치, TEN-DB-02).
-- 불변식: TEN-INV-05, TEN-INV-13.
+- 불변식: TEN-INV-05(`ownerless`가 참인 `ARCHIVED` 조직만 예외), TEN-INV-13.
 
 ### verified_domain (도메인 자동 가입)
 
@@ -272,7 +280,8 @@ erDiagram
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `org_id` | `UUID` | ○ | 바뀌지 않는다(TEN-INV-02) |
-| `name` | `TEXT(40)` | ○ | |
+| `name` | `TEXT(40)` | ○ | 보이는 이름 |
+| `name_key` | `TEXT(40)` | ○ | 비교용 이름. 유니코드 NFKC 정규화, 앞뒤·연속 공백 정리, 소문자(TEN-DB-05) |
 | `visibility` | `CODE` | ○ | `PRIVATE`(기본)·`PUBLIC` |
 | `join_mode` | `CODE` | ○ | 공개 팀의 가입 방식 `APPROVAL`(기본)·`INSTANT`(OQ-52) |
 | `state` | `CODE` | ○ | `ACTIVE`·`ARCHIVED` |
@@ -282,6 +291,7 @@ erDiagram
 | `report_notice_titles` | `TEXT(400)` | ○ | 공지 칸 제목 목록 |
 | `version` | `INT` | ○ | 잠금 |
 
+- 유일: (`org_id`, `name_key`). 보관된 팀도 포함한다. 겉보기만 비슷한 이름으로 다른 팀을 사칭하지 못하게 비교용 이름으로 판정한다.
 - 인덱스 후보: (`org_id`, `state`).
 - 불변식: TEN-INV-02, TEN-INV-06.
 
@@ -342,11 +352,14 @@ erDiagram
 | `token_hash` | `HASH` | ○ | 유일. 원문은 저장하지 않는다(TEN-LINK-04, SEC-TOKEN) |
 | `approval_required` | `BOOL` | ○ | |
 | `role` | `CODE` | ○ | `TEAM_MEMBER`·`VIEWER`(TEN-LINK-03) |
-| `expires_at` | `UTC_TIMESTAMP` | ○ | 30일 이내(TEN-LINK-02) |
-| `max_uses` | `INT` | | 없으면 무제한 |
+| `expires_at` | `UTC_TIMESTAMP` | ○ | 기본 7일, 30일 이내(TEN-LINK-02) |
+| `max_uses` | `INT` | ○ | 필수(TEN-LINK-02). 무제한 링크는 없다 |
 | `use_count` | `INT` | ○ | 원자적 조건부 증가(TEN-LINK-01) |
 | `enabled` | `BOOL` | ○ | |
 | `created_by` | `UUID` | ○ | |
+
+- TEN-ADM-01의 "만든 사람이 조직 관리자인가"는 링크를 쓰는 시점에 `created_by`의 현재 조직 관리자 여부로 판정한다. 만든 뒤 조직 관리자에서 내려온 사람의 링크는 팀 관리자 링크로 다룬다.
+- 만든 사람이 그 팀의 팀 관리자도 조직 관리자도 아니게 되면 링크를 쓸 수 없다(TEN-LINK-05 공통 응답).
 
 ### job_type
 
@@ -397,37 +410,35 @@ erDiagram
 
 ```mermaid
 erDiagram
-    DOMAIN_EVENT ||--o{ DOMAIN_EVENT_DELIVERY : "구독자별"
+    EVENT_PUBLICATION }o--|| LISTENER : "구독자별 한 행"
     TEAM ||--o{ NOTIFICATION : "받는 곳"
     ACCOUNT ||--o{ NOTIFICATION : "받는 사람"
 ```
 
-### domain_event
+### event_publication
 
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `id` | `UUID` | ○ | 이벤트 ID |
-| `event_type` | `TEXT(80)` | ○ | 예: `TaskCompleted` |
-| `org_id` | `UUID` | ○ | |
-| `team_id` | `UUID` | | 팀 범위 이벤트 |
-| `payload` | `LONG_TEXT` | ○ | 불변 레코드의 직렬화 값(ARCH-EVT-06) |
-| `occurred_at` | `UTC_TIMESTAMP` | ○ | |
+도메인 이벤트 저장소다. Spring Modulith의 이벤트 발행 기록 표를 쓴다([ADR-0016](../adr/0016-spring-modulith-events.md)). 이벤트 하나에 구독자 수만큼 행이 생긴다. 열 구조는 라이브러리가 DB마다 정하므로 §1.1 논리 타입과 DOM-TYPE-01의 예외다(DOM-LIB-01).
 
-### domain_event_delivery
+| 필드 | 설명 |
+| --- | --- |
+| `id` | 발행 기록 ID |
+| `listener_id` | 구독자 식별자 |
+| `event_type` | 이벤트 레코드의 클래스 이름 |
+| `serialized_event` | 불변 레코드의 직렬화 값. `org_id`와 팀 범위면 `team_id`를 담는다(ARCH-EVT-05, ARCH-EVT-06) |
+| `publication_date` | 발행 시각 |
+| `completion_date` | 구독자 처리 완료 시각. 비어 있으면 미처리 |
+| `status` | 처리 상태(발행됨, 처리 중, 완료, 실패, 다시 보냄) |
+| `completion_attempts` | 시도 횟수(ARCH-EVT-04) |
+| `last_resubmission_date` | 마지막으로 다시 보낸 시각 |
 
-| 필드 | 타입 | 필수 | 설명 |
-| --- | --- | --- | --- |
-| `event_id` | `UUID` | ○ | |
-| `subscriber` | `TEXT(120)` | ○ | 구독자 식별자 |
-| `state` | `CODE` | ○ | `PENDING`·`DONE`·`SKIPPED`(모듈 꺼짐)·`FAILED` |
-| `attempts` | `INT` | ○ | |
-| `next_attempt_at` | `UTC_TIMESTAMP` | | 간격을 늘려 다시 시도(ARCH-EVT-04) |
-| `last_error` | `TEXT(500)` | | 비밀값 없는 요약 |
-| `completed_at` | `UTC_TIMESTAMP` | | |
+- 원인 변경과 같은 트랜잭션에서 행을 만든다(ARCH-EVT-01).
+- 구독자의 모듈이 그 범위에서 꺼져 있으면 처리 없이 완료로 기록한다(ARCH-EVT-05).
+- 완료된 행은 보관 기간 뒤 지운다(ARCH-EVT-08).
 
-- 유일: (`event_id`, `subscriber`). 이벤트와 같은 트랜잭션에서 만든다(ARCH-EVT-01).
-- 인덱스 후보: (`state`, `next_attempt_at`).
-- 처리된 행은 보관 기간 뒤 지운다(ARCH-EVT-08). 이 저장소를 Spring Modulith의 이벤트 저장소로 대신할지는 OQ-55다.
+| ID | 요구사항 | 수준 |
+| --- | --- | --- |
+| DOM-LIB-01 | 라이브러리가 쓰는 표(`event_publication`)는 라이브러리가 DB마다 제공하는 열 구조를 그대로 따른다. DDL은 Flyway DB별 위치에 두고(TEN-DB-01), 라이브러리의 자동 스키마 생성은 끈다 | 필수 |
+| DOM-LIB-02 | 앱 코드는 라이브러리 표를 직접 조회하거나 고치지 않는다. 라이브러리 API로만 다룬다 | 필수 |
 
 ### notification
 
@@ -622,7 +633,7 @@ erDiagram
 | `healing_rest` | `team_id`, `account_id`, `kind` `CODE`(`FIRE_GAZE`·`WATER_GAZE`·`YOGA`·`WALK`·`MOUNTAIN_GAZE`), `started_at`, `ended_at`, `counted` `BOOL`(최소 시간 이상, OQ-36) | 진행 중(끝 시각 없음)은 계정 × 팀에 하나(RULE-REST-02). 서버 상한 3시간 뒤 자동 종료 |
 | `healing_walk` | `team_id`, `account_id`, `started_at`, `ended_at`, `stamps` `TEXT(100)`(받은 구간 코드 목록), `completed_loop` `BOOL` | 한 번의 걷기(RULE-TRAIL-04) |
 | `healing_walk_daily` | `team_id`, `account_id`, `day` `LOCAL_DATE`, `meters` `INT` | 유일 (`team_id`, `account_id`, `day`)(RULE-TRAIL-02) |
-| `healing_team_distance` | `team_id`, `season` `TEXT(7)`, `meters` `BIGINT`, `unlocked_scenes` `TEXT(200)`, `version` | 유일 (`team_id`, `season`). 풍경 문턱은 OQ-58 |
+| `healing_team_distance` | `team_id`, `season` `TEXT(7)`, `meters` `BIGINT`, `unlocked_scenes` `TEXT(200)`, `version` | 유일 (`team_id`, `season`). 시즌 팀 합계 5km마다 풍경 하나를 연다(RULE-TRAIL-03) |
 | `healing_cairn` | `team_id`, `account_id`, `spot` `CODE`, `message` `TEXT(100)`, `expires_at`(30일, OQ-23), `deleted_at` | 쉼터마다 최근 몇 개만 보인다 |
 | `healing_weather` | `org_id`, `day` `LOCAL_DATE`, `slot` `INT`(하루 몇 번째, OQ-40), `weather` `CODE`, `starts_at` | 유일 (`org_id`, `day`, `slot`). 당일 날씨만 쓴다 |
 
