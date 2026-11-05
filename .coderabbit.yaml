@@ -1,0 +1,58 @@
+language: ko-KR
+tone_instructions: "한국어로 짧게 쓴다. 보안, 데이터 격리, 정합성 문제를 스타일 지적보다 먼저 쓴다. 근거가 되는 요구사항 ID가 있으면 함께 적는다."
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  poem: false
+  in_progress_fortune: false
+  suggested_labels: false
+  auto_apply_labels: false
+  suggested_reviewers: false
+  security_risk_instructions: |
+    - 브라우저는 같은 출처의 REST API만 부른다. 로그인은 Google OIDC만 쓰고, 세션은 서버 세션이며 DB에는 세션 ID의 SHA-256만 저장한다(ADR-0018).
+    - 조직·팀 격리는 TeamContext 판정(docs/architecture/tenancy.md §10)에서 강제한다. 남의 조직·팀 자원은 존재 여부와 관계없이 같은 404로 응답한다.
+    - 모든 엔드포인트는 권한을 선언해야 하고, 선언이 없으면 서버가 시작하지 않는다.
+    - 초대·링크 토큰은 해시로만 저장하고, 실패 사유를 응답으로 구별할 수 없어야 한다.
+    - 보안 요구사항과 테스트 ID는 docs/architecture/security.md에 있다.
+  path_filters:
+    - "!**/build/**"
+    - "!gradle/wrapper/**"
+    - "!gradlew"
+    - "!gradlew.bat"
+  path_instructions:
+    - path: "src/main/java/**"
+      instructions: |
+        - 새 엔드포인트에 권한 선언이 있는지, 조직·팀 범위 조회가 경로의 orgId·teamId와 함께 이루어지는지 본다(남의 자원은 같은 404).
+        - 요청 DTO의 문자열 필드에 길이 상한이 있는지, 요청 본문으로 역할·소속을 바꿀 수 없는지 본다.
+        - 토큰, 세션 ID, 이메일, 웹훅 주소가 로그·예외 메시지·응답에 원문으로 나오지 않는지 본다.
+        - 트랜잭션 경계, 동시 요청에서의 정합성(마지막 관리자 유지, 사용 횟수), 낙관적 version 처리를 본다.
+        - 패키지 의존 방향은 docs/architecture/modules.md §3.1을 따른다.
+    - path: "src/main/resources/db/migration/**"
+      instructions: |
+        - 이미 main에 들어간 마이그레이션 파일을 고치면 지적한다. 바꿀 때는 새 버전 파일을 쓴다.
+        - PostgreSQL, MySQL, MariaDB에서 모두 동작하는 SQL인지 본다(docs/architecture/tenancy.md §11.4).
+    - path: "src/test/java/**"
+      instructions: |
+        - 성공뿐 아니라 실패·경계 조건과 다른 조직·팀 사람의 요청을 확인하는지 본다.
+        - 테스트끼리 데이터나 실행 순서에 의존하지 않는지 본다.
+    - path: "build.gradle.kts"
+      instructions: |
+        - 새 의존성의 판이 고정되어 있는지(BOM 관리 대상은 BOM), 알려진 취약점이 없는지, 꼭 필요한지 본다.
+    - path: ".github/workflows/**"
+      instructions: |
+        - 권한은 필요한 최소만 주는지, pull_request_target에서 PR 코드를 체크아웃하지 않는지, PR 제목·본문 같은 값을 run 스크립트에 직접 끼워 넣지 않는지 본다.
+    - path: "docs/**"
+      instructions: |
+        - 머리말 버전·수정일 규칙(docs/README.md §2.4), 요구사항 ID 중복, 미결 사항 번호 재사용을 본다.
+        - 평서체로 단정하게 쓰는지, 회사 이름이나 실제 데이터가 없는지 본다.
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+chat:
+  auto_reply: true

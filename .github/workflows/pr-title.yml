@@ -1,0 +1,39 @@
+name: PR Title
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: pr-title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  title:
+    name: PR 제목 검사
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # PR 코드를 체크아웃하지 않음. 제목은 env로만 넘김
+      - name: 형식 확인과 타입 라벨
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if ! printf '%s' "$PR_TITLE" | grep -Eq '^(feat|fix|refactor|test|docs|ci|chore): [^ ]'; then
+            echo "::error::PR 제목은 '<type>: <요약>' 형식이어야 합니다. type은 feat, fix, refactor, test, docs, ci, chore 중 하나입니다."
+            exit 1
+          fi
+          type="${PR_TITLE%%:*}"
+          current="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"
+          for label in feat fix refactor test docs ci chore; do
+            if [ "$label" != "$type" ] && printf '%s\n' "$current" | grep -qx "$label"; then
+              gh pr edit "$PR_NUMBER" --remove-label "$label"
+            fi
+          done
+          gh pr edit "$PR_NUMBER" --add-label "$type"
