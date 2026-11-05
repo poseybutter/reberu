@@ -1,7 +1,7 @@
 # reberu 문서
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-04
+> 버전: v0.3.0\
+> 수정일: 2026-11-05
 
 reberu의 제품·도메인·아키텍처 기준 문서다. 도메인 모델, API 명세, 구현, 테스트는 이 문서들을 근거로 삼는다. 진행 상황은 문서에 쓰지 않고 이슈와 커밋으로 관리한다.
 
@@ -25,6 +25,8 @@ docs/
 │   ├── security.md          위협 모델, 보안 요구사항, 보안 검증
 │   ├── realtime.md          실시간 범위, 이벤트, 연결, 위치 동기화
 │   └── modules.md           core·고정 기능·모듈 경계, 의존 방향, 도메인 이벤트, 모듈 계약
+├── operations/            어떻게 운영하는가 — 배포 뒤 상태 확인
+│   └── observability.md     지표 수집, 대시보드, 경보
 ├── adr/                   왜 그렇게 정했는가 — 설계 결정 기록
 │   ├── README.md            ADR 목록과 템플릿
 │   └── NNNN-제목.md         결정 하나에 문서 하나
@@ -39,11 +41,12 @@ docs/
 | `product/` | 무엇을, 왜 만드는가. 사용자에게 어떻게 보이는가 | 제품 방향, 화면, 사용 흐름이 바뀔 때 | 기획·디자인·프론트엔드 |
 | `domain/` | 기술과 관계없이 무엇이 참인가 | 업무 규칙이 바뀔 때 | 백엔드·기획 |
 | `architecture/` | 어떻게 만드는가 | 기술 선택, 구조, 보안 요구가 바뀔 때 | 백엔드 |
+| `operations/` | 배포한 서버를 어떻게 지켜보는가 | 지표, 경보, 운영 절차가 바뀔 때 | 백엔드·운영 |
 | `adr/` | 왜 그렇게 정했는가 | 새 결정이 생기거나 이전 결정을 뒤집을 때 | 전원 |
 | `ai/` | AI 에이전트가 어떻게 작업하는가 | 작업 규칙이 바뀔 때 | AI 에이전트 |
 
 - 새 문서는 위 질문으로 자리를 정한다. 한 문서가 두 질문에 답하면 더 무거운 쪽에 두고 다른 쪽에서 링크한다.
-- 다음에 생길 문서의 자리: API 목록은 `architecture/api.md`. 배포·운영 문서가 생기면 `operations/`를 더한다.
+- 다음에 생길 문서의 자리: API 목록은 `architecture/api.md`. 배포 절차는 `operations/` 아래에 둔다.
 - 폴더 안 문서 이름은 번호 없이 내용으로 짓는다. 읽는 순서는 아래 §1.3이 정한다.
 
 ### 1.3 읽는 순서
@@ -56,7 +59,8 @@ docs/
 6. [domain/model.md](domain/model.md): 엔티티와 제약
 7. [architecture/realtime.md](architecture/realtime.md): 실시간 설계
 8. [architecture/modules.md](architecture/modules.md): 코드 경계와 모듈 계약
-9. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
+9. [operations/observability.md](operations/observability.md): 지표와 경보
+10. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
 
 ## 2. 작성 규칙
 
@@ -85,6 +89,7 @@ docs/
 | `SEC` | 보안 | `architecture/security.md` |
 | `RT` | 실시간 | `architecture/realtime.md` |
 | `ARCH` | 모듈 구조 | `architecture/modules.md` |
+| `OPS` | 운영·관측 | `operations/observability.md` |
 | `RULE` | 도메인 규칙 | `domain/rules.md` |
 | `DOM` | 도메인 모델 | `domain/model.md` |
 | `UX` | 흐름·공간·화면 | `product/flows.md`, `product/spaces.md`, `product/screens.md` |
@@ -237,18 +242,12 @@ docs/
 | OQ-41 | 모듈의 기본 켜짐 값을 정하는 곳 | 직무 유형이 정하고, 직무 유형에 없으면 모듈 정보의 기본값을 쓴다 |
 | OQ-43 | 공간 모듈을 끌 때 힐링 존 | 함께 꺼진다. 공간을 다시 켜도 힐링 존은 따로 켜야 한다 |
 | OQ-44 | 초대 알림 메일 | 보내지 않는다. 초대받은 사람이 로그인하면 보인다 |
-| OQ-45 | 이메일 초대 자동 수락 범위 | 사용자가 직접 행동한 것만 자동 수락한다. 초대 링크를 눌러 들어오면 자동 수락(링크가 승인 필요면 요청 상태). 이메일 초대는 새 계정·기존 계정 모두 첫 화면의 초대 카드에서 한 번 눌러 수락. 초대 없이 가입한 사람은 A0에서 조직을 만들거나 공개 조직을 찾는다 |
 | OQ-46 | 탈퇴할 때 Google `sub`를 어떻게 하나 | 되돌릴 수 없는 해시로 바꾼다. 원문으로 찾을 수 없으므로 같은 Google 계정으로 다시 오면 새 계정이다 |
 | OQ-47 | 초안 수치 | 재요청 대기 7일, 가입 대기 세션 15분, 빈 조직 정리 유예 14일, 계정당 동시 세션 10, 도메인 확인 값 72시간·재확인 30일, 요청 본문 1MB, 실시간 메시지 4KB, 공개 조직 검색 결과 20 |
-| OQ-48 | 활동 기록 보관 기간 | 정하지 않는다 |
 | OQ-49 | 약관이 바뀌면 다시 동의를 받나 | 중요한 변경이면 다음 로그인 때 다시 받는다 |
 | OQ-50 | 칭찬을 보내는 범위와 상한 | 같은 팀 안에서만, 보내는 쪽 하루 10번 |
 | OQ-51 | 업무 세부 항목 개수 상한 | 50개 |
 | OQ-52 | 공개 팀의 "바로 들어오기" 허용 | 팀 설정으로 고른다. 기본은 승인 필요 |
 | OQ-53 | 인증·만료일 D-day 모달의 단계와 받는 사람 | D-45·30·14·7·3·1·당일, 지난 뒤 매일. 담당자와 팀 관리자 |
 | OQ-54 | 모닝 브리핑 발송 시각 기본값 | 조직 시간대 08:30, 팀 설정으로 바꿈 |
-| OQ-55 | 경계 검증·이벤트 저장소 도구 | Spring Modulith 2.1(Spring Boot 4.1 짝). 이벤트 저장소의 MySQL·MariaDB 지원을 확인한 뒤 도입하고, 안 되면 ArchUnit과 직접 만든 이벤트 저장소 |
-| OQ-56 | UUID의 물리 저장 타입 | 세 DB 모두 `CHAR(36)` |
-| OQ-57 | 서버 세션 저장소 구현 | Spring Session JDBC(세 DB 지원 확인 뒤) |
-| OQ-58 | 산길 팀 거리의 풍경 문턱 | 시즌 팀 거리 5km마다 풍경 하나 |
 | OQ-59 | 연회장 건배를 누가 얼마나 자주 누르나 | 연회장에 있는 누구나 누를 수 있고, 같은 연회장에서 1분에 한 번 |

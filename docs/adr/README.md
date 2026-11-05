@@ -1,7 +1,7 @@
 # 설계 결정 기록 (ADR)
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-04
+> 버전: v0.3.0\
+> 수정일: 2026-11-05
 
 되돌리기 어렵거나 여러 문서에 영향을 주는 결정을 남긴다. 본문 설계 문서는 "무엇을"을, ADR은 "왜 그렇게 정했는가"를 맡는다.
 
@@ -23,6 +23,10 @@
 | [ADR-0012](0012-chat-webhook-notifications.md) | 외부 알림: Google Chat 웹훅, 계정 종류 구분 | Accepted |
 | [ADR-0013](0013-shared-db-portable-sql.md) | DB: 공유 테이블, 세 DB 호환, 조직 단위 이관 | Accepted |
 | [ADR-0014](0014-module-architecture.md) | 모듈 구조: 단방향 의존, 이벤트 저장소, 시작 검증 | Accepted |
+| [ADR-0015](0015-healing-only-spaces.md) | 공간에는 업무 기능을 두지 않음 | Accepted |
+| [ADR-0016](0016-spring-modulith-events.md) | 이벤트 저장소와 경계 검증: Spring Modulith | Accepted |
+| [ADR-0017](0017-prometheus-grafana.md) | 관측: Prometheus 지표와 Grafana 대시보드 | Accepted |
+| [ADR-0018](0018-hashed-session-store.md) | 세션 저장소: 해시로 저장하는 직접 구현 | Accepted |
 
 ## 2. 규칙
 
