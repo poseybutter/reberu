@@ -3,8 +3,8 @@
 
 PR에서 바뀐 문서마다 다음을 확인한다.
 - 제목 바로 아래 머리말 형식
-- 고친 문서는 기준 브랜치보다 높은 버전과 바뀐 수정일
-- 수정일은 기준 브랜치의 수정일 이상이고 미래가 아님
+- 고친 문서는 기준 브랜치보다 높은 버전
+- 수정일은 그 파일을 마지막으로 고친 커밋의 날짜(±1일), 기준 브랜치의 수정일 이상, 미래가 아님
 
 사용법: check_doc_headers.py <기준 커밋> [대상 커밋, 기본 HEAD]
 """
@@ -18,6 +18,8 @@ import sys
 VERSION_LINE = re.compile(r"^> 버전: v(\d+)\.(\d+)\.(\d+)\\?$")
 DATE_LINE = re.compile(r"^> 수정일: (\d{4}-\d{2}-\d{2})$")
 DOC_PATHSPEC = ":(glob)docs/**/*.md"
+# 커밋 시각과 머리말 날짜의 시간대 차이 허용
+DATE_TOLERANCE_DAYS = 1
 FORMAT_HINT = r"제목 아래에 '> 버전: vX.Y.Z\'와 '> 수정일: YYYY-MM-DD' 두 줄을 차례로 둔다"
 
 
@@ -92,6 +94,11 @@ def check(base, head):
         if date > latest_allowed:
             errors.append((new_path, f"수정일이 미래다: {date}"))
 
+        # 같은 날 여러 번 고쳐도 되도록, 날짜는 그 파일을 마지막으로 고친 커밋 날짜와 맞춘다
+        commit_date = last_commit_date(head, new_path)
+        if abs((date - commit_date).days) > DATE_TOLERANCE_DAYS:
+            errors.append((new_path, f"수정일이 마지막으로 고친 날과 다르다: 머리말 {date}, 커밋 {commit_date}"))
+
         if status not in ("M", "R"):
             continue
         try:
@@ -102,9 +109,7 @@ def check(base, head):
 
         if version <= old_version:
             errors.append((new_path, f"버전을 올리지 않았다: {format_version(old_version)} → {format_version(version)}"))
-        if date == old_date:
-            errors.append((new_path, f"수정일을 바꾸지 않았다: {date}"))
-        elif date < old_date:
+        if date < old_date:
             errors.append((new_path, f"수정일이 이전 수정일보다 앞선다: {old_date} → {date}"))
 
     for path, message in errors:
@@ -114,6 +119,12 @@ def check(base, head):
         return 1
     print(f"문서 머리말 검사 통과: {len(entries)}개 문서")
     return 0
+
+
+def last_commit_date(commit, path):
+    """commit까지의 이력에서 path를 마지막으로 바꾼 커밋의 날짜(커밋한 사람 기준 시간대)."""
+    text = git("log", "-1", "--format=%cd", "--date=format:%Y-%m-%d", commit, "--", path).strip()
+    return datetime.date.fromisoformat(text)
 
 
 def format_version(version):
