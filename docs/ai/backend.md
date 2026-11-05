@@ -1,6 +1,6 @@
 # 백엔드 규칙
 
-> 버전: v0.3.0\
+> 버전: v0.4.0\
 > 수정일: 2026-11-05
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
@@ -13,7 +13,7 @@
 - Spring Data JPA, Flyway
 - Spring Security, Google OAuth2 로그인, 서버 세션 방식. 세션 저장소는 Spring Session 인터페이스 위에 직접 만든 JDBC 구현이며 세션 ID를 해시로만 저장합니다([ADR-0018](../adr/0018-hashed-session-store.md))
 - 브라우저는 REST API만 호출하고 DB에 직접 접근하지 않음
-- 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. MySQL·MariaDB 드라이버와 Testcontainers 모듈도 함께 둡니다
+- 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. 같은 테스트를 PostgreSQL, MySQL, MariaDB에서 돌립니다
 - 도메인 이벤트 저장소와 경계 검증은 Spring Modulith를 씁니다([ADR-0016](../adr/0016-spring-modulith-events.md)). 외부 메시지 브로커(Kafka 등)는 쓰지 않습니다
 - 지표는 Micrometer로 내보내고 Prometheus·Grafana로 봅니다([ADR-0017](../adr/0017-prometheus-grafana.md)). 두 도구는 Compose 선택 프로필입니다
 - Spring Session은 `spring-session-core`(인터페이스)만 씁니다. 자동 구성 모듈과 Spring Session JDBC는 넣지 않습니다
@@ -64,6 +64,9 @@ team/
 
 - `spring.jpa.hibernate.ddl-auto`는 `validate`로 고정합니다. `update`, `create`로 바꾸지 않습니다.
 - 스키마는 Flyway 마이그레이션으로만 바꿉니다. 공통 마이그레이션은 `src/main/resources/db/migration/core`에 둡니다.
+- 세 DB의 문법이 달라 공통으로 쓸 수 없는 변경만 `db/migration/vendor/{postgresql,mysql,mariadb}`에 둡니다. 버전 번호는 core와 같은 순서를 쓰고, 한 버전은 core에 있거나 세 DB 폴더 모두에 있어야 합니다. `MigrationLayoutTest`가 이 규칙과 파일 이름 형식을 확인합니다.
+- MySQL·MariaDB는 문자 집합 `utf8mb4`, 정렬 규칙 `utf8mb4_bin`으로 씁니다([architecture/tenancy.md](../architecture/tenancy.md) TEN-DB-04). 테스트 컨테이너도 이 값으로 띄웁니다.
+- 트랜잭션 격리 수준은 `spring.datasource.hikari.transaction-isolation`으로 READ COMMITTED를 명시합니다(TEN-DB-07). MySQL·MariaDB의 기본값(REPEATABLE READ)과 PostgreSQL의 동작을 맞추기 위해서입니다. `DatabaseSettingsTest`가 세 DB에서 이 값과 문자 집합을 확인합니다.
 - 마이그레이션 파일은 어떤 테이블과 컬럼을 바꿀지 계획을 먼저 보여 주고, 승인을 받은 뒤 작성합니다.
 - 이미 적용된 마이그레이션은 수정하지 않고, 새 버전 파일을 추가합니다.
 - core와 company의 버전 규칙, 복사한 저장소가 company 위치를 추가하는 방법은 [`CONTRIBUTING.md`의 업스트림 운영 규칙](../../CONTRIBUTING.md#3-업스트림-운영-규칙)을 따릅니다.
@@ -135,6 +138,14 @@ team/
 .\gradlew.bat bootJar
 ```
 
+- 테스트 DB는 PostgreSQL이 기본입니다. 다른 DB는 `-PtestDb`로 고릅니다. 값은 `postgresql`, `mysql`, `mariadb` 중 하나이며, 다른 값이면 빌드가 시작하지 않습니다.
+
+  ```bash
+  ./gradlew test -PtestDb=mysql
+  ./gradlew test -PtestDb=mariadb
+  ```
+
+- Windows Git Bash에서 Gradle 오류 메시지의 한국어가 깨지면 실행 전에 `export GRADLE_OPTS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8"`를 설정합니다. Gradle 실행기의 출력 인코딩 문제라 저장소 설정으로는 바꿀 수 없습니다.
 - `JAVA_HOME`이 JDK 17 이상을 가리켜야 Gradle이 실행됩니다. 빌드에 쓰는 JDK 17은 Gradle toolchain이 찾습니다.
 - 실패하면 오류 원문을 그대로 보고합니다.
-- CI는 `.github/workflows/ci.yml`에서 `main` push와 모든 PR마다 `./gradlew test bootJar`를 실행합니다. Ubuntu 러너의 Docker로 Testcontainers를 띄우고, 실패하면 테스트 리포트를 artifact로 남깁니다.
+- CI는 `.github/workflows/ci.yml`에서 `main` push와 모든 PR마다 `./gradlew test bootJar`를 PostgreSQL, MySQL, MariaDB 세 job으로 실행합니다. Ubuntu 러너의 Docker로 Testcontainers를 띄우고, 실패하면 테스트 리포트를 artifact로 남깁니다.
