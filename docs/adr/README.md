@@ -1,6 +1,6 @@
 # 설계 결정 기록 (ADR)
 
-> 버전: v0.3.0\
+> 버전: v0.4.0\
 > 수정일: 2026-11-05
 
 되돌리기 어렵거나 여러 문서에 영향을 주는 결정을 남긴다. 본문 설계 문서는 "무엇을"을, ADR은 "왜 그렇게 정했는가"를 맡는다.
@@ -27,6 +27,7 @@
 | [ADR-0016](0016-spring-modulith-events.md) | 이벤트 저장소와 경계 검증: Spring Modulith | Accepted |
 | [ADR-0017](0017-prometheus-grafana.md) | 관측: Prometheus 지표와 Grafana 대시보드 | Accepted |
 | [ADR-0018](0018-hashed-session-store.md) | 세션 저장소: 해시로 저장하는 직접 구현 | Accepted |
+| [ADR-0019](0019-spa-frontend.md) | 프론트엔드: 같은 출처의 SPA, 보안 경계에서 전체 새로고침 | Accepted |
 
 ## 2. 규칙
 

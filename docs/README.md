@@ -1,6 +1,6 @@
 # reberu 문서
 
-> 버전: v0.3.0\
+> 버전: v0.4.0\
 > 수정일: 2026-11-05
 
 reberu의 제품·도메인·아키텍처 기준 문서다. 도메인 모델, API 명세, 구현, 테스트는 이 문서들을 근거로 삼는다. 진행 상황은 문서에 쓰지 않고 이슈와 커밋으로 관리한다.
@@ -20,11 +20,13 @@ docs/
 ├── domain/                무엇이 참인가 — 기술과 관계없는 업무 규칙
 │   ├── rules.md             업무, 출석, EXP·레벨·시즌, 업적, 휴식, 리포트 규칙
 │   └── model.md             엔티티, 관계, 제약, 소속, 멱등 키
-├── architecture/          어떻게 만드는가 — 백엔드 설계
+├── architecture/          어떻게 만드는가 — 백엔드·프론트엔드 설계
 │   ├── tenancy.md           조직·팀·멤버십, 가입, 권한, 데이터 격리
 │   ├── security.md          위협 모델, 보안 요구사항, 보안 검증
 │   ├── realtime.md          실시간 범위, 이벤트, 연결, 위치 동기화
-│   └── modules.md           core·고정 기능·모듈 경계, 의존 방향, 도메인 이벤트, 모듈 계약
+│   ├── modules.md           core·고정 기능·모듈 경계, 의존 방향, 도메인 이벤트, 모듈 계약
+│   ├── api.md               REST API 주소 체계, 공통 형식, API 목록
+│   └── frontend.md          화면 구성, 상태, 보안 경계 새로고침, 배포 판, 화면 보안
 ├── operations/            어떻게 운영하는가 — 배포 뒤 상태 확인
 │   └── observability.md     지표 수집, 대시보드, 경보
 ├── adr/                   왜 그렇게 정했는가 — 설계 결정 기록
@@ -40,13 +42,13 @@ docs/
 | --- | --- | --- | --- |
 | `product/` | 무엇을, 왜 만드는가. 사용자에게 어떻게 보이는가 | 제품 방향, 화면, 사용 흐름이 바뀔 때 | 기획·디자인·프론트엔드 |
 | `domain/` | 기술과 관계없이 무엇이 참인가 | 업무 규칙이 바뀔 때 | 백엔드·기획 |
-| `architecture/` | 어떻게 만드는가 | 기술 선택, 구조, 보안 요구가 바뀔 때 | 백엔드 |
+| `architecture/` | 어떻게 만드는가 | 기술 선택, 구조, 보안 요구가 바뀔 때 | 백엔드·프론트엔드 |
 | `operations/` | 배포한 서버를 어떻게 지켜보는가 | 지표, 경보, 운영 절차가 바뀔 때 | 백엔드·운영 |
 | `adr/` | 왜 그렇게 정했는가 | 새 결정이 생기거나 이전 결정을 뒤집을 때 | 전원 |
 | `ai/` | AI 에이전트가 어떻게 작업하는가 | 작업 규칙이 바뀔 때 | AI 에이전트 |
 
 - 새 문서는 위 질문으로 자리를 정한다. 한 문서가 두 질문에 답하면 더 무거운 쪽에 두고 다른 쪽에서 링크한다.
-- 다음에 생길 문서의 자리: API 목록은 `architecture/api.md`. 배포 절차는 `operations/` 아래에 둔다.
+- 다음에 생길 문서의 자리: 배포 절차는 `operations/` 아래에 둔다.
 - 폴더 안 문서 이름은 번호 없이 내용으로 짓는다. 읽는 순서는 아래 §1.3이 정한다.
 
 ### 1.3 읽는 순서
@@ -59,8 +61,10 @@ docs/
 6. [domain/model.md](domain/model.md): 엔티티와 제약
 7. [architecture/realtime.md](architecture/realtime.md): 실시간 설계
 8. [architecture/modules.md](architecture/modules.md): 코드 경계와 모듈 계약
-9. [operations/observability.md](operations/observability.md): 지표와 경보
-10. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
+9. [architecture/api.md](architecture/api.md): API 목록
+10. [architecture/frontend.md](architecture/frontend.md): 화면 쪽 구조와 규칙
+11. [operations/observability.md](operations/observability.md): 지표와 경보
+12. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
 
 ## 2. 작성 규칙
 
@@ -89,6 +93,8 @@ docs/
 | `SEC` | 보안 | `architecture/security.md` |
 | `RT` | 실시간 | `architecture/realtime.md` |
 | `ARCH` | 모듈 구조 | `architecture/modules.md` |
+| `API` | REST API | `architecture/api.md` |
+| `FE` | 프론트엔드 | `architecture/frontend.md` |
 | `OPS` | 운영·관측 | `operations/observability.md` |
 | `RULE` | 도메인 규칙 | `domain/rules.md` |
 | `DOM` | 도메인 모델 | `domain/model.md` |
@@ -222,7 +228,6 @@ docs/
 | OQ-21 | 조직 공간에서 다른 팀 사람에게 보일 정보 | 표시 이름, 기본 아바타, 현재 상태, 팀 이름 |
 | OQ-22 | 날씨를 실제 날씨와 맞추나 | 맞추지 않는다. 계절에 따른 가상 날씨 |
 | OQ-23 | 산길에 남긴 말의 보관 | 팀 소속, 30일 보관, 쓴 사람과 팀 관리자가 지운다 |
-| OQ-24 | 프론트엔드 기술과 도입 시점 | v0.1~v0.2는 API와 테스트로 검증한다 |
 | OQ-25 | 첫 조직 관리자 지정 | `MULTI_ORG`: 만든 사람. `SINGLE_ORG`: 환경 변수 이메일, 조직 관리자가 없을 때만 적용 |
 | OQ-26 | 운영자 역할의 권한 | 조직 정지만 한다. 업무 데이터를 볼 수 없다. 환경 변수로 지정한다 |
 | OQ-27 | 계정당 조직 수 상한과 빈 조직 정리 | 계정당 5개. 90일 동안 활동이 없으면 알린 뒤 보관 |
@@ -251,3 +256,5 @@ docs/
 | OQ-53 | 인증·만료일 D-day 모달의 단계와 받는 사람 | D-45·30·14·7·3·1·당일, 지난 뒤 매일. 담당자와 팀 관리자 |
 | OQ-54 | 모닝 브리핑 발송 시각 기본값 | 조직 시간대 08:30, 팀 설정으로 바꿈 |
 | OQ-59 | 연회장 건배를 누가 얼마나 자주 누르나 | 연회장에 있는 누구나 누를 수 있고, 같은 연회장에서 1분에 한 번 |
+| OQ-60 | 만드는 요청의 중복 방지 키 보관 | 계정 × 키로 DB에 24시간 보관한다(`api_idempotency_key`). 토큰이 담긴 응답은 저장하지 않는다(API-CON-05) |
+| OQ-61 | 팀 관리자의 손님 연장 요청 | v0.1에는 연장 요청 API를 두지 않는다. 팀 관리자는 조직 관리자에게 직접 알리고, 조직 관리자가 F5에서 연장한다. 요청 기록은 알림이 생기는 v0.3에 다시 본다 |

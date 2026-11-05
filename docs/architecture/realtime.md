@@ -1,7 +1,7 @@
 # 실시간 설계
 
-> 버전: v0.1.0\
-> 수정일: 2026-11-04
+> 버전: v0.2.0\
+> 수정일: 2026-11-05
 
 새로고침 없이 바뀌어야 하는 모든 상태의 전달 방식을 정한다. 화면별 실시간 항목은 [product/screens.md](../product/screens.md)에, 권한 확인 규칙은 [architecture/tenancy.md](tenancy.md)에, 보안 요구사항은 [architecture/security.md](security.md)에 있다. 이 문서는 그 셋을 실시간 채널에 적용하는 규칙이다.
 
@@ -30,12 +30,12 @@
 | 조직 공간 | `ORG_SPACE` | 그 조직 공간에 지금 들어가 있는 연결(팀과 무관) | `/topic/orgs/{orgId}/spaces/{spaceKey}` |
 | 조직 | `ORG` | 그 조직의 활동 조직 멤버 전원(손님은 F7 설정에 따름) | `/topic/orgs/{orgId}` |
 
-- `spaceKey`는 공간 종류 상수다: `LOBBY`, `DESK`, `LOUNGE`, `MEETING_ROOM`, `BEACH`, `TRAIL`(팀 공간), `PLAZA`, `HALL`, `SHARED_MEETING_ROOM:{roomId}`(조직 공간).
+- `spaceKey`는 공간 종류 상수다: `LOBBY`, `DESK`, `LOUNGE`, `MEETING_ROOM`, `BEACH`, `TRAIL`(팀 공간), `PLAZA`, `HALL`(조직 공간).
 - 주소의 경로 값은 구독 권한 확인에만 쓰고, 이벤트 본문의 범위 값은 서버가 채운다(RT-PRIN-06).
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
-| RT-SCOPE-01 | 조직 범위에는 드물게 바뀌는 조직 전체 공지만 보낸다(연회장 모임 일정·시작·끝, 날씨). 초당 1회를 넘는 빈도의 이벤트를 보내지 않는다 | 필수 |
+| RT-SCOPE-01 | 조직 범위에는 드물게 바뀌는 조직 전체 공지만 보낸다(날씨, 조직 범위 모듈 변화). 초당 1회를 넘는 빈도의 이벤트를 보내지 않는다 | 필수 |
 | RT-SCOPE-02 | 팀 관리자에게만 가는 이벤트(가입 요청 등)는 팀 주소로 보내지 않고, 서버가 그 팀의 활동 팀 관리자 각자의 개인 주소로 나눠 보낸다 | 필수 |
 | RT-SCOPE-03 | 조직 관리자가 팀 멤버가 아닌 팀은 팀·공간 범위를 구독하지 않는다. 관리 화면은 열 때 API로 불러온다 | 필수 |
 | RT-SCOPE-04 | A3 팀 고르기의 팀별 접속자 수는 실시간으로 보내지 않는다. 화면을 열 때 API로 불러온다 | 필수 |
@@ -49,7 +49,7 @@
 | `/user/queue/*` | 연결의 계정 본인 주소만. 다른 계정 주소는 구조상 지정할 수 없다 |
 | `/topic/teams/{teamId}` | 계정 `ACTIVE` · 조직 `ACTIVE` · 조직 멤버십 `ACTIVE` · 팀 `ACTIVE` 또는 `ARCHIVED`(읽기 전용) · 팀 멤버십 `ACTIVE` |
 | `/topic/teams/{teamId}/spaces/{spaceKey}` | 팀 주소 조건 · 그 팀에서 공간 모듈이 켜짐(`BEACH`·`TRAIL`이면 힐링 존 모듈도) · 서버가 그 연결의 `space.enter`를 받아들여 현재 공간이 `spaceKey`임 · 팀이 `ACTIVE` |
-| `/topic/orgs/{orgId}/spaces/{spaceKey}` | 계정·조직·조직 멤버십 `ACTIVE` · 조직 공간 모듈이 켜짐 · 손님이면 F7 "손님의 조직 공간 출입"이 켜짐 · 현재 조직 공간이 `spaceKey`임 · 공용 회의실이면 그 회의의 참석자 |
+| `/topic/orgs/{orgId}/spaces/{spaceKey}` | 계정·조직·조직 멤버십 `ACTIVE` · 조직 공간 모듈이 켜짐 · 손님이면 F7 "손님의 조직 공간 출입"이 켜짐 · 현재 조직 공간이 `spaceKey`임 |
 | `/topic/orgs/{orgId}` | 계정·조직·조직 멤버십 `ACTIVE` · 손님이면 F7 "손님의 조직 공간 출입"이 켜짐. 조직 공간 모듈과 무관하다(날씨는 팀 공간 모듈만으로도 쓰이기 때문) |
 
 ```mermaid
@@ -68,7 +68,7 @@ flowchart TD
     G -- 아니오 --> X2
     G -- 예 --> H{조직 공간 주소?}
     H -- 아니오: 조직 주소 --> OK[구독 등록]
-    H -- 예 --> I{조직 공간 모듈 켜짐, 현재 조직 공간이 그 주소, 공용 회의실이면 참석자?}
+    H -- 예 --> I{조직 공간 모듈 켜짐, 현재 조직 공간이 그 주소?}
     I -- 아니오 --> X2
     I -- 예 --> OK
     F -- 아니오 --> OK
@@ -184,7 +184,6 @@ flowchart TD
 | `team.modules-changed` | 팀 모듈 켜짐·꺼짐 | 켜진 모듈 목록 | API 뒤 | 팀 설정 | 모든 화면 |
 | `team.settings-changed` | 팀 설정 변화(이름, 공개 범위, 정원 등) | 바뀐 항목 이름 | API 뒤 | 팀 설정 | 모든 화면 |
 | `presence.space-changed` | 동료가 팀 공간을 옮김 | 계정, 떠난 공간, 들어간 공간, 공간별 인원 | 직접(`space.enter`) | 안 함 | B0, B6, B7 |
-| `meeting.started` / `meeting.ended` | 팀 회의 시작·끝 | 회의 ID, 시각, 끝날 때 결과 요약 | API 뒤 | 회의 | B4, B6 |
 | `trail.team-distance` | 팀이 함께 걸은 거리 변화 | 오늘 거리, 시즌 거리, 새로 열린 풍경 | 서버(1분마다 묶음) | 거리 | B12 |
 
 ### 4.3 공간 (`TEAM_SPACE`)
@@ -200,9 +199,6 @@ flowchart TD
 | `tea.poured` | 차 마시기 | 보낸 사람 | 직접 | 안 함 | B3 |
 | `chat.sent` | 라운지 채팅 | 메시지 ID, 보낸 사람, 내용, 시각 | 직접 | 서버 메모리(OQ-10) | B3 |
 | `level.celebrated` | 같은 공간 동료의 레벨업 | 계정, 새 레벨 | API 뒤 | 안 함 | B0 |
-| `meeting.attendee-changed` | 회의 참석자 변화 | 참석자 목록 | 서버 | 참석 기록 | B4 |
-| `meeting.note-changed` | 안건·메모 변화 | 회의 ID, 바뀐 부분, 버전, 바꾼 사람 | API 뒤 | 회의 | B4 |
-| `meeting.note-editing` | 메모 편집 중 표시 | 계정, 켜짐/꺼짐 | 직접 | 안 함 | B4 (OQ-08) |
 | `rest.started` / `rest.ended` | 동료 휴식 시작·끝 | 계정, 휴식 종류 | API 뒤 | 휴식 기록 | B5, B12 |
 | `campfire.log-added` | 장작 넣기 | 보낸 사람, 모닥불 둘레 인원 | 직접 | 안 함 | B5 |
 | `yoga.pose` | 요가 동작 | 계정, 동작 | 직접 | 안 함 | B5 |
@@ -211,25 +207,19 @@ flowchart TD
 
 ### 4.4 조직 공간 (`ORG_SPACE`)
 
-- 팀 공간 이벤트 가운데 `space.snapshot`, `avatar.joined`, `avatar.left`, `avatar.moved`, `avatar.seated`, `avatar.stood`, `greeting.sent`, 공용 회의실의 `meeting.*`를 같은 모양으로 쓴다.
+- 팀 공간 이벤트 가운데 `space.snapshot`, `avatar.joined`, `avatar.left`, `avatar.moved`, `avatar.seated`, `avatar.stood`, `greeting.sent`를 같은 모양으로 쓴다.
 - 조직 공간의 본문에는 다른 팀 사람에 대해 표시 이름, 기본 아바타, 현재 상태, 팀 이름만 담는다(OQ-21).
 - 위치는 관심 영역 규칙(§7.4)으로 걸러 보낸다.
 
 | 이벤트 | 뜻 | 본문 | 생성 | 저장 | 화면 |
 | --- | --- | --- | --- | --- | --- |
-| `assembly.agenda-changed` | 지금 안건 변화 | 모임 ID, 안건 순서 | API 뒤 | 모임 | B10 |
-| `assembly.stage-changed` | 단상에 선 사람 변화 | 계정 목록 | API 뒤 | 안 함 | B10 |
-| `assembly.question-changed` | 질문 추가, 공감 수, 답함 표시 | 질문 ID, 내용, 공감 수, 답함, 쓴 사람(익명이면 없음) | API 뒤 | 모임 | B10 |
-| `assembly.hand-raised` | 손들기·내리기(진행자에게만, RT-SCOPE-02 방식) | 계정, 들었음/내렸음 | 직접 | 안 함 | B10 |
-| `assembly.reactions` | 묶은 리액션 수 | 종류별 수 | 서버(1초마다) | 안 함 | B10 |
-| `assembly.toast` | 건배 연출 | 없음 | 직접(진행자만) | 안 함 | B10 |
+| `hall.reactions` | 묶은 리액션 수 | 종류별 수 | 서버(1초마다) | 안 함 | B10 |
+| `hall.toast` | 건배 연출 | 없음 | 직접(연회장에 있는 누구나. 같은 연회장에서 1분에 한 번만 연출, OQ-59) | 안 함 | B10 |
 
 ### 4.5 조직 (`ORG`)
 
 | 이벤트 | 뜻 | 본문 | 생성 | 저장 | 화면 |
 | --- | --- | --- | --- | --- | --- |
-| `assembly.scheduled` | 연회장 모임 일정 생성·변경·취소 | 모임 ID, 일시, 상태 | API 뒤 | 모임 | B9, D1 |
-| `assembly.started` / `assembly.ended` | 연회장 모임 시작·끝 | 모임 ID, 끝날 때 요약 | API 뒤 | 모임 | 모든 화면, B9, B10 |
 | `weather.changed` | 가상 날씨 변화 | 날씨, 전환 시간(초) | 서버 | 당일 날씨 | B1, B5, B10, B12 |
 | `org.modules-changed` | 조직 범위 모듈 켜짐·꺼짐 | 켜진 조직 범위 모듈 목록 | API 뒤 | 조직 설정 | 모든 화면 |
 
@@ -237,7 +227,7 @@ flowchart TD
 
 | 명령 | 보내는 주소 | 빈도 상한 | 서버 검증 | 결과 |
 | --- | --- | --- | --- | --- |
-| `space.enter` | `/app/teams/{teamId}/space` 또는 `/app/orgs/{orgId}/space` | 1초에 2회 | 공간 모듈 켜짐(`BEACH`·`TRAIL`은 힐링 존 모듈도), 정원, 공용 회의실은 참석자 | 이전 공간 구독 해제, `space.snapshot`, `avatar.joined`, `presence.space-changed` |
+| `space.enter` | `/app/teams/{teamId}/space` 또는 `/app/orgs/{orgId}/space` | 1초에 2회 | 공간 모듈 켜짐(`BEACH`·`TRAIL`은 힐링 존 모듈도), 정원 | 이전 공간 구독 해제, `space.snapshot`, `avatar.joined`, `presence.space-changed` |
 | `space.leave` | 같음 | 1초에 2회 | 현재 공간 있음 | `avatar.left`, `presence.space-changed` |
 | `avatar.move` | `/app/spaces/move` | 1초에 5회(§7.2) | 경계, 속도, 앉아 있지 않음 | `avatar.moved` |
 | `avatar.sit` / `avatar.stand` | `/app/spaces/seat` | 1초에 2회 | 자리 존재, 비어 있음, 자리 가까이 있음 | `avatar.seated` / `avatar.stood` 또는 `SEAT_TAKEN` |
@@ -246,18 +236,16 @@ flowchart TD
 | `tea.pour` | `/app/spaces/tea` | 30초에 1회 | 라운지, 찻주전자 가까이 | `tea.poured` |
 | `chat.send` | `/app/spaces/chat` | 1분에 30회 | 라운지, 500자 이하, 서식 없는 글 | `chat.sent` |
 | `wave.send` | `/app/me/wave` | 1분에 5회, 같은 상대 1분에 1회 | 같은 팀 활동 멤버 | 상대에게 `wave.received` |
-| `meeting.note-editing` | `/app/spaces/note-editing` | 1초에 1회 | 회의 참석자 | `meeting.note-editing` |
 | `campfire.log` | `/app/spaces/campfire` | 10초에 1회 | 바닷가, 모닥불 자리에 앉음 | `campfire.log-added` |
 | `yoga.pose` | `/app/spaces/yoga` | 2초에 1회 | 바닷가, 요가 매트에 앉음, 동작이 목록에 있음 | `yoga.pose` |
 | `trail.progress` | `/app/spaces/trail` | 구간이 바뀔 때 + 5초에 1회 | 산길, 구간 존재, 진행도 0~1, 속도 상한 | `trail.progress` |
-| `assembly.hand` | `/app/orgs/{orgId}/hall/hand` | 5초에 1회 | 연회장, 모임 `IN_PROGRESS` | 진행자에게 `assembly.hand-raised` |
-| `assembly.toast` | `/app/orgs/{orgId}/hall/toast` | 30초에 1회 | 진행자 | `assembly.toast` |
+| `hall.toast` | `/app/orgs/{orgId}/hall/toast` | 계정마다 30초에 1회 | 연회장에 있음. 같은 연회장의 마지막 건배에서 1분이 지나지 않았으면 연출하지 않고 버림(OQ-59) | `hall.toast` |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | RT-EVT-01 | "API 뒤" 이벤트는 트랜잭션 커밋 뒤에만 보낸다. 롤백된 변경은 이벤트를 만들지 않는다 | 필수 |
 | RT-EVT-02 | "API 뒤" 이벤트의 본문은 변경 사실과 식별자만 담는다. 받는 쪽은 상세가 필요하면 API로 다시 불러온다. 단, §4의 본문 열에 적힌 필드는 담는다 | 필수 |
-| RT-EVT-03 | `task.changed`, `report.changed`, `meeting.note-changed`는 대상의 버전을 담는다. 받는 쪽은 자기 버전보다 낮은 이벤트를 버린다 | 필수 |
+| RT-EVT-03 | `task.changed`, `report.changed`는 대상의 버전을 담는다. 받는 쪽은 자기 버전보다 낮은 이벤트를 버린다 | 필수 |
 | RT-EVT-04 | 명령의 빈도 상한은 서버가 계정 × 명령 단위로 지킨다. 넘는 명령은 버리고 `RATE_LIMITED`를 보낸다 | 필수 |
 | RT-EVT-05 | 빈도 상한의 2배를 10초 동안 넘게 보내는 연결은 끊는다 | 필수 |
 | RT-EVT-06 | `notification.created`의 `silent`는 받는 사람이 방해 금지 시간이거나 휴식 중이면 `true`다. 받는 쪽은 안 읽은 수만 바꾸고 잠깐 뜨는 알림을 띄우지 않는다. 알림 생성 규칙은 [domain/rules.md](../domain/rules.md) §10이다 | 필수 |
@@ -268,7 +256,7 @@ flowchart TD
 | --- | --- | --- |
 | RT-MOD-01 | 꺼진 모듈의 이벤트는 만들지 않는다. 꺼진 모듈의 명령은 `NOT_FOUND`로 거부한다 | 필수 |
 | RT-MOD-02 | 팀 공간 모듈이 꺼지면 그 팀의 모든 공간 구독을 서버가 지우고 위치 상태를 버린다. 힐링 존 모듈만 꺼지면 `BEACH`·`TRAIL` 구독만 지운다. 연결에는 `team.modules-changed`가 간다 | 필수 |
-| RT-MOD-03 | 조직 공간 모듈이 꺼지면 그 조직의 조직 공간 구독을 지우고 연회장 이벤트(`assembly.*`)를 만들지 않는다. 조직 범위 구독은 유지한다(`weather.changed`, `org.modules-changed`). 팀 공간 모듈과는 서로 영향을 주지 않는다 | 필수 |
+| RT-MOD-03 | 조직 공간 모듈이 꺼지면 그 조직의 조직 공간 구독을 지우고 연회장 이벤트(`hall.*`)를 만들지 않는다. 조직 범위 구독은 유지한다(`weather.changed`, `org.modules-changed`). 팀 공간 모듈과는 서로 영향을 주지 않는다 | 필수 |
 | RT-MOD-05 | `weather.changed`는 그 조직에 공간 모듈이 켜진 팀이 하나 이상 있거나 조직 공간 모듈이 켜져 있을 때만 만든다 | 필수 |
 | RT-MOD-04 | 모듈은 이벤트·명령을 등록할 때 범위(§2.1)와 빈도 상한을 함께 선언한다. 선언이 없는 이벤트·명령은 등록되지 않는다. 확장 모듈도 같다 | 필수 |
 
@@ -358,7 +346,6 @@ sequenceDiagram
 | 조직이 `SUSPENDED`·`DELETION_SCHEDULED`가 됨 | 그 조직의 모든 구독 | 조직 멤버 전원에게 `org-membership.removed`(이유 `ORG_SUSPENDED`) |
 | 계정이 `SUSPENDED`·`DELETED`가 됨 | 그 계정의 모든 연결을 닫음 | 닫기 전에 `account.suspended` |
 | 모듈이 꺼짐 | §5 | `team.modules-changed` / `org.modules-changed` |
-| 공용 회의 참석자에서 빠짐 | 그 회의실 조직 공간 구독 | 본인에게 `NOT_FOUND` 오류 |
 
 ```mermaid
 sequenceDiagram
@@ -432,8 +419,8 @@ flowchart TD
 | 가까운 사람 | 내 칸과 맞닿은 8칸에 있는 사람의 위치는 5Hz로 받는다 |
 | 먼 사람 | 나머지 사람의 위치는 서버가 2초마다 한 메시지로 묶어 보낸다 |
 | 앉은 사람 | 위치를 보내지 않는다(§7.1) |
-| 리액션 | 연회장에서는 하나씩 퍼뜨리지 않고 1초마다 종류별 수로 묶는다(`assembly.reactions`) |
-| 정원 초과 | 넘는 사람은 단순하게 보기로 참여한다. 위치를 주고받지 않고 안건·질문·리액션 수만 받는다 |
+| 리액션 | 연회장에서는 하나씩 퍼뜨리지 않고 1초마다 종류별 수로 묶는다(`hall.reactions`) |
+| 정원 초과 | 넘는 사람은 단순하게 보기로 함께한다. 위치를 주고받지 않고 리액션 수와 건배만 받는다(UX-SPACE-33) |
 
 ## 8. 부하 어림
 
@@ -444,11 +431,11 @@ flowchart TD
 | 팀 공간 | N=8, M=8, f=5 | M·f = 40 | M·(N−1)·f = 280 |
 | 연회장, 관심 영역 없음 | N=100, M=100, f=5 | 500 | 100·99·5 = 49,500 |
 | 연회장, 관심 영역 | N=100, M=100, K=10 | 500 | 가까운 사람 M·K·f = 5,000 + 먼 사람 묶음 N·0.5 = 50 → 약 5,050 |
-| 연회장 모임 중 | N=100, M=10(90명 앉음), K=10 | 50 | 10·10·5 = 500 + 묶음 50 + 리액션 묶음 N·1 = 100 → 약 650 |
+| 연회장에 대부분 앉음 | N=100, M=10(90명 앉음), K=10 | 50 | 10·10·5 = 500 + 묶음 50 + 리액션 묶음 N·1 = 100 → 약 650 |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
-| RT-LOAD-01 | 서버 한 대, 메모리 안 메시지 중계로 위 표의 연회장 모임 중 부하를 감당한다. 수치는 조직 공간 모듈을 만드는 단계의 부하 테스트로 확인한다 | 필수 |
+| RT-LOAD-01 | 서버 한 대, 메모리 안 메시지 중계로 위 표의 "연회장, 관심 영역"(모두 움직이는 가장 나쁜 경우) 부하를 감당한다. 수치는 조직 공간 모듈을 만드는 단계의 부하 테스트로 확인한다 | 필수 |
 | RT-LOAD-02 | 서버를 여러 대로 늘릴 때는 외부 메시지 중계기와 공유 상태 저장소(접속, 현재 공간, 위치)를 둔다. 그 전까지 위치·접속 상태는 서버 한 대의 메모리에 둔다 | 권장 |
 
 ## 9. 기술 후보
