@@ -1,6 +1,6 @@
 # 백엔드 규칙
 
-> 버전: v0.2.0\
+> 버전: v0.3.0\
 > 수정일: 2026-11-05
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
@@ -13,10 +13,12 @@
 - Spring Data JPA, Flyway
 - Spring Security, Google OAuth2 로그인, 서버 세션 방식. 세션 저장소는 Spring Session 인터페이스 위에 직접 만든 JDBC 구현이며 세션 ID를 해시로만 저장합니다([ADR-0018](../adr/0018-hashed-session-store.md))
 - 브라우저는 REST API만 호출하고 DB에 직접 접근하지 않음
-- 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. 지금은 PostgreSQL이고, MySQL·MariaDB 테스트는 의존성 추가 승인 뒤 CI에 더합니다
+- 테스트는 JUnit과 Testcontainers로 실제 DB를 사용합니다. MySQL·MariaDB 드라이버와 Testcontainers 모듈도 함께 둡니다
 - 도메인 이벤트 저장소와 경계 검증은 Spring Modulith를 씁니다([ADR-0016](../adr/0016-spring-modulith-events.md)). 외부 메시지 브로커(Kafka 등)는 쓰지 않습니다
 - 지표는 Micrometer로 내보내고 Prometheus·Grafana로 봅니다([ADR-0017](../adr/0017-prometheus-grafana.md)). 두 도구는 Compose 선택 프로필입니다
-- Spring Session, Spring Modulith, Micrometer Prometheus 의존성은 아직 추가하지 않았습니다. 구현을 시작할 때 승인을 받고 더합니다
+- Spring Session은 `spring-session-core`(인터페이스)만 씁니다. 자동 구성 모듈과 Spring Session JDBC는 넣지 않습니다
+- Spring Modulith는 BOM(`spring-modulith-bom`)으로 판을 정합니다. Spring Boot BOM에 들어 있지 않기 때문입니다
+- Spring Boot BOM이 정한 판에 알려진 취약점이 있으면 `build.gradle.kts`의 `extra["<이름>.version"]`으로 수정판을 고정하고, 이유는 커밋 메시지와 PR에 적습니다. BOM이 수정판 이상을 정하면 그 줄을 지웁니다
 - Lombok, Spotless는 현재 사용하지 않음
 
 이 목록을 바꾸려면 [`docs/adr/`](../adr/README.md)에 ADR을 남기고, 바뀐 내용을 이 문서에 반영합니다. 의존성 추가·변경은 따로 승인을 받습니다.
