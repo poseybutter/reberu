@@ -66,4 +66,5 @@ require(testDb in setOf("postgresql", "mysql", "mariadb")) {
 tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("reberu.test.db", testDb)
+    environment("CURSOR_SIGNING_KEY", "dGVzdC1vbmx5LWN1cnNvci1zaWduaW5nLWtleS0zMmI=")
 }

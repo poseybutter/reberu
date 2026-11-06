@@ -16,7 +16,8 @@
 ```bash
 # 1. 환경 변수 파일 만들기 (.env는 Git에 올라가지 않습니다)
 cp .env.example .env
-# .env를 열어 DB_PASSWORD 값을 채웁니다.
+# .env를 열어 DB_PASSWORD, CURSOR_SIGNING_KEY 값을 채웁니다.
+# CURSOR_SIGNING_KEY는 openssl rand -base64 32 로 만듭니다.
 
 # 2. PostgreSQL 실행
 docker compose up -d

@@ -9,6 +9,9 @@ spring:
     password: ${DB_PASSWORD}
     hikari:
       transaction-isolation: TRANSACTION_READ_COMMITTED
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   jpa:
     open-in-view: false
     hibernate:
@@ -22,3 +25,14 @@ spring:
         schema-initialization:
           enabled: false
       republish-outstanding-events-on-restart: true
+
+logging:
+  pattern:
+    correlation: "[%X{traceId:-}] "
+
+reberu:
+  app:
+    version: ${APP_VERSION:0.0.0}
+    min-version: ${APP_MIN_VERSION:0.0.0}
+  cursor:
+    signing-key: ${CURSOR_SIGNING_KEY}
