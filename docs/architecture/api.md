@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-05
+> 버전: v0.3.0\
+> 수정일: 2026-11-06
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -53,7 +53,7 @@
 | API-FMT-02 | 응답은 API마다 정한 응답 DTO로만 만든다. 엔티티를 그대로 직렬화하지 않는다 | 필수 |
 | API-FMT-03 | 다른 사람의 이메일은 관리 API(§8 구성원·초대, §9 구성원·초대)의 응답에만 담는다(SEC-OUTPUT-04) | 필수 |
 | API-FMT-04 | 인증이 필요한 모든 응답에 `Cache-Control: no-store`를 붙인다(SEC-HDR-07) | 필수 |
-| API-FMT-05 | 모든 API 응답에 `X-App-Version`(지금 배포된 화면 판)과 `X-App-Min-Version`(받아 주는 가장 낮은 화면 판)을 담는다. API는 바로 이전 판의 화면이 부르는 형태를 깨지 않게 바꾼다([architecture/frontend.md](frontend.md) §8.2) | 필수 |
+| API-FMT-05 | 모든 API 응답에 `X-App-Version`(지금 배포된 화면 판)과 `X-App-Min-Version`(받아 주는 가장 낮은 화면 판)을 담는다. API는 바로 이전 판의 화면이 부르는 형태를 깨지 않게 바꾼다([architecture/frontend.md](frontend.md) §8.2). 값은 배포 설정 `APP_VERSION`, `APP_MIN_VERSION`이고 기본값은 `0.0.0`이다 | 필수 |
 | API-FMT-06 | `/api`, `/oauth2`, `/login/oauth2` 밖의 모든 `GET` 주소에는 같은 `index.html`을 돌려준다. 없는 API 주소는 `index.html`이 아니라 `404 NOT_FOUND` JSON이다(FE-ROUTE-05) | 필수 |
 
 ### 3.2 오류
@@ -74,6 +74,8 @@
 | API-ERR-01 | `message`는 사용자에게 보여 줄 짧은 문장이다. 예외 메시지, 스택, SQL, 클래스 이름, 다른 조직·팀의 존재를 담지 않는다(SEC-OUTPUT-03) | 필수 |
 | API-ERR-02 | `fields[].reason`은 정해진 코드(`REQUIRED`, `TOO_LONG`, `TOO_SHORT`, `INVALID_FORMAT`, `NOT_ALLOWED_VALUE`, `BANNED_WORD`)만 쓴다. 입력 값을 되돌려 보내지 않는다 | 필수 |
 | API-ERR-03 | 볼 수 없는 자원에 대한 요청은 검증 오류보다 먼저 `404 NOT_FOUND`로 끝낸다. 남의 자원에 잘못된 본문을 보내 `400`과 `404`의 차이로 존재를 알아낼 수 없게 한다 | 필수 |
+| API-ERR-04 | 경로에 없는 메서드로 부르면 `405`가 아니라 `404 NOT_FOUND`다. 경로가 있는지 알려 주지 않는다 | 필수 |
+| API-ERR-05 | `fields`는 칸마다 사유 하나만 담는다. 여러 규칙을 함께 어기면 `fields[].reason` 목록의 앞쪽 사유(`REQUIRED`가 가장 앞)를 쓴다. 칸과 무관한 `400`(깨진 JSON, DTO에 없는 필드 등)은 빈 `fields`다 | 필수 |
 
 ### 3.3 페이지
 
