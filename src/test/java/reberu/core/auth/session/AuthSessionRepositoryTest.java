@@ -149,13 +149,13 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("로그인 전 세션은 10분 뒤 만료")
-    void anonymousSessionExpiresAfterTenMinutes() {
+    @DisplayName("로그인 전 세션은 15분 뒤 만료")
+    void anonymousSessionExpiresAfterFifteenMinutes() {
         AuthSession session = repository.createSession();
         session.setAttribute(AuthSession.LOGIN, login(clock.instant()));
         repository.save(session);
 
-        clock.advance(Duration.ofMinutes(9));
+        clock.advance(Duration.ofMinutes(14));
         assertThat(repository.findById(session.getId())).isNotNull();
 
         clock.advance(Duration.ofMinutes(1));
@@ -280,7 +280,7 @@ class AuthSessionRepositoryTest {
         repository.save(anonymous);
         AuthSession member = signedIn(ACCOUNT);
 
-        clock.advance(Duration.ofMinutes(10));
+        clock.advance(Duration.ofMinutes(15));
 
         assertThat(repository.deleteExpired()).isEqualTo(1);
         assertThat(hashes()).containsExactly(SessionIds.sha256(member.getId()));

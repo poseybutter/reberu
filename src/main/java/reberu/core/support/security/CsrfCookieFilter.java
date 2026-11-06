@@ -8,7 +8,7 @@ import java.io.IOException;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-class CsrfCookieFilter extends OncePerRequestFilter {
+public class CsrfCookieFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)

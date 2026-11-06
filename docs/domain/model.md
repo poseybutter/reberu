@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.6.0\
+> 버전: v0.7.0\
 > 수정일: 2026-11-06
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -153,15 +153,18 @@ erDiagram
 | `default_avatar` | `TEXT(40)` | | 기본 아바타 코드 |
 | `last_login_at` | `UTC_TIMESTAMP` | | |
 | `deleted_at` | `UTC_TIMESTAMP` | | 탈퇴 시각 |
+| `created_at`, `updated_at` | `UTC_TIMESTAMP` | ○ | 공통 열(§1.2) |
 
 - 유일: `google_sub`(TEN-INV-01, TEN-INV-21).
-- 인덱스 후보: `email`(초대 맞추기).
+- 인덱스: `email`(초대 맞추기).
+- `display_name`은 탈퇴 때 지우므로 DB에서는 비울 수 있다. 탈퇴 전에는 앱이 늘 값을 채운다. Google 이름이 비어 있으면 이메일 `@` 앞부분을 쓰고 30자에서 자른다(OQ-09).
 
 ### account_consent (추가만)
 
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
-| `account_id` | `UUID` | ○ | |
+| `id` | `UUID` | ○ | 공통 열(§1.2) |
+| `account_id` | `UUID` | ○ | 인덱스 |
 | `terms_version` | `TEXT(20)` | ○ | 약관 버전 |
 | `privacy_version` | `TEXT(20)` | ○ | 개인정보 처리방침 버전 |
 | `agreed_at` | `UTC_TIMESTAMP` | ○ | |
@@ -197,7 +200,8 @@ erDiagram
 
 - 인덱스: (`account_id`), (`expires_at`) 만료 정리.
 - 만료된 행은 서버 작업이 10분마다 지운다(§1.4).
-- 로그인 전 세션(`account_id` 없음)은 만든 뒤 10분이면 만료다.
+- 로그인 전 세션(`account_id` 없음)은 만든 뒤 15분이면 만료다. 가입 대기(15분)를 담기 위해서다. 로그인 진행 값은 따로 10분이다.
+- `login_nonce`는 32바이트 무작위 값(base64url 43자)이다.
 - `last_used_at`은 1분에 한 번만 갱신한다. 유휴 만료가 최대 1분 늦어질 수 있다.
 - 지워진 행은 요청 끝의 저장이 다시 만들지 않는다. 바뀐 열만 갱신한다.
 
@@ -209,9 +213,12 @@ erDiagram
 | --- | --- | --- | --- |
 | `session_id_hash` | `HASH` | ○ | |
 | `google_sub` | `TEXT(255)` | ○ | |
-| `email`, `name`, `picture_url`, `workspace_domain` | `TEXT` | | ID 토큰 값 |
+| `email`, `name`, `picture_url`, `workspace_domain` | `TEXT(254)`, `TEXT(255)`, `TEXT(1024)`, `TEXT(253)` | | ID 토큰 값 |
 | `invite_link_id` | `UUID` | | 링크로 들어온 경우 동의 직후 처리한다([architecture/tenancy.md](../architecture/tenancy.md) §6.3) |
-| `expires_at` | `UTC_TIMESTAMP` | ○ | |
+| `created_at` | `UTC_TIMESTAMP` | ○ | |
+| `expires_at` | `UTC_TIMESTAMP` | ○ | 인덱스. 서버 작업이 10분마다 지운다 |
+
+- 가입 대기가 되는 순간 세션을 새로 만들어 `session_id_hash`를 그 세션 값으로 둔다.
 
 ### api_idempotency_key
 

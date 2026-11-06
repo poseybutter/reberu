@@ -67,4 +67,6 @@ tasks.withType<Test> {
     useJUnitPlatform()
     systemProperty("reberu.test.db", testDb)
     environment("CURSOR_SIGNING_KEY", "dGVzdC1vbmx5LWN1cnNvci1zaWduaW5nLWtleS0zMmI=")
+    environment("GOOGLE_CLIENT_ID", "test-client-id")
+    environment("GOOGLE_CLIENT_SECRET", "test-client-secret")
 }
