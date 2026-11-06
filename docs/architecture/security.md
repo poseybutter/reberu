@@ -1,7 +1,7 @@
 # 보안 설계
 
-> 버전: v0.4.0\
-> 수정일: 2026-11-05
+> 버전: v0.5.0\
+> 수정일: 2026-11-06
 
 reberu의 보안 요구사항과 검증 기준을 정한다. 요구사항 ID 접두어는 `SEC`다. 테넌시·멤버십 규칙은 [architecture/tenancy.md](tenancy.md), 실시간 채널 규칙은 [architecture/realtime.md](realtime.md)를 따른다.
 
