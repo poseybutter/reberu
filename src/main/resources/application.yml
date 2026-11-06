@@ -16,8 +16,24 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        type:
+          preferred_uuid_jdbc_type: CHAR
+          preferred_instant_jdbc_type: TIMESTAMP
+        jdbc:
+          time_zone: UTC
   flyway:
     locations: classpath:db/migration/core,classpath:db/migration/vendor/{vendor}
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid,email,profile
+            redirect-uri: ${APP_BASE_URL:http://localhost:8080}/login/oauth2/code/google
   modulith:
     detection-strategy: explicitly-annotated
     events:
@@ -36,6 +52,9 @@ reberu:
     min-version: ${APP_MIN_VERSION:0.0.0}
   cursor:
     signing-key: ${CURSOR_SIGNING_KEY}
+  legal:
+    terms-version: ${TERMS_VERSION:v1}
+    privacy-version: ${PRIVACY_VERSION:v1}
   session:
     idle-timeout: ${SESSION_IDLE_TIMEOUT:8h}
     max-lifetime: ${SESSION_MAX_LIFETIME:7d}

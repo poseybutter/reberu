@@ -13,6 +13,7 @@ public final class AuthSession implements Session {
     public static final String LOGIN = "reberu.login";
 
     static final Duration LOGIN_VALIDITY = Duration.ofMinutes(10);
+    static final Duration ANONYMOUS_LIFETIME = Duration.ofMinutes(15);
     static final Duration TOUCH_INTERVAL = Duration.ofMinutes(1);
 
     private final SessionProperties properties;
@@ -154,7 +155,7 @@ public final class AuthSession implements Session {
 
     @Override
     public Duration getMaxInactiveInterval() {
-        return authentication == null ? LOGIN_VALIDITY : properties.idleTimeout();
+        return authentication == null ? ANONYMOUS_LIFETIME : properties.idleTimeout();
     }
 
     @Override
@@ -164,7 +165,7 @@ public final class AuthSession implements Session {
 
     Instant expiresAt() {
         if (authentication == null) {
-            return createdAt.plus(LOGIN_VALIDITY);
+            return createdAt.plus(ANONYMOUS_LIFETIME);
         }
         Instant idle = lastUsedAt.plus(properties.idleTimeout());
         Instant max = createdAt.plus(properties.maxLifetime());

@@ -10,11 +10,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ErrorResponseWriter;
 
-class CrossOriginRejectFilter extends OncePerRequestFilter {
+public class CrossOriginRejectFilter extends OncePerRequestFilter {
 
     private final ErrorResponseWriter errorWriter;
 
-    CrossOriginRejectFilter(ErrorResponseWriter errorWriter) {
+    public CrossOriginRejectFilter(ErrorResponseWriter errorWriter) {
         this.errorWriter = errorWriter;
     }
 
