@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.5.0\
+> 버전: v0.6.0\
 > 수정일: 2026-11-06
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -195,8 +195,11 @@ erDiagram
 | `login_return_path` | `TEXT(200)` | | 로그인 뒤 돌아갈 앱 안 경로. 상대 경로만(SEC-AUTH) |
 | `login_started_at` | `UTC_TIMESTAMP` | | |
 
-- 인덱스 후보: (`account_id`), (`expires_at`) 만료 정리.
-- 만료된 행은 서버 작업이 지운다(§1.4).
+- 인덱스: (`account_id`), (`expires_at`) 만료 정리.
+- 만료된 행은 서버 작업이 10분마다 지운다(§1.4).
+- 로그인 전 세션(`account_id` 없음)은 만든 뒤 10분이면 만료다.
+- `last_used_at`은 1분에 한 번만 갱신한다. 유휴 만료가 최대 1분 늦어질 수 있다.
+- 지워진 행은 요청 끝의 저장이 다시 만들지 않는다. 바뀐 열만 갱신한다.
 
 ### auth_pending_signup
 
