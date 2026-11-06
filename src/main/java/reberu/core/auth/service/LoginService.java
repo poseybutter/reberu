@@ -28,9 +28,12 @@ public class LoginService {
     }
 
     @Transactional
-    public LoginOutcome login(GoogleProfile profile) {
-        Instant now = clock.instant();
+    public LoginOutcome login(GoogleProfile profile, Instant authenticatedAt, UUID requiredAccountId) {
         Optional<AccountSummary> account = accounts.findByGoogleSub(profile.sub());
+        if (requiredAccountId != null
+                && (account.isEmpty() || !account.get().id().equals(requiredAccountId))) {
+            return LoginOutcome.mismatch();
+        }
         if (account.isEmpty()) {
             return LoginOutcome.pending();
         }
@@ -40,8 +43,8 @@ public class LoginService {
         if (account.get().state() != AccountState.ACTIVE) {
             return LoginOutcome.rejected();
         }
-        accounts.recordLogin(account.get().id(), profile, now);
-        return LoginOutcome.signedIn(account.get().id(), now);
+        accounts.recordLogin(account.get().id(), profile, clock.instant());
+        return LoginOutcome.signedIn(account.get().id(), authenticatedAt);
     }
 
     @Transactional
@@ -56,6 +59,7 @@ public class LoginService {
             SIGNED_IN,
             PENDING_SIGNUP,
             SUSPENDED,
+            ACCOUNT_MISMATCH,
             REJECTED
         }
 
@@ -69,6 +73,10 @@ public class LoginService {
 
         static LoginOutcome suspended() {
             return new LoginOutcome(Kind.SUSPENDED, null, null);
+        }
+
+        static LoginOutcome mismatch() {
+            return new LoginOutcome(Kind.ACCOUNT_MISMATCH, null, null);
         }
 
         static LoginOutcome rejected() {

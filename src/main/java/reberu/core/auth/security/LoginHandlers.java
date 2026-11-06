@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +28,7 @@ class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailu
     static final String FAILED = "/login?error=failed";
     static final String SUSPENDED = "/login?error=suspended";
     static final String SIGNUP = "/signup";
+    static final Duration REAUTH_FRESHNESS = Duration.ofMinutes(10);
 
     private static final Logger log = LoggerFactory.getLogger(LoginHandlers.class);
 
@@ -39,14 +42,26 @@ class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailu
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) throws IOException {
         SecurityContextHolder.clearContext();
-        Optional<GoogleProfile> profile = authentication.getPrincipal() instanceof OidcUser user
-                ? GoogleClaims.profileOf(user)
-                : Optional.empty();
+        SessionAuthentication current = currentSignIn(request);
+        if (!(authentication.getPrincipal() instanceof OidcUser user)) {
+            fail(request, response, "OIDC 사용자 아님");
+            return;
+        }
+        Optional<GoogleProfile> profile = GoogleClaims.profileOf(user);
         if (profile.isEmpty()) {
             fail(request, response, "ID 토큰 값 거부(email_verified·sub·email·hd)");
             return;
         }
-        LoginOutcome outcome = loginService.login(profile.get());
+        Instant now = Instant.now();
+        Instant authTime = user.getAuthenticatedAt();
+        if (current != null && (authTime == null || authTime.isBefore(now.minus(REAUTH_FRESHNESS)))) {
+            discardSession(request);
+            fail(request, response, "재인증 auth_time 없음 또는 오래됨");
+            return;
+        }
+        Instant authenticatedAt = authTime == null || authTime.isAfter(now) ? now : authTime;
+        LoginOutcome outcome = loginService.login(profile.get(), authenticatedAt,
+                current == null ? null : current.accountId());
         switch (outcome.kind()) {
             case SIGNED_IN -> {
                 newSession(request).setAttribute(AuthSession.AUTHENTICATION,
@@ -59,8 +74,13 @@ class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailu
                 redirect(response, SIGNUP);
             }
             case SUSPENDED -> {
+                discardSession(request);
                 log.info("로그인 거부: 정지된 계정");
                 redirect(response, SUSPENDED);
+            }
+            case ACCOUNT_MISMATCH -> {
+                discardSession(request);
+                fail(request, response, "재인증 계정 불일치");
             }
             case REJECTED -> fail(request, response, "로그인할 수 없는 계정 상태");
         }
@@ -89,6 +109,13 @@ class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailu
     private static HttpSession newSession(HttpServletRequest request) {
         discardSession(request);
         return request.getSession(true);
+    }
+
+    private static SessionAuthentication currentSignIn(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        return session != null && session.getAttribute(AuthSession.AUTHENTICATION) instanceof SessionAuthentication value
+                ? value
+                : null;
     }
 
     private static void discardSession(HttpServletRequest request) {
