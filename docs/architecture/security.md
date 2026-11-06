@@ -376,7 +376,7 @@ flowchart TD
 
 | ID | 헤더 | 값 | 수준 |
 | --- | --- | --- | --- |
-| SEC-HDR-02 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self'; worker-src 'self'; connect-src 'self' wss://<배포 호스트>; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types reberu-html` (인라인 스크립트·`eval` 금지. Trusted Types 정책은 서식 있는 글 하나, [architecture/frontend.md](frontend.md) FE-XSS-02) | 필수 |
+| SEC-HDR-02 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com; font-src 'self'; worker-src 'self'; connect-src 'self' wss://<배포 호스트>; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; require-trusted-types-for 'script'; trusted-types reberu-html` (인라인 스크립트·`eval` 금지. Trusted Types 정책은 서식 있는 글 하나, [architecture/frontend.md](frontend.md) FE-XSS-02. 실시간 연결을 붙이기 전(v0.3 전)에는 `connect-src 'self'`만 둔다) | 필수 |
 | SEC-HDR-03 | `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | 필수 |
 | SEC-HDR-04 | `X-Content-Type-Options` | `nosniff` | 필수 |
 | SEC-HDR-05 | `Referrer-Policy` | `strict-origin-when-cross-origin` | 필수 |

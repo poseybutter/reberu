@@ -26,7 +26,7 @@ docker compose up -d
 ./gradlew bootRun
 ```
 
-아직 로그인 화면을 만들지 않았기 때문에, 브라우저로 접속하면 Spring Security 기본 로그인 화면이 나오거나 401 응답이 옵니다. 정상 동작입니다.
+아직 로그인 기능을 만들지 않았기 때문에, 브라우저로 접속하면 `401` JSON 응답(`UNAUTHENTICATED`)이 옵니다. 정상 동작입니다.
 
 ## 테스트
 
