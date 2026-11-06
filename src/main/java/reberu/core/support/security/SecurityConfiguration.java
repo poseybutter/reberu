@@ -13,6 +13,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfFilter;
@@ -52,6 +53,8 @@ class SecurityConfiguration {
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .headers(AbstractHttpConfigurer::disable)
+                .securityContext(context -> context
+                        .securityContextRepository(new RequestAttributeSecurityContextRepository()))
                 .cors(AbstractHttpConfigurer::disable)
                 .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokens))
                 .exceptionHandling(exceptions -> exceptions

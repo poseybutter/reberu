@@ -36,3 +36,7 @@ reberu:
     min-version: ${APP_MIN_VERSION:0.0.0}
   cursor:
     signing-key: ${CURSOR_SIGNING_KEY}
+  session:
+    idle-timeout: ${SESSION_IDLE_TIMEOUT:8h}
+    max-lifetime: ${SESSION_MAX_LIFETIME:7d}
+    max-per-account: ${SESSION_MAX_PER_ACCOUNT:10}

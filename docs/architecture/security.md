@@ -1,6 +1,6 @@
 # 보안 설계
 
-> 버전: v0.5.0\
+> 버전: v0.6.0\
 > 수정일: 2026-11-06
 
 reberu의 보안 요구사항과 검증 기준을 정한다. 요구사항 ID 접두어는 `SEC`다. 테넌시·멤버십 규칙은 [architecture/tenancy.md](tenancy.md), 실시간 채널 규칙은 [architecture/realtime.md](realtime.md)를 따른다.
@@ -176,7 +176,7 @@ sequenceDiagram
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | SEC-SESS-01 | 세션은 서버 저장소에 둔다. 브라우저에는 세션 ID만 쿠키로 보낸다. 토큰 기반(JWT) 세션은 쓰지 않는다 | 필수 |
-| SEC-SESS-02 | 세션 쿠키 속성: `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Domain` 지정 없음(호스트 전용). 이름은 `__Host-` 접두어를 쓴다 | 필수 |
+| SEC-SESS-02 | 세션 쿠키 속성: `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Domain` 지정 없음(호스트 전용). 이름은 `__Host-session`이다. 만료 시각 없는 브라우저 세션 쿠키이고, 만료는 서버가 판정한다 | 필수 |
 | SEC-SESS-03 | 로그인 성공, 재인증 성공, 조직 관리자 권한 부여 직후 세션 ID를 새로 발급하고 이전 ID를 무효화한다 | 필수 |
 | SEC-SESS-04 | 유휴 만료와 최대 수명을 둔다(기본값: 유휴 8시간, 최대 7일). 값은 환경 변수로 바꾼다 | 필수 |
 | SEC-SESS-05 | 세션 ID는 128비트 이상의 CSPRNG 값이다 | 필수 |

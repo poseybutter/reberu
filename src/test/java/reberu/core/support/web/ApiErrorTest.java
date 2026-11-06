@@ -1,10 +1,10 @@
 package reberu.core.support.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static reberu.TestCsrf.csrfToken;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,7 +86,7 @@ class ApiErrorTest {
                 {"name": "가", "code": "abc-<script>", "nickname": "%s"}
                 """.formatted("다".repeat(11));
 
-        MvcResult result = mockMvc.perform(post("/api/probe/body").with(csrf())
+        MvcResult result = mockMvc.perform(post("/api/probe/body").with(csrfToken())
                 .contentType(MediaType.APPLICATION_JSON).content(request)).andReturn();
         JsonNode body = jsonMapper.readTree(result.getResponse().getContentAsString());
 
@@ -101,7 +101,7 @@ class ApiErrorTest {
     @Test
     @DisplayName("빈 필수 값: REQUIRED")
     void blankRequiredFieldIsRequired() throws Exception {
-        JsonNode body = error(post("/api/probe/body").with(csrf())
+        JsonNode body = error(post("/api/probe/body").with(csrfToken())
                 .contentType(MediaType.APPLICATION_JSON).content("{\"name\": \" \", \"code\": \"ab\"}"), 400);
 
         assertThat(fieldReasons(body)).containsExactly("name:REQUIRED");
@@ -110,11 +110,11 @@ class ApiErrorTest {
     @Test
     @DisplayName("DTO에 없는 필드·깨진 JSON·지원하지 않는 Content-Type: 400")
     void malformedRequestsAreInvalid() throws Exception {
-        JsonNode unknownField = error(post("/api/probe/body").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        JsonNode unknownField = error(post("/api/probe/body").with(csrfToken()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\": \"다온\", \"code\": \"ab\", \"teamId\": \"x\"}"), 400);
-        JsonNode brokenJson = error(post("/api/probe/body").with(csrf()).contentType(MediaType.APPLICATION_JSON)
+        JsonNode brokenJson = error(post("/api/probe/body").with(csrfToken()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\": "), 400);
-        JsonNode textBody = error(post("/api/probe/body").with(csrf()).contentType(MediaType.TEXT_PLAIN)
+        JsonNode textBody = error(post("/api/probe/body").with(csrfToken()).contentType(MediaType.TEXT_PLAIN)
                 .content("name=다온"), 400);
 
         for (JsonNode body : List.of(unknownField, brokenJson, textBody)) {
@@ -138,7 +138,7 @@ class ApiErrorTest {
     @DisplayName("모르는 /api 경로·허용하지 않는 메서드: JSON 404")
     void unknownApiPathIsJsonNotFound() throws Exception {
         JsonNode unknown = error(get("/api/does-not-exist"), 404);
-        JsonNode wrongMethod = error(put("/api/probe/conflict").with(csrf()), 404);
+        JsonNode wrongMethod = error(put("/api/probe/conflict").with(csrfToken()), 404);
 
         assertThat(unknown.get("code").asString()).isEqualTo("NOT_FOUND");
         assertThat(wrongMethod.get("code").asString()).isEqualTo("NOT_FOUND");
