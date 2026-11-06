@@ -15,3 +15,10 @@ spring:
       ddl-auto: validate
   flyway:
     locations: classpath:db/migration/core,classpath:db/migration/vendor/{vendor}
+  modulith:
+    detection-strategy: explicitly-annotated
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+      republish-outstanding-events-on-restart: true

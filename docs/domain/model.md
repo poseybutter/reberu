@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.4.0\
-> 수정일: 2026-11-05
+> 버전: v0.5.0\
+> 수정일: 2026-11-06
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -443,6 +443,7 @@ erDiagram
 - 원인 변경과 같은 트랜잭션에서 행을 만든다(ARCH-EVT-01).
 - 구독자의 모듈이 그 범위에서 꺼져 있으면 처리 없이 완료로 기록한다(ARCH-EVT-05).
 - 완료된 행은 보관 기간 뒤 지운다(ARCH-EVT-08).
+- MySQL·MariaDB에서는 표 이름을 대문자 `EVENT_PUBLICATION`으로 만든다. 라이브러리가 대문자 이름으로 조회하고, Linux의 MySQL·MariaDB는 표 이름의 대소문자를 구분한다(TEN-DB-09의 예외, DOM-LIB-01).
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
