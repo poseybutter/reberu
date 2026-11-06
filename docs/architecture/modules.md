@@ -1,7 +1,7 @@
 # 모듈 구조
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-05
+> 버전: v0.3.0\
+> 수정일: 2026-11-06
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
@@ -299,3 +299,5 @@ flowchart TD
 
 - Spring Modulith 2.1.x를 쓴다. 2.1.2는 Spring Boot 4.1.2를 기준으로 만든 판이고, 이벤트 발행 기록 표를 PostgreSQL, MySQL, MariaDB마다 제공한다([ADR-0016](../adr/0016-spring-modulith-events.md)).
 - 이벤트 발행 기록 표의 DDL은 우리 Flyway 마이그레이션에 둔다. 라이브러리의 자동 스키마 생성은 쓰지 않는다(DOM-LIB-01).
+- 단위 감지는 명시 선언 방식(`spring.modulith.detection-strategy: explicitly-annotated`)이다. 단위마다 `package-info.java`에 `@ApplicationModule`을 두고, 고정 기능과 모듈은 `allowedDependencies`로 §3.1의 허용 의존을 선언한다.
+- 구독자는 비동기로 처리한다(`@EnableAsync`). 서버를 다시 켜면 미완료 기록을 다시 보낸다(`spring.modulith.events.republish-outstanding-events-on-restart`).
