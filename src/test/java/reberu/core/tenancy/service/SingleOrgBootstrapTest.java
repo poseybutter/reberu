@@ -145,6 +145,8 @@ class SingleOrgBootstrapTest {
         assertThat(mockMvc.perform(get("/api/default-job-types").with(authentication(signedIn)))
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
         assertThat(jdbc.sql("SELECT COUNT(*) FROM organization").query(Integer.class).single()).isOne();
+        assertThat(mockMvc.perform(get("/api/auth/session")).andReturn().getResponse().getContentAsString())
+                .contains("\"deploymentMode\":\"SINGLE_ORG\"");
     }
 
     @Test

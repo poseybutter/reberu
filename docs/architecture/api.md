@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.6.0\
+> 버전: v0.7.0\
 > 수정일: 2026-11-09
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -72,7 +72,7 @@
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | API-ERR-01 | `message`는 사용자에게 보여 줄 짧은 문장이다. 예외 메시지, 스택, SQL, 클래스 이름, 다른 조직·팀의 존재를 담지 않는다(SEC-OUTPUT-03) | 필수 |
-| API-ERR-02 | `fields[].reason`은 정해진 코드(`REQUIRED`, `TOO_LONG`, `TOO_SHORT`, `INVALID_FORMAT`, `NOT_ALLOWED_VALUE`, `BANNED_WORD`)만 쓴다. 입력 값을 되돌려 보내지 않는다 | 필수 |
+| API-ERR-02 | `fields[].reason`은 정해진 코드(`REQUIRED`, `TOO_LONG`, `TOO_SHORT`, `INVALID_FORMAT`, `NOT_ALLOWED_VALUE`, `BANNED_WORD`, `DUPLICATE`)만 쓴다. `DUPLICATE`는 유일해야 하는 값(팀 이름 등)이 이미 있을 때다. 입력 값을 되돌려 보내지 않는다 | 필수 |
 | API-ERR-03 | 볼 수 없는 자원에 대한 요청은 검증 오류보다 먼저 `404 NOT_FOUND`로 끝낸다. 남의 자원에 잘못된 본문을 보내 `400`과 `404`의 차이로 존재를 알아낼 수 없게 한다 | 필수 |
 | API-ERR-04 | 경로에 없는 메서드로 부르면 `405`가 아니라 `404 NOT_FOUND`다. 경로가 있는지 알려 주지 않는다 | 필수 |
 | API-ERR-05 | `fields`는 칸마다 사유 하나만 담는다. 여러 규칙을 함께 어기면 `fields[].reason` 목록의 앞쪽 사유(`REQUIRED`가 가장 앞)를 쓴다. 칸과 무관한 `400`(깨진 JSON, DTO에 없는 필드 등)은 빈 `fields`다 | 필수 |
@@ -121,7 +121,7 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/oauth2/authorization/google` | Google 인가 요청으로 보낸다. 쿼리 `next`는 서버의 허용 경로 목록에 있을 때만 저장하고, 아니면 버린다(SEC-AUTH-08). `reauth=true`이거나 이미 로그인한 세션이면 재인증으로 보고 `prompt=login`, `max_age=0`을 붙인다 | 공개 | 제한 SEC-RATE-01 |
 | `GET` | `/login/oauth2/code/google` | 콜백. 판정은 [architecture/tenancy.md](tenancy.md) §6.1. 결과에 따라 A6, A1, 첫 화면으로 `302` | 공개 | 제한 SEC-RATE-01 |
-| `GET` | `/api/auth/session` | 세션 상태 `ANONYMOUS`·`SIGNUP_PENDING`·`AUTHENTICATED`, 배포 모드, 로그인 뒤 갈 첫 화면(§5.1). 로그인 상태면 계정 ID와 인증 시각도 담는다(탭 계정 확인 FE-TAB-03, 재인증 판단 FE-REAUTH-01). CSRF 쿠키를 내려 준다 | 공개 | |
+| `GET` | `/api/auth/session` | 세션 상태 `ANONYMOUS`·`SIGNUP_PENDING`·`AUTHENTICATED`, 배포 모드 `deploymentMode`, 로그인 뒤 갈 첫 화면 `next`(§5.1, `AUTHENTICATED`일 때만, `GET /api/me/home`과 같은 판정, TEN-HOME-03). 로그인 상태면 계정 ID와 인증 시각도 담는다(탭 계정 확인 FE-TAB-03, 재인증 판단 FE-REAUTH-01). CSRF 쿠키를 내려 준다 | 공개 | |
 | `GET` | `/api/auth/signup` | A6에 보일 값: Google이 준 이메일·이름·사진, 지금 약관·처리방침 버전 | 가입 대기 | |
 | `POST` | `/api/auth/signup/consent` | 동의. 본문 `termsVersion`, `privacyVersion`(지금 버전과 같아야 함), 선택 `inviteToken`. 계정을 만들고 세션 ID를 새로 발급한다. 링크가 있으면 §6과 같이 처리한다 | 가입 대기 | `201`. 응답에 첫 화면 |
 | `DELETE` | `/api/auth/signup` | 동의 안 함. 가입 대기 세션을 지운다 | 가입 대기 | `204` |
@@ -206,10 +206,10 @@
 | `PATCH` | `/api/orgs/{orgId}/settings` | 이름, 한 줄 소개, 시간대(OQ-32), 공개 범위, 가입 방법, 새 구성원 조직 관리자 확인(TEN-ADM-01·02), 손님 규칙, 초대 수락 기한 | 조직 관리자 🔒 | `version` 필수 |
 | `POST` | `/api/orgs/{orgId}/archive` | 조직 보관([architecture/tenancy.md](tenancy.md) §14.1) | 조직 관리자 🔒 | |
 | `POST` | `/api/orgs/{orgId}/restore` | 조직 복원. 관리자 없는 보관 조직은 `404 NOT_FOUND` | 조직 관리자 🔒 | |
-| `GET` | `/api/orgs/{orgId}/teams` | 조직 관리자: 모든 팀(F2). 구성원: `PUBLIC` 팀과 내 팀(A3 공개 팀 찾기) | 조직 멤버 | 손님은 `404` |
-| `POST` | `/api/orgs/{orgId}/teams` | 팀 만들기. 본문 `name`, `visibility`, `jobTypeId`, `firstAdminAccountId`(그 조직의 `ACTIVE` 구성원) | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`(`fields`) |
-| `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관 | 조직 관리자 🔒 | |
-| `POST` | `/api/orgs/{orgId}/teams/{teamId}/restore` | 팀 복원. 팀 관리자가 없으면 본문 `newAdminAccountId` 필수 | 조직 관리자 🔒 | |
+| `GET` | `/api/orgs/{orgId}/teams` | 조직 관리자: 모든 팀(F2). 구성원: `PUBLIC` 팀과 내 팀(A3 공개 팀 찾기). 항목마다 `id`, `name`, `visibility`, `state`, `jobTypeName`, `memberCount`, `myRole`, `createdAt`. 만든 순서, 커서 페이지(§3.3) | 조직 멤버 | 손님은 `404` |
+| `POST` | `/api/orgs/{orgId}/teams` | 팀 만들기. 본문 `name`, `visibility`, `jobTypeId`, `firstAdminAccountId`(TEN-TEAM-01). 응답 `{ teamId }` | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`(`fields`의 `DUPLICATE`) |
+| `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관(TEN-TEAM-04·05) | 조직 관리자 🔒 | `204` |
+| `POST` | `/api/orgs/{orgId}/teams/{teamId}/restore` | 팀 복원. 본문 `newAdminAccountId`는 팀 관리자가 없을 때만 필수이고, 있을 때 보내면 `400`(TEN-TEAM-02·03) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/join` | 공개 팀 가입 요청 또는 바로 들어가기([architecture/tenancy.md](tenancy.md) §7.5) | 조직 멤버 | 구성원만, 제한 SEC-RATE-04 |
 | `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록(숨김 포함 여부 쿼리) | 조직 관리자 | F3 |
 | `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가 | 조직 관리자 | `201`, `Idempotency-Key` |

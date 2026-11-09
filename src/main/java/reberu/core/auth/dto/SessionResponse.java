@@ -3,9 +3,12 @@ package reberu.core.auth.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.UUID;
+import reberu.core.tenancy.DeploymentMode;
+import reberu.core.tenancy.HomeScreens.HomeNext;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record SessionResponse(State state, UUID accountId, Instant authenticatedAt) {
+public record SessionResponse(State state, DeploymentMode deploymentMode, UUID accountId, Instant authenticatedAt,
+        HomeNext next) {
 
     public enum State {
         ANONYMOUS,
@@ -13,16 +16,17 @@ public record SessionResponse(State state, UUID accountId, Instant authenticated
         AUTHENTICATED
     }
 
-    public static SessionResponse anonymous() {
-        return new SessionResponse(State.ANONYMOUS, null, null);
+    public static SessionResponse anonymous(DeploymentMode mode) {
+        return new SessionResponse(State.ANONYMOUS, mode, null, null, null);
     }
 
-    public static SessionResponse signupPending() {
-        return new SessionResponse(State.SIGNUP_PENDING, null, null);
+    public static SessionResponse signupPending(DeploymentMode mode) {
+        return new SessionResponse(State.SIGNUP_PENDING, mode, null, null, null);
     }
 
-    public static SessionResponse authenticated(UUID accountId, Instant authenticatedAt) {
-        return new SessionResponse(State.AUTHENTICATED, accountId, authenticatedAt);
+    public static SessionResponse authenticated(DeploymentMode mode, UUID accountId, Instant authenticatedAt,
+            HomeNext next) {
+        return new SessionResponse(State.AUTHENTICATED, mode, accountId, authenticatedAt, next);
     }
 
 }

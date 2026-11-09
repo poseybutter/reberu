@@ -58,6 +58,10 @@ public class JobType {
         return name;
     }
 
+    public boolean hidden() {
+        return hidden;
+    }
+
     public String defaults() {
         return defaults;
     }

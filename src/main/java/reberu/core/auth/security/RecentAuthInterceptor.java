@@ -7,7 +7,7 @@ import java.time.Duration;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
-import reberu.core.auth.RequiresRecentAuth;
+import reberu.core.support.RequiresRecentAuth;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ReberuException;
 

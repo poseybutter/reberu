@@ -1,4 +1,4 @@
-package reberu.core.auth;
+package reberu.core.support;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
