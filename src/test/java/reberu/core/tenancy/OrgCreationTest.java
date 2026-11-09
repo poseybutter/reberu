@@ -202,8 +202,8 @@ class OrgCreationTest {
         assertThat(invalid(body("r.e-b e_r u", "basic"))).containsExactly("name:BANNED_WORD");
         assertThat(invalid(body("공식 모임", "basic"))).containsExactly("name:BANNED_WORD");
         assertThat(invalid(body("줄\n바꿈", "basic"))).containsExactly("name:INVALID_FORMAT");
-        assertThat(invalid(body("방향‮바꿈", "basic"))).containsExactly("name:INVALID_FORMAT");
-        assertThat(invalid(body("안​보임", "basic"))).containsExactly("name:INVALID_FORMAT");
+        assertThat(invalid(body("방향\u202E바꿈", "basic"))).containsExactly("name:INVALID_FORMAT");
+        assertThat(invalid(body("안\u200B보임", "basic"))).containsExactly("name:INVALID_FORMAT");
         assertThat(invalid(body("가".repeat(41), "basic"))).containsExactly("name:TOO_LONG");
         assertThat(invalid(body("   ", "basic"))).containsExactly("name:REQUIRED");
         assertThat(count("organization")).isZero();

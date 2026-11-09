@@ -4,7 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,7 +25,7 @@ import reberu.core.tenancy.service.OrgCreationService.CreatedOrg;
 
 @RestController
 @RequestMapping("/api")
-@ConditionalOnProperty(name = "reberu.tenancy.mode", havingValue = "MULTI_ORG", matchIfMissing = true)
+@ConditionalOnExpression("!'${reberu.tenancy.mode:}'.trim().equalsIgnoreCase('SINGLE_ORG')")
 class OrgController {
 
     private final OrgCreationService orgCreation;

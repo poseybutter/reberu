@@ -13,6 +13,11 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,7 +32,9 @@ import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.security.AccountAuthentication;
+import reberu.core.auth.repository.PendingSignupRepository;
 import reberu.core.auth.service.LoginService;
+import reberu.core.auth.service.SignupService;
 import reberu.core.tenancy.DeploymentMode;
 import reberu.core.tenancy.OrgBootstrap;
 
@@ -61,10 +68,17 @@ class SingleOrgBootstrapTest {
     @Autowired
     LoginService loginService;
 
+    @Autowired
+    SignupService signupService;
+
+    @Autowired
+    PendingSignupRepository pendingSignups;
+
     @BeforeEach
     void setUp() {
         jdbc.sql("DELETE FROM org_membership").update();
         jdbc.sql("DELETE FROM org_activity_log WHERE action = 'ORG_ADMIN_BOOTSTRAPPED'").update();
+        jdbc.sql("DELETE FROM auth_pending_signup").update();
         jdbc.sql("DELETE FROM account_consent").update();
         jdbc.sql("DELETE FROM account").update();
     }
@@ -152,6 +166,49 @@ class SingleOrgBootstrapTest {
     }
 
     @Test
+    @DisplayName("TEN-BOOT-01: 첫 가입 동의에서도 부트스트랩 이메일이면 조직 관리자로 지정")
+    void grantsFirstAdminOnSignupConsent() {
+        String sessionHash = "a".repeat(64);
+        GoogleProfile leader = profile("leader", "leader@example.com");
+        pendingSignups.create(sessionHash, leader, Instant.now(), Instant.now().plusSeconds(600));
+
+        SignupService.SignedIn signedIn = signupService.consent(sessionHash, leader, "v1", "v1");
+
+        Map<String, Object> membership = jdbc.sql("SELECT * FROM org_membership").query().singleRow();
+        assertThat(membership).containsEntry("account_id", signedIn.accountId().toString())
+                .containsEntry("joined_via", "BOOTSTRAP");
+        assertThat(bool(membership.get("org_admin"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("TEN-BOOT-01: 같은 이메일 계정 둘이 동시에 로그인해도 조직 관리자는 하나")
+    void concurrentBootstrapGrantsOnce() throws Exception {
+        UUID first = newAccount("first", "leader@example.com");
+        UUID second = newAccount("second", "leader@example.com");
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> a = executor.submit(() -> {
+                start.await();
+                return bootstrap.grantFirstAdmin(first, "leader@example.com");
+            });
+            Future<Boolean> b = executor.submit(() -> {
+                start.await();
+                return bootstrap.grantFirstAdmin(second, "leader@example.com");
+            });
+            start.countDown();
+
+            assertThat(List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(true, false);
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM org_membership WHERE org_admin = :admin")
+                    .param("admin", true).query(Integer.class).single()).isOne();
+        }
+        finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("부트스트랩 이메일과 다른 계정은 지정 안 함")
     void ignoresOtherEmail() {
         UUID member = newAccount("member", "member@example.com");
@@ -184,6 +241,12 @@ class SingleOrgBootstrapTest {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new TenancyProperties(DeploymentMode.SINGLE_ORG,
                 new TenancyProperties.SingleOrg("모임", "Asia/Seoul", " "), List.of()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new TenancyProperties(DeploymentMode.SINGLE_ORG,
+                new TenancyProperties.SingleOrg(" ", "Asia/Seoul", "leader@example.com"), List.of()))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new TenancyProperties(DeploymentMode.SINGLE_ORG,
+                new TenancyProperties.SingleOrg(null, "Asia/Seoul", "leader@example.com"), List.of()))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(new TenancyProperties(null, null, null).mode()).isEqualTo(DeploymentMode.MULTI_ORG);
     }
