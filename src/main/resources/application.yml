@@ -50,6 +50,8 @@ reberu:
   app:
     version: ${APP_VERSION:0.0.0}
     min-version: ${APP_MIN_VERSION:0.0.0}
+  audit:
+    retention: ${ACTIVITY_LOG_RETENTION:365d}
   cursor:
     signing-key: ${CURSOR_SIGNING_KEY}
   legal:

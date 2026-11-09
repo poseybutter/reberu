@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <conversionRule conversionWord="m" class="reberu.core.support.logging.MaskedMessageConverter"/>
+    <conversionRule conversionWord="msg" class="reberu.core.support.logging.MaskedMessageConverter"/>
+    <conversionRule conversionWord="message" class="reberu.core.support.logging.MaskedMessageConverter"/>
+    <conversionRule conversionWord="ex" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="exception" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="throwable" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="xEx" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="xException" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="xThrowable" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="wex" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+    <conversionRule conversionWord="wEx" class="reberu.core.support.logging.MaskedThrowableConverter"/>
+
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

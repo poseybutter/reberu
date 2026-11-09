@@ -17,7 +17,8 @@ public class TestcontainersConfiguration {
 
     private static final String[] MYSQL_FAMILY_COMMAND = {
         "--character-set-server=utf8mb4",
-        "--collation-server=utf8mb4_bin"
+        "--collation-server=utf8mb4_bin",
+        "--log-bin-trust-function-creators=1"
     };
 
     @Bean
