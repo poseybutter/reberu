@@ -9,6 +9,7 @@ public final class SensitiveText {
             Pattern.compile("([A-Za-z0-9._%+-])[A-Za-z0-9._%+-]*@([A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+)");
     private static final Pattern URL_QUERY = Pattern.compile("([A-Za-z][A-Za-z0-9+.-]*://[^\\s?#]*)[?#]\\S*");
     private static final Pattern URL = Pattern.compile("[A-Za-z][A-Za-z0-9+.-]*://");
+    private static final Pattern JWT = Pattern.compile("eyJ[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]*");
     private static final Pattern TOKEN_RUN = Pattern.compile("[A-Za-z0-9+_-]{32,}={0,2}");
     private static final Pattern UUID_TEXT =
             Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -25,6 +26,7 @@ public final class SensitiveText {
         }
         String masked = EMAIL.matcher(text).replaceAll("$1" + HIDDEN + "@$2");
         masked = URL_QUERY.matcher(masked).replaceAll("$1?" + HIDDEN);
+        masked = JWT.matcher(masked).replaceAll(HIDDEN);
         return maskTokens(masked);
     }
 
@@ -39,7 +41,7 @@ public final class SensitiveText {
         if (text == null || text.isEmpty()) {
             return false;
         }
-        return EMAIL.matcher(text).find() || URL.matcher(text).find() || hasToken(text);
+        return EMAIL.matcher(text).find() || URL.matcher(text).find() || JWT.matcher(text).find() || hasToken(text);
     }
 
     public static boolean containsControl(String text) {

@@ -31,9 +31,3 @@ CREATE TABLE team_activity_log (
 CREATE INDEX team_activity_log_team_id_occurred_at_idx ON team_activity_log (team_id, occurred_at);
 CREATE INDEX team_activity_log_team_id_actor_id_idx ON team_activity_log (team_id, actor_id);
 CREATE INDEX team_activity_log_occurred_at_idx ON team_activity_log (occurred_at);
-
-CREATE TRIGGER org_activity_log_no_update BEFORE UPDATE ON org_activity_log
-    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'activity log is append-only';
-
-CREATE TRIGGER team_activity_log_no_update BEFORE UPDATE ON team_activity_log
-    FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'activity log is append-only';

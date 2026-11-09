@@ -86,6 +86,37 @@ class ActivityLogCleanupTest {
     }
 
     @Test
+    @DisplayName("한 표 정리가 실패해도 지운 건수를 남기고 다른 표 정리는 계속")
+    void failureInOneTableDoesNotStopOthers(CapturedOutput output) {
+        for (int i = 0; i < ActivityLogCleanup.BATCH_SIZE + 1; i++) {
+            insert("org_activity_log", CUTOFF.minusDays(1));
+        }
+        String expiredTeam = insert("team_activity_log", CUTOFF.minusDays(1));
+        ActivityLogCleanup failing = new ActivityLogCleanup(dataSource, transactions,
+                new AuditProperties(Duration.ofDays(365)), Clock.fixed(NOW, ZoneOffset.UTC)) {
+            private int orgBatches;
+
+            @Override
+            int deleteBatch(String table, LocalDateTime threshold) {
+                if (table.equals("org_activity_log") && ++orgBatches == 2) {
+                    throw new IllegalStateException("정리 실패 재현");
+                }
+                return super.deleteBatch(table, threshold);
+            }
+        };
+
+        int deleted = failing.deleteExpired();
+
+        assertThat(deleted).isEqualTo(ActivityLogCleanup.BATCH_SIZE + 1);
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM org_activity_log").query(Integer.class).single()).isOne();
+        assertThat(exists("team_activity_log", expiredTeam)).isFalse();
+        assertThat(output.getOut())
+                .contains("활동 기록 정리 중단: org_activity_log occurred_at < " + CUTOFF + "Z, "
+                        + ActivityLogCleanup.BATCH_SIZE + "건 삭제 후 실패")
+                .contains("활동 기록 정리: team_activity_log occurred_at < " + CUTOFF + "Z, 1건");
+    }
+
+    @Test
     @DisplayName("TEN-LOG-04: 보관 기간 365일 미만 설정 거부")
     void rejectsShortRetention() {
         assertThatThrownBy(() -> new AuditProperties(Duration.ofDays(364)))

@@ -60,6 +60,32 @@ class SensitiveTextTest {
     }
 
     @Test
+    @DisplayName("JWT는 구간 길이와 상관없이 전체를 가림")
+    void masksWholeJwt() {
+        String jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl";
+
+        assertThat(SensitiveText.mask("Bearer " + jwt + " 끝")).isEqualTo("Bearer *** 끝");
+        assertThat(SensitiveText.containsSensitive(jwt)).isTrue();
+    }
+
+    @Test
+    @DisplayName("경계 입력: null·빈 값, 31자·32자, 한 글자 이메일, 조각만 있는 URL")
+    void boundaryInputs() {
+        String token31 = "a1".repeat(15) + "b";
+        String token32 = "a1".repeat(16);
+
+        assertThat(SensitiveText.mask(null)).isNull();
+        assertThat(SensitiveText.mask("")).isEmpty();
+        assertThat(SensitiveText.containsSensitive(null)).isFalse();
+        assertThat(SensitiveText.containsSensitive("")).isFalse();
+        assertThat(SensitiveText.containsControl(null)).isFalse();
+        assertThat(SensitiveText.mask(token31)).isEqualTo(token31);
+        assertThat(SensitiveText.mask(token32)).isEqualTo("***");
+        assertThat(SensitiveText.mask("a@example.com")).isEqualTo("a***@example.com");
+        assertThat(SensitiveText.mask("https://example.com/cb#access_token=x")).isEqualTo("https://example.com/cb?***");
+    }
+
+    @Test
     @DisplayName("이메일·URL·토큰·제어 문자 검출")
     void detectsSensitiveValues() {
         assertThat(SensitiveText.containsSensitive("a@example.com")).isTrue();

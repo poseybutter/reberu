@@ -49,36 +49,44 @@ class ActivityLogCleanup {
         LocalDateTime threshold = LocalDateTime.ofInstant(cutoff, ZoneOffset.UTC);
         int total = 0;
         for (String table : TABLES) {
-            int deleted = deleteBefore(table, threshold);
-            if (deleted > 0) {
-                log.info("활동 기록 정리: {} occurred_at < {}Z, {}건", table, threshold, deleted);
-            }
-            total += deleted;
+            total += deleteBefore(table, threshold);
         }
         return total;
     }
 
     private int deleteBefore(String table, LocalDateTime threshold) {
         int total = 0;
-        while (true) {
-            Integer deleted = transactions.execute(status -> {
-                List<String> ids = batchJdbc.sql("SELECT id FROM " + table + " WHERE occurred_at < :threshold")
-                        .param("threshold", threshold)
-                        .query(String.class)
-                        .list();
-                if (ids.isEmpty()) {
-                    return 0;
-                }
-                return jdbc.sql("DELETE FROM " + table + " WHERE id IN (:ids) AND occurred_at < :threshold")
-                        .param("ids", ids)
-                        .param("threshold", threshold)
-                        .update();
-            });
-            if (deleted == null || deleted == 0) {
-                return total;
+        try {
+            int deleted;
+            while ((deleted = deleteBatch(table, threshold)) > 0) {
+                total += deleted;
             }
-            total += deleted;
         }
+        catch (RuntimeException exception) {
+            log.error("활동 기록 정리 중단: {} occurred_at < {}Z, {}건 삭제 후 실패", table, threshold, total, exception);
+            return total;
+        }
+        if (total > 0) {
+            log.info("활동 기록 정리: {} occurred_at < {}Z, {}건", table, threshold, total);
+        }
+        return total;
+    }
+
+    int deleteBatch(String table, LocalDateTime threshold) {
+        Integer deleted = transactions.execute(status -> {
+            List<String> ids = batchJdbc.sql("SELECT id FROM " + table + " WHERE occurred_at < :threshold")
+                    .param("threshold", threshold)
+                    .query(String.class)
+                    .list();
+            if (ids.isEmpty()) {
+                return 0;
+            }
+            return jdbc.sql("DELETE FROM " + table + " WHERE id IN (:ids) AND occurred_at < :threshold")
+                    .param("ids", ids)
+                    .param("threshold", threshold)
+                    .update();
+        });
+        return deleted == null ? 0 : deleted;
     }
 
 }
