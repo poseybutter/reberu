@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.4.0\
-> 수정일: 2026-11-06
+> 버전: v0.5.0\
+> 수정일: 2026-11-09
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -94,7 +94,7 @@
 | --- | --- | --- |
 | API-CON-01 | 잠금(`version`)이 있는 자원의 수정 요청은 본문에 읽은 `version`을 담는다. 다르면 `409 VERSION_CONFLICT`이고 화면은 최신 값을 다시 불러온다 | 필수 |
 | API-CON-02 | 이미 다른 사람이 처리한 승인·거절·취소·수락에는 `409 ALREADY_PROCESSED`로 응답한다(UX-SCR-012). 같은 사람이 같은 행동을 다시 보내도 같다 | 필수 |
-| API-CON-03 | 자원을 만드는 `POST`(조직, 팀, 초대, 초대 링크, 직무 유형)는 `Idempotency-Key` 헤더(UUID)를 받는다. 같은 계정·같은 키의 두 번째 요청은 처음 응답을 그대로 돌려주고 다시 만들지 않는다. 키에 다른 본문을 보내면 `400 INVALID_REQUEST`다 | 필수 |
+| API-CON-03 | 자원을 만드는 `POST`(조직, 팀, 초대, 초대 링크, 직무 유형)는 `Idempotency-Key` 헤더(UUID)를 받는다. 같은 계정·같은 키의 두 번째 요청은 처음 응답을 그대로 돌려주고 다시 만들지 않는다(초대 링크는 API-CON-05를 따른다). 키에 다른 메서드·경로·본문을 보내면 `400 INVALID_REQUEST`다. 키가 없거나 UUID가 아니면 `400 INVALID_REQUEST`(`fields`의 `Idempotency-Key`)다. 성공 응답(2xx)만 기록하고 24시간 지나면 지운다 | 필수 |
 | API-CON-05 | 토큰 원문이 담긴 응답(초대 링크 만들기)은 중복 요청 기록에 저장하지 않는다. 같은 키의 두 번째 요청에는 `409 ALREADY_PROCESSED`로 응답하고 토큰을 다시 보내지 않는다(TEN-LINK-04) | 필수 |
 | API-CON-04 | 마지막 관리자를 없애는 요청은 `409 LAST_ADMIN_REQUIRED`로 거부한다(TEN-INV-20). 화면은 이 코드로 "관리자가 한 명은 있어야 해요"를 보인다 | 필수 |
 

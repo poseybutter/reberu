@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.8.0\
+> 버전: v0.9.0\
 > 수정일: 2026-11-09
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -229,11 +229,13 @@ erDiagram
 | `account_id` | `UUID` | ○ | |
 | `idempotency_key` | `TEXT(36)` | ○ | 화면이 만든 UUID |
 | `request_hash` | `HASH` | ○ | 메서드, 경로, 본문의 SHA-256. 같은 키에 다른 본문이면 거부한다 |
-| `response_status` | `INT` | | 처리 중이면 비어 있다 |
-| `response_body` | `LONG_TEXT` | | 처음 응답. 토큰이 담긴 응답은 저장하지 않는다(API-CON-05) |
-| `expires_at` | `UTC_TIMESTAMP` | ○ | 만든 뒤 24시간 |
+| `response_status` | `INT` | | 처음 성공 응답(2xx)의 상태 코드. 커밋된 행에는 항상 값이 있다 |
+| `response_body` | `LONG_TEXT` | | 처음 성공 응답, 65,536자 이하. 토큰이 담긴 응답은 저장하지 않는다(API-CON-05) |
+| `expires_at` | `UTC_TIMESTAMP` | ○ | 만든 뒤 24시간. 인덱스 |
 
-- 유일: (`account_id`, `idempotency_key`). 같은 키의 동시 요청은 유일 제약으로 하나만 처리한다(TEN-DB-07).
+- 기본 키: (`account_id`, `idempotency_key`). 같은 키의 동시 요청은 이 제약으로 하나만 처리한다(TEN-DB-07).
+- 키 행은 실제 처리와 같은 트랜잭션에서 넣는다. 같은 키의 두 번째 요청은 첫 요청이 끝날 때까지 기다린 뒤 저장된 응답을 받는다. 처리가 실패하거나 성공이 아닌 응답이면 키 행도 롤백되어 같은 키로 다시 보낼 수 있다(FE-MUT-02).
+- 만료된 키로 다시 오면 새 요청으로 처리한다.
 - 만료된 행은 서버 작업이 지운다(§1.4).
 
 ## 4. core.tenancy
