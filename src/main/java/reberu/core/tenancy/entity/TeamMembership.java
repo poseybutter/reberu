@@ -71,6 +71,22 @@ public class TeamMembership {
         return membership;
     }
 
+    public void promoteToAdmin(Instant at) {
+        if (state != MembershipState.ACTIVE || role == TeamRole.TEAM_ADMIN) {
+            throw new IllegalStateException("팀 관리자로 올릴 수 없는 멤버십");
+        }
+        role = TeamRole.TEAM_ADMIN;
+        updatedAt = at;
+    }
+
+    public Instant expiresAt() {
+        return expiresAt;
+    }
+
+    public UUID teamId() {
+        return teamId;
+    }
+
     public UUID accountId() {
         return accountId;
     }

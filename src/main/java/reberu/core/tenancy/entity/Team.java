@@ -91,6 +91,31 @@ public class Team {
         return team;
     }
 
+    public void makePublic(Instant at) {
+        visibility = Visibility.PUBLIC;
+        updatedAt = at;
+    }
+
+    public void archive(Instant at) {
+        if (state != TeamState.ACTIVE) {
+            throw new IllegalStateException("보관할 수 없는 팀 상태: " + state);
+        }
+        state = TeamState.ARCHIVED;
+        updatedAt = at;
+    }
+
+    public void restore(Instant at) {
+        if (state != TeamState.ARCHIVED) {
+            throw new IllegalStateException("복원할 수 없는 팀 상태: " + state);
+        }
+        state = TeamState.ACTIVE;
+        updatedAt = at;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
+    }
+
     public UUID id() {
         return id;
     }

@@ -33,6 +33,7 @@ import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.FakeGoogle.IdToken;
+import reberu.core.support.RequiresRecentAuth;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 

@@ -23,26 +23,33 @@ import reberu.core.auth.service.SignupService;
 import reberu.core.auth.service.SignupService.SignedIn;
 import reberu.core.auth.session.AuthSession;
 import reberu.core.auth.session.SessionAuthentication;
+import reberu.core.tenancy.Deployment;
+import reberu.core.tenancy.HomeScreens;
 
 @RestController
 @RequestMapping("/api/auth")
 class AuthController {
 
     private final SignupService signupService;
+    private final HomeScreens homeScreens;
+    private final Deployment deployment;
 
-    AuthController(SignupService signupService) {
+    AuthController(SignupService signupService, HomeScreens homeScreens, Deployment deployment) {
         this.signupService = signupService;
+        this.homeScreens = homeScreens;
+        this.deployment = deployment;
     }
 
     @GetMapping("/session")
     SessionResponse session(Authentication authentication) {
         if (authentication instanceof AccountAuthentication account) {
-            return SessionResponse.authenticated(account.accountId(), account.authenticatedAt());
+            return SessionResponse.authenticated(deployment.mode(), account.accountId(), account.authenticatedAt(),
+                    homeScreens.next(account.accountId()));
         }
         if (authentication instanceof PendingSignupAuthentication) {
-            return SessionResponse.signupPending();
+            return SessionResponse.signupPending(deployment.mode());
         }
-        return SessionResponse.anonymous();
+        return SessionResponse.anonymous(deployment.mode());
     }
 
     @GetMapping("/signup")

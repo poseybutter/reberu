@@ -7,6 +7,7 @@ public enum FieldReason {
     TOO_SHORT,
     INVALID_FORMAT,
     NOT_ALLOWED_VALUE,
-    BANNED_WORD
+    BANNED_WORD,
+    DUPLICATE
 
 }
