@@ -10,6 +10,8 @@ public interface Accounts {
 
     Optional<AccountState> stateOf(UUID accountId);
 
+    Optional<AccountState> lockState(UUID accountId);
+
     void recordLogin(UUID accountId, GoogleProfile profile, Instant at);
 
     UUID createWithConsent(GoogleProfile profile, String termsVersion, String privacyVersion, Instant at);

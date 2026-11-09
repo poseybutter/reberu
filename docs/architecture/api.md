@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.5.0\
+> 버전: v0.6.0\
 > 수정일: 2026-11-09
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -189,7 +189,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/orgs` | 조직 만들기. 본문 `name`, `tagline`, `visibility`, `timeZone`, `firstTeam { name, jobTypeKey }`(`jobTypeKey`는 기본 직무 유형, [architecture/tenancy.md](tenancy.md) §12). 처리는 [architecture/tenancy.md](tenancy.md) §8.1 | 계정 | `201`, 제한 SEC-RATE-05, `409 LIMIT_EXCEEDED`, `Idempotency-Key` |
+| `POST` | `/api/orgs` | 조직 만들기. 본문 `name`, `tagline`, `visibility`, `timeZone`, `firstTeam { name, jobTypeKey }`(`jobTypeKey`는 기본 직무 유형, [architecture/tenancy.md](tenancy.md) §12). 처리는 [architecture/tenancy.md](tenancy.md) §8.1. 응답 `{ orgId, teamId }` | 계정 | `201`, 제한 SEC-RATE-05, `409 LIMIT_EXCEEDED`, `Idempotency-Key` |
 | `GET` | `/api/default-job-types` | 조직 만들기에서 고를 기본 직무 유형 목록(key, 이름, 설명) | 계정 | A4 |
 | `GET` | `/api/public-orgs?q=` | 공개 조직 찾기. 두 글자 이상, 최대 20개, 이름·한 줄 소개·가입 방식만(SEC-ORG-03). `PUBLIC`·`ACTIVE`이고 가입 요청이 켜진 조직만 | 계정 | 제한 SEC-RATE-06 |
 | `POST` | `/api/public-orgs/{orgId}/join` | 가입 요청 또는 바로 가입. 결과 `REQUESTED` 또는 `JOINED` | 계정 | 제한 SEC-RATE-04, 재요청 대기 중이면 `409 REQUEST_COOLDOWN` |

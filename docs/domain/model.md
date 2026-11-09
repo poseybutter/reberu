@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.9.0\
+> 버전: v0.10.0\
 > 수정일: 2026-11-09
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -274,7 +274,7 @@ erDiagram
 | `guest_orgspace_allowed` | `BOOL` | ○ | 손님 조직 공간 출입(기본 거짓) |
 | `invitation_ttl_days` | `INT` | ○ | 이메일 초대 수락 기한(기본 7, 최대 30, TEN-INVT-03) |
 | `ownerless` | `BOOL` | ○ | 혼자뿐인 조직 관리자가 탈퇴해 보관된 조직(기본 거짓). 참이면 복원하지 않는다([architecture/tenancy.md](../architecture/tenancy.md) §5.1) |
-| `created_by` | `UUID` | ○ | 만든 계정 |
+| `created_by` | `UUID` | | 만든 계정. `SINGLE_ORG` 시작 때 서버가 만든 조직만 비어 있다. 인덱스(계정당 상한, SEC-ORG-04) |
 | `state_before_suspend` | `CODE` | | 감사용. 해제는 늘 `ACTIVE`([architecture/tenancy.md](../architecture/tenancy.md) §5.2) |
 | `deletion_scheduled_at` | `UTC_TIMESTAMP` | | 삭제 예약 시각(30일 유예, v0.3) |
 | `version` | `INT` | ○ | 잠금 |
