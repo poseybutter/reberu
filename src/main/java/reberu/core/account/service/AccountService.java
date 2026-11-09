@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reberu.core.account.AccountState;
 import reberu.core.account.AccountSummary;
@@ -36,6 +37,12 @@ class AccountService implements Accounts {
     @Transactional(readOnly = true)
     public Optional<AccountState> stateOf(UUID accountId) {
         return accounts.findStateById(accountId);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Optional<AccountState> lockState(UUID accountId) {
+        return accounts.findForUpdate(accountId).map(Account::state);
     }
 
     @Override

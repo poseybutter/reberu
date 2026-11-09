@@ -19,6 +19,7 @@ import reberu.core.support.ErrorCode;
 import reberu.core.support.FieldReason;
 import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
+import reberu.core.tenancy.OrgBootstrap;
 
 @Service
 public class SignupService {
@@ -27,15 +28,17 @@ public class SignupService {
 
     private final Accounts accounts;
     private final PendingSignupRepository pendingSignups;
+    private final OrgBootstrap orgBootstrap;
     private final String termsVersion;
     private final String privacyVersion;
     private final Clock clock = Clock.systemUTC();
 
-    SignupService(Accounts accounts, PendingSignupRepository pendingSignups,
+    SignupService(Accounts accounts, PendingSignupRepository pendingSignups, OrgBootstrap orgBootstrap,
             @Value("${reberu.legal.terms-version}") String termsVersion,
             @Value("${reberu.legal.privacy-version}") String privacyVersion) {
         this.accounts = accounts;
         this.pendingSignups = pendingSignups;
+        this.orgBootstrap = orgBootstrap;
         this.termsVersion = termsVersion;
         this.privacyVersion = privacyVersion;
     }
@@ -63,7 +66,9 @@ public class SignupService {
             throw new ReberuException(ErrorCode.UNAUTHENTICATED);
         }
         Instant now = clock.instant();
-        return new SignedIn(createOrFind(profile, now), now);
+        UUID accountId = createOrFind(profile, now);
+        orgBootstrap.grantFirstAdmin(accountId, profile.email());
+        return new SignedIn(accountId, now);
     }
 
     public void decline(String sessionIdHash) {

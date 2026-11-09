@@ -12,6 +12,7 @@ import reberu.core.account.AccountSummary;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.repository.PendingSignupRepository;
+import reberu.core.tenancy.OrgBootstrap;
 
 @Service
 public class LoginService {
@@ -20,11 +21,13 @@ public class LoginService {
 
     private final Accounts accounts;
     private final PendingSignupRepository pendingSignups;
+    private final OrgBootstrap orgBootstrap;
     private final Clock clock = Clock.systemUTC();
 
-    LoginService(Accounts accounts, PendingSignupRepository pendingSignups) {
+    LoginService(Accounts accounts, PendingSignupRepository pendingSignups, OrgBootstrap orgBootstrap) {
         this.accounts = accounts;
         this.pendingSignups = pendingSignups;
+        this.orgBootstrap = orgBootstrap;
     }
 
     @Transactional
@@ -44,6 +47,7 @@ public class LoginService {
             return LoginOutcome.rejected();
         }
         accounts.recordLogin(account.get().id(), profile, clock.instant());
+        orgBootstrap.grantFirstAdmin(account.get().id(), profile.email());
         return LoginOutcome.signedIn(account.get().id(), authenticatedAt);
     }
 

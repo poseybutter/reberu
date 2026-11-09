@@ -62,3 +62,21 @@ reberu:
     max-lifetime: ${SESSION_MAX_LIFETIME:7d}
     max-per-account: ${SESSION_MAX_PER_ACCOUNT:10}
     recent-auth-window: 1h
+  tenancy:
+    mode: ${DEPLOYMENT_MODE:MULTI_ORG}
+    single-org:
+      name: ${SINGLE_ORG_NAME:}
+      time-zone: ${SINGLE_ORG_TIME_ZONE:}
+      admin-email: ${SINGLE_ORG_ADMIN_EMAIL:}
+    banned-words:
+      - reberu
+      - 레베루
+      - 운영자
+      - 관리자
+      - 공식
+      - 운영진
+      - admin
+      - administrator
+      - official
+      - operator
+      - moderator
