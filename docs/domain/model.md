@@ -229,7 +229,7 @@ erDiagram
 | `account_id` | `UUID` | ○ | |
 | `idempotency_key` | `TEXT(36)` | ○ | 화면이 만든 UUID |
 | `request_hash` | `HASH` | ○ | 메서드, 경로, 본문의 SHA-256. 같은 키에 다른 본문이면 거부한다 |
-| `response_status` | `INT` | | 처음 성공 응답(2xx)의 상태 코드. 처리 중이면 비어 있다 |
+| `response_status` | `INT` | | 처음 성공 응답(2xx)의 상태 코드. 커밋된 행에는 항상 값이 있다 |
 | `response_body` | `LONG_TEXT` | | 처음 성공 응답, 65,536자 이하. 토큰이 담긴 응답은 저장하지 않는다(API-CON-05) |
 | `expires_at` | `UTC_TIMESTAMP` | ○ | 만든 뒤 24시간. 인덱스 |
 
