@@ -1,6 +1,7 @@
 package reberu.core.auth.security;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -12,6 +13,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.oidc.endpoint.OidcParameterNames;
+import reberu.core.auth.session.AuthSession;
 
 class LoginRequestResolver implements OAuth2AuthorizationRequestResolver {
 
@@ -51,12 +53,26 @@ class LoginRequestResolver implements OAuth2AuthorizationRequestResolver {
             return null;
         }
         String returnPath = ReturnPaths.accept(request.getParameter("next"));
-        if (returnPath == null) {
+        boolean reauth = "true".equals(request.getParameter("reauth")) || signedIn(request);
+        if (returnPath == null && !reauth) {
             return authorizationRequest;
         }
-        return OAuth2AuthorizationRequest.from(authorizationRequest)
-                .attributes(attributes -> attributes.put(RETURN_PATH, returnPath))
-                .build();
+        OAuth2AuthorizationRequest.Builder builder = OAuth2AuthorizationRequest.from(authorizationRequest);
+        if (returnPath != null) {
+            builder.attributes(attributes -> attributes.put(RETURN_PATH, returnPath));
+        }
+        if (reauth) {
+            builder.additionalParameters(parameters -> {
+                parameters.put("prompt", "login");
+                parameters.put("max_age", "0");
+            });
+        }
+        return builder.build();
+    }
+
+    private static boolean signedIn(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        return session != null && session.getAttribute(AuthSession.AUTHENTICATION) != null;
     }
 
     private static String newNonce() {

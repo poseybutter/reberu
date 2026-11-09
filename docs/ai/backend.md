@@ -1,6 +1,6 @@
 # 백엔드 규칙
 
-> 버전: v0.5.0\
+> 버전: v0.6.0\
 > 수정일: 2026-11-06
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
@@ -55,6 +55,7 @@ team/
 - 엔티티 → 응답 DTO 변환은 DTO의 정적 메서드(`from(...)`)로 직접 씁니다. 담을 필드를 하나씩 적어, 이메일 같은 값이 실수로 나가지 않게 합니다(API-FMT-02, SEC-OUTPUT-04).
 - 이름이 같은 필드를 실행 중에 자동으로 복사하는 매퍼(ModelMapper 등)는 쓰지 않습니다.
 - 여러 단위가 같이 쓰는 응답 모양(오류 본문, 커서 페이지)은 `core.support`의 공개 타입을 씁니다.
+- 새 `/api` 엔드포인트는 [`architecture/api.md`](../architecture/api.md) 표에 먼저 적습니다. 권한 칸이 🔒이면 컨트롤러 메서드에 `@RequiresRecentAuth`를 붙입니다. `EndpointDeclarationTest`가 둘이 맞는지 확인합니다.
 
 ## 3. JPA와 트랜잭션
 

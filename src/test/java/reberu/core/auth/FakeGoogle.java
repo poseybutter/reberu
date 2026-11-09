@@ -93,6 +93,9 @@ final class FakeGoogle {
         if (token.hostedDomain() != null) {
             claims.claim("hd", token.hostedDomain());
         }
+        if (token.authTime() != null) {
+            claims.claim("auth_time", token.authTime().getEpochSecond());
+        }
         try {
             SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("fake-google").build(),
                     claims.build());
@@ -136,53 +139,59 @@ final class FakeGoogle {
     }
 
     record IdToken(String issuer, String audience, String sub, String email, boolean emailVerified, String name,
-            String hostedDomain, String nonce, Instant issuedAt, Instant expiresAt, boolean forgedSignature) {
+            String hostedDomain, String nonce, Instant issuedAt, Instant expiresAt, Instant authTime,
+            boolean forgedSignature) {
 
         static IdToken valid(String sub, String email, String nonce) {
             Instant now = Instant.now();
             return new IdToken(ISSUER, CLIENT_ID, sub, email, true, "다온 하늘", null, nonce, now,
-                    now.plusSeconds(3600), false);
+                    now.plusSeconds(3600), null, false);
         }
 
         IdToken withIssuer(String value) {
             return new IdToken(value, audience, sub, email, emailVerified, name, hostedDomain, nonce, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
         }
 
         IdToken withAudience(String value) {
             return new IdToken(issuer, value, sub, email, emailVerified, name, hostedDomain, nonce, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
         }
 
         IdToken withEmailVerified(boolean value) {
             return new IdToken(issuer, audience, sub, email, value, name, hostedDomain, nonce, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
         }
 
         IdToken withNonce(String value) {
             return new IdToken(issuer, audience, sub, email, emailVerified, name, hostedDomain, value, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
         }
 
         IdToken withName(String value) {
             return new IdToken(issuer, audience, sub, email, emailVerified, value, hostedDomain, nonce, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
         }
 
         IdToken withHostedDomain(String value) {
             return new IdToken(issuer, audience, sub, email, emailVerified, name, value, nonce, issuedAt,
-                    expiresAt, forgedSignature);
+                    expiresAt, authTime, forgedSignature);
+        }
+
+        IdToken withAuthTime(Instant value) {
+            return new IdToken(issuer, audience, sub, email, emailVerified, name, hostedDomain, nonce, issuedAt,
+                    expiresAt, value, forgedSignature);
         }
 
         IdToken expired() {
             Instant past = Instant.now().minusSeconds(7200);
             return new IdToken(issuer, audience, sub, email, emailVerified, name, hostedDomain, nonce, past,
-                    past.plusSeconds(3600), forgedSignature);
+                    past.plusSeconds(3600), authTime, forgedSignature);
         }
 
         IdToken forged() {
             return new IdToken(issuer, audience, sub, email, emailVerified, name, hostedDomain, nonce, issuedAt,
-                    expiresAt, true);
+                    expiresAt, authTime, true);
         }
 
     }

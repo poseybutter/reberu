@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.3.0\
+> 버전: v0.4.0\
 > 수정일: 2026-11-06
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -119,7 +119,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/oauth2/authorization/google` | Google 인가 요청으로 보낸다. 쿼리 `next`는 서버의 허용 경로 목록에 있을 때만 저장하고, 아니면 버린다(SEC-AUTH-08). `reauth=true`면 `prompt=login`, `max_age=0`을 붙인다 | 공개 | 제한 SEC-RATE-01 |
+| `GET` | `/oauth2/authorization/google` | Google 인가 요청으로 보낸다. 쿼리 `next`는 서버의 허용 경로 목록에 있을 때만 저장하고, 아니면 버린다(SEC-AUTH-08). `reauth=true`이거나 이미 로그인한 세션이면 재인증으로 보고 `prompt=login`, `max_age=0`을 붙인다 | 공개 | 제한 SEC-RATE-01 |
 | `GET` | `/login/oauth2/code/google` | 콜백. 판정은 [architecture/tenancy.md](tenancy.md) §6.1. 결과에 따라 A6, A1, 첫 화면으로 `302` | 공개 | 제한 SEC-RATE-01 |
 | `GET` | `/api/auth/session` | 세션 상태 `ANONYMOUS`·`SIGNUP_PENDING`·`AUTHENTICATED`, 배포 모드, 로그인 뒤 갈 첫 화면(§5.1). 로그인 상태면 계정 ID와 인증 시각도 담는다(탭 계정 확인 FE-TAB-03, 재인증 판단 FE-REAUTH-01). CSRF 쿠키를 내려 준다 | 공개 | |
 | `GET` | `/api/auth/signup` | A6에 보일 값: Google이 준 이메일·이름·사진, 지금 약관·처리방침 버전 | 가입 대기 | |

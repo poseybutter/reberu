@@ -1,6 +1,6 @@
 # 보안 설계
 
-> 버전: v0.6.0\
+> 버전: v0.7.0\
 > 수정일: 2026-11-06
 
 reberu의 보안 요구사항과 검증 기준을 정한다. 요구사항 ID 접두어는 `SEC`다. 테넌시·멤버십 규칙은 [architecture/tenancy.md](tenancy.md), 실시간 채널 규칙은 [architecture/realtime.md](realtime.md)를 따른다.
@@ -201,6 +201,11 @@ sequenceDiagram
 - 계정 탈퇴(D3)
 
 재인증은 Google 인가 요청에 `prompt=login`과 `max_age=0`을 붙여 다시 로그인시키고, ID 토큰의 `auth_time`을 새 인증 시각으로 쓴다. 재인증한 `sub`가 세션 계정과 다르면 세션을 끊고 A1로 보낸다.
+
+- 이미 로그인한 세션에서 시작한 로그인은 `reauth` 값과 관계없이 모두 재인증으로 다룬다. 다른 계정으로 바꾸려면 먼저 로그아웃한다.
+- 재인증 콜백의 `auth_time`이 없거나 10분보다 오래됐으면 세션을 끊고 A1로 보낸다.
+- 일반 로그인도 `auth_time`이 있으면 그 값을 인증 시각으로 쓰고, 없으면 지금 시각을 쓴다. 미래 시각은 지금 시각으로 자른다.
+- 🔒 API는 컨트롤러 메서드의 `@RequiresRecentAuth`로 선언하고, 컨트롤러보다 먼저 판정한다. 기준 1시간은 설정 `reberu.session.recent-auth-window`다.
 
 ```mermaid
 flowchart TD
