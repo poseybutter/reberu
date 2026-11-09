@@ -26,7 +26,36 @@ public class HomeService implements HomeScreens {
     @Override
     @Transactional(readOnly = true)
     public HomeNext next(UUID accountId) {
-        return home(accountId).next();
+        String account = accountId.toString();
+        List<UUID> activeTeams = jdbc.sql("""
+                        SELECT t.id
+                        FROM team_membership tm
+                        JOIN team t ON t.id = tm.team_id
+                        JOIN org_membership m ON m.org_id = t.org_id AND m.account_id = tm.account_id
+                        JOIN organization o ON o.id = t.org_id
+                        WHERE tm.account_id = :account AND tm.state = 'ACTIVE' AND t.state = 'ACTIVE'
+                          AND m.state = 'ACTIVE' AND o.state NOT IN ('SUSPENDED', 'DELETED')
+                        ORDER BY tm.created_at, t.id
+                        LIMIT 2
+                        """)
+                .param("account", account)
+                .query((rs, rowNum) -> UUID.fromString(rs.getString("id")))
+                .list();
+        if (activeTeams.size() == 1) {
+            return new HomeNext(Screen.TEAM_HOME, activeTeams.get(0));
+        }
+        if (activeTeams.size() > 1) {
+            return new HomeNext(Screen.TEAM_PICKER, null);
+        }
+        boolean inOrg = jdbc.sql("""
+                        SELECT COUNT(*) FROM org_membership m
+                        JOIN organization o ON o.id = m.org_id
+                        WHERE m.account_id = :account AND m.state = 'ACTIVE' AND o.state NOT IN ('SUSPENDED', 'DELETED')
+                        """)
+                .param("account", account)
+                .query(Long.class)
+                .single() > 0;
+        return decide(!inOrg, List.of(), pendingRequest(account));
     }
 
     @Transactional(readOnly = true)
@@ -74,14 +103,24 @@ public class HomeService implements HomeScreens {
                         }
                     }
                 });
-        boolean requested = jdbc.sql("""
-                        SELECT (SELECT COUNT(*) FROM org_membership WHERE account_id = :account AND state = 'REQUESTED')
-                             + (SELECT COUNT(*) FROM team_membership WHERE account_id = :account AND state = 'REQUESTED')
+        boolean requested = pendingRequest(account);
+        return new Home(decide(orgs.isEmpty(), activeTeams, requested), List.copyOf(orgs.values()), 0);
+    }
+
+    private boolean pendingRequest(String account) {
+        return jdbc.sql("""
+                        SELECT (SELECT COUNT(*) FROM org_membership m
+                                JOIN organization o ON o.id = m.org_id
+                                WHERE m.account_id = :account AND m.state = 'REQUESTED' AND o.state = 'ACTIVE')
+                             + (SELECT COUNT(*) FROM team_membership tm
+                                JOIN team t ON t.id = tm.team_id
+                                JOIN organization o ON o.id = t.org_id
+                                WHERE tm.account_id = :account AND tm.state = 'REQUESTED' AND t.state = 'ACTIVE'
+                                  AND o.state = 'ACTIVE')
                         """)
                 .param("account", account)
                 .query(Long.class)
                 .single() > 0;
-        return new Home(decide(orgs.isEmpty(), activeTeams, requested), List.copyOf(orgs.values()), 0);
     }
 
     private static HomeNext decide(boolean noOrg, List<TeamEntry> activeTeams, boolean requested) {

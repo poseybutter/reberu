@@ -329,7 +329,8 @@ flowchart TD
 | --- | --- | --- |
 | TEN-HOME-01 | 첫 화면 판정에서 세는 팀 멤버십은 `ACTIVE` 팀 멤버십 가운데 팀이 `ACTIVE`이고, 그 조직의 내 조직 멤버십이 `ACTIVE`이며, 조직이 `SUSPENDED`·`DELETED`가 아닌 것이다. 보관된 팀은 A3 목록에는 보이지만 "팀 하나면 바로 그 팀" 판정에는 들지 않는다 | 필수 |
 | TEN-HOME-02 | 세는 팀 멤버십이 0개라도 `ACTIVE` 조직 멤버십이 하나 이상 있으면 A0이 아니라 A3이다. 조직에 들어온 사람에게 조직 만들기 첫 화면을 보이지 않는다 | 필수 |
-| TEN-HOME-03 | `GET /api/auth/session`과 `GET /api/me/home`의 `next`는 같은 판정 코드로 만든다 | 필수 |
+| TEN-HOME-03 | `GET /api/auth/session`과 `GET /api/me/home`의 `next`는 같은 판정 기준으로 만든다. 세션 확인은 자주 불리므로 `next`만 구하는 가벼운 조회를 쓰고, 두 경로가 같은 값을 내는지 테스트로 확인한다 | 필수 |
+| TEN-HOME-04 | A2(`JOIN_PENDING`) 판정에서 세는 가입 요청은 처리될 수 있는 것뿐이다. 조직 요청은 조직이 `ACTIVE`일 때, 팀 요청은 팀과 조직이 모두 `ACTIVE`일 때만 센다 | 필수 |
 
 ### 6.3 대기 중인 이메일 초대 처리
 

@@ -272,6 +272,84 @@ class TeamTest {
         UUID requester = newAccount("requester");
         insertOrgMembership(orgId, requester, "MEMBER", "REQUESTED");
         assertThat(home(requester).get("next").get("screen").asString()).isEqualTo("JOIN_PENDING");
+
+        for (UUID actor : List.of(admin, member, guest, outsider, requester)) {
+            assertThat(session(actor).get("next")).as(actor.toString()).isEqualTo(home(actor).get("next"));
+        }
+    }
+
+    @Test
+    @DisplayName("TEN-HOME-04: 처리될 수 없는 가입 요청(정지·보관 조직, 보관 팀)은 JOIN_PENDING으로 세지 않음")
+    void ignoresUnprocessableRequests() throws Exception {
+        UUID requester = newAccount("requester");
+        insertOrgMembership(orgId, requester, "MEMBER", "REQUESTED");
+
+        for (String state : List.of("SUSPENDED", "ARCHIVED")) {
+            jdbc.sql("UPDATE organization SET state = :state WHERE id = :id").param("state", state)
+                    .param("id", orgId).update();
+            assertThat(home(requester).get("next").get("screen").asString()).as(state).isEqualTo("START");
+            assertThat(session(requester).get("next").get("screen").asString()).as(state).isEqualTo("START");
+        }
+        jdbc.sql("UPDATE organization SET state = 'ACTIVE' WHERE id = :id").param("id", orgId).update();
+        assertThat(home(requester).get("next").get("screen").asString()).isEqualTo("JOIN_PENDING");
+
+        UUID teamRequester = newAccount("team-requester");
+        insertTeamMembership(firstTeamId, teamRequester, "REQUESTED");
+        jdbc.sql("UPDATE team SET state = 'ARCHIVED' WHERE id = :id").param("id", firstTeamId).update();
+        assertThat(session(teamRequester).get("next").get("screen").asString()).isEqualTo("START");
+        jdbc.sql("UPDATE team SET state = 'ACTIVE' WHERE id = :id").param("id", firstTeamId).update();
+        assertThat(session(teamRequester).get("next").get("screen").asString()).isEqualTo("JOIN_PENDING");
+    }
+
+    @Test
+    @DisplayName("SEC-AUTHZ-09·TEN-ISO-02: 다른 조직 관리자는 이 조직 팀을 보관·복원할 수 없음(404, 상태 그대로)")
+    void otherOrgAdminCannotArchiveOrRestore() throws Exception {
+        String otherOrg = json(createOrg(outsider, "다른 조직")).get("orgId").asString();
+
+        for (String action : List.of("archive", "restore")) {
+            assertThat(perform(post("/api/orgs/" + otherOrg + "/teams/" + firstTeamId + "/" + action), outsider)
+                    .getStatus()).as("다른 조직 경로 " + action).isEqualTo(404);
+            assertThat(perform(post(teamPath(firstTeamId) + "/" + action), outsider).getStatus())
+                    .as("이 조직 경로 " + action).isEqualTo(404);
+        }
+        assertThat(state(firstTeamId)).isEqualTo("ACTIVE");
+
+        perform(post(teamPath(firstTeamId) + "/archive"), admin);
+        for (UUID actor : List.of(member, guest, outsider)) {
+            assertThat(perform(post(teamPath(firstTeamId) + "/restore"), actor).getStatus())
+                    .as("복원 " + actor).isEqualTo(404);
+        }
+        assertThat(perform(post("/api/orgs/" + otherOrg + "/teams/" + firstTeamId + "/restore"), outsider)
+                .getStatus()).isEqualTo(404);
+        assertThat(state(firstTeamId)).isEqualTo("ARCHIVED");
+    }
+
+    @Test
+    @DisplayName("팀 목록은 같은 시각에 만든 팀도 만든 시각·ID 순서로 커서와 함께 빠짐없이 나옴")
+    void ordersTeamsByCreationTimeThenId() throws Exception {
+        LocalDateTime same = LocalDateTime.of(2026, 11, 9, 9, 0);
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            ids.add(json(createTeam(admin, orgId, team("같은 시각 " + i, "PRIVATE", jobType("기본"), admin)))
+                    .get("teamId").asString());
+        }
+        jdbc.sql("UPDATE team SET created_at = :at WHERE org_id = :org AND id <> :first")
+                .param("at", same).param("org", orgId).param("first", firstTeamId).update();
+        jdbc.sql("UPDATE team SET created_at = :at WHERE id = :first")
+                .param("at", same.plusDays(1)).param("first", firstTeamId).update();
+        ids.sort(String::compareTo);
+        List<String> expected = new ArrayList<>(ids);
+        expected.add(firstTeamId);
+
+        List<String> seen = new ArrayList<>();
+        String cursor = null;
+        do {
+            JsonNode page = json(list(admin, "?limit=1" + (cursor == null ? "" : "&cursor=" + cursor)));
+            page.get("items").forEach(item -> seen.add(item.get("id").asString()));
+            cursor = page.get("nextCursor").isNull() ? null : page.get("nextCursor").asString();
+        } while (cursor != null);
+
+        assertThat(seen).containsExactlyElementsOf(expected);
     }
 
     @Test
@@ -395,6 +473,21 @@ class TeamTest {
                 .param("admin", false)
                 .param("state", state)
                 .param("expires", "GUEST".equals(kind) ? now.plusDays(30) : null)
+                .param("now", now)
+                .update();
+    }
+
+    private void insertTeamMembership(String teamId, UUID account, String state) {
+        LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+        jdbc.sql("""
+                        INSERT INTO team_membership (id, team_id, account_id, role, state, joined_via, created_at,
+                            updated_at, version)
+                        VALUES (:id, :team, :account, 'TEAM_MEMBER', :state, 'REQUEST', :now, :now, 0)
+                        """)
+                .param("id", UUID.randomUUID().toString())
+                .param("team", teamId)
+                .param("account", account.toString())
+                .param("state", state)
                 .param("now", now)
                 .update();
     }

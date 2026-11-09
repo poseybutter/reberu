@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static reberu.TestCsrf.csrfToken;
 
 import java.time.Instant;
@@ -145,8 +146,27 @@ class SingleOrgBootstrapTest {
         assertThat(mockMvc.perform(get("/api/default-job-types").with(authentication(signedIn)))
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
         assertThat(jdbc.sql("SELECT COUNT(*) FROM organization").query(Integer.class).single()).isOne();
-        assertThat(mockMvc.perform(get("/api/auth/session")).andReturn().getResponse().getContentAsString())
-                .contains("\"deploymentMode\":\"SINGLE_ORG\"");
+        mockMvc.perform(get("/api/auth/session"))
+                .andExpect(jsonPath("$.state").value("ANONYMOUS"))
+                .andExpect(jsonPath("$.deploymentMode").value("SINGLE_ORG"))
+                .andExpect(jsonPath("$.next").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("SINGLE_ORG: 로그인한 첫 관리자의 세션은 deploymentMode와 첫 화면 TEAM_PICKER(팀 없는 조직 멤버)")
+    void signedInSessionShowsModeAndNext() throws Exception {
+        UUID leader = newAccount("leader", "leader@example.com");
+        assertThat(bootstrap.grantFirstAdmin(leader, "leader@example.com")).isTrue();
+
+        mockMvc.perform(get("/api/auth/session")
+                        .with(authentication(new AccountAuthentication(leader, Instant.now()))))
+                .andExpect(jsonPath("$.state").value("AUTHENTICATED"))
+                .andExpect(jsonPath("$.deploymentMode").value("SINGLE_ORG"))
+                .andExpect(jsonPath("$.next.screen").value("TEAM_PICKER"));
+        mockMvc.perform(get("/api/me/home").with(authentication(new AccountAuthentication(leader, Instant.now()))))
+                .andExpect(jsonPath("$.next.screen").value("TEAM_PICKER"))
+                .andExpect(jsonPath("$.orgs[0].orgId").value(ORG_ID))
+                .andExpect(jsonPath("$.orgs[0].orgAdmin").value(true));
     }
 
     @Test

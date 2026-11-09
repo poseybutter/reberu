@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -43,8 +44,6 @@ public class TeamService {
     public static final int DEFAULT_LIMIT = 20;
     public static final int MAX_LIMIT = 100;
 
-    private static final String FIRST_ID = "";
-
     private final OrgAccess access;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
@@ -77,12 +76,14 @@ public class TeamService {
     public CursorPage<TeamSummary> list(UUID orgId, UUID accountId, String cursor, int limit) {
         OrgAccess.Member member = access.requireMember(orgId, accountId);
         String scope = "org-teams:" + orgId;
-        String after = cursor == null ? FIRST_ID : afterId(cursors.decode(scope, cursor));
+        Position after = cursor == null ? null : position(cursors.decode(scope, cursor));
         String visibleFilter = member.membership().orgAdmin() ? "" : """
                  AND (t.visibility = 'PUBLIC' OR EXISTS (SELECT 1 FROM team_membership v
                       WHERE v.team_id = t.id AND v.account_id = :account AND v.state = 'ACTIVE'))
                 """;
-        List<TeamSummary> rows = jdbc.sql("""
+        String afterFilter = after == null ? ""
+                : " AND (t.created_at > :afterAt OR (t.created_at = :afterAt AND t.id > :afterId))";
+        JdbcClient.StatementSpec query = jdbc.sql("""
                         SELECT t.id, t.name, t.visibility, t.state, t.created_at, j.name AS job_type_name,
                                (SELECT COUNT(*) FROM team_membership c
                                 WHERE c.team_id = t.id AND c.state = 'ACTIVE') AS member_count,
@@ -90,20 +91,22 @@ public class TeamService {
                                 WHERE r.team_id = t.id AND r.account_id = :account AND r.state = 'ACTIVE') AS my_role
                         FROM team t
                         LEFT JOIN job_type j ON j.id = t.job_type_id AND j.org_id = t.org_id
-                        WHERE t.org_id = :org AND t.id > :after
-                        """ + visibleFilter + " ORDER BY t.id LIMIT :limit")
+                        WHERE t.org_id = :org
+                        """ + visibleFilter + afterFilter + " ORDER BY t.created_at, t.id LIMIT :limit")
                 .param("org", orgId.toString())
                 .param("account", accountId.toString())
-                .param("after", after)
-                .param("limit", limit + 1)
-                .query(TeamService::summary)
-                .list();
+                .param("limit", limit + 1);
+        if (after != null) {
+            query = query.param("afterAt", after.createdAt()).param("afterId", after.id());
+        }
+        List<TeamSummary> rows = query.query(TeamService::summary).list();
         if (rows.size() <= limit) {
             return new CursorPage<>(rows, null);
         }
         List<TeamSummary> page = rows.subList(0, limit);
-        return new CursorPage<>(List.copyOf(page),
-                cursors.encode(scope, List.of(page.get(limit - 1).id().toString())));
+        TeamSummary last = page.get(limit - 1);
+        return new CursorPage<>(List.copyOf(page), cursors.encode(scope,
+                List.of(LocalDateTime.ofInstant(last.createdAt(), ZoneOffset.UTC).toString(), last.id().toString())));
     }
 
     @Transactional
@@ -221,16 +224,17 @@ public class TeamService {
                 newAdminAccountId, null, "TEAM_ADMIN"));
     }
 
-    private static String afterId(List<String> position) {
+    private static Position position(List<String> values) {
         try {
-            if (position.size() == 1) {
-                String id = position.get(0);
+            if (values.size() == 2) {
+                LocalDateTime createdAt = LocalDateTime.parse(values.get(0));
+                String id = values.get(1);
                 if (UUID.fromString(id).toString().equals(id)) {
-                    return id;
+                    return new Position(createdAt, id);
                 }
             }
         }
-        catch (IllegalArgumentException malformed) {
+        catch (IllegalArgumentException | DateTimeParseException malformed) {
             throw new ReberuException(ErrorCode.INVALID_REQUEST);
         }
         throw new ReberuException(ErrorCode.INVALID_REQUEST);
@@ -260,6 +264,9 @@ public class TeamService {
                 rs.getLong("member_count"),
                 role == null ? null : TeamRole.valueOf(role),
                 createdAt.toInstant(ZoneOffset.UTC));
+    }
+
+    private record Position(LocalDateTime createdAt, String id) {
     }
 
     public record NewTeam(String name, Visibility visibility, UUID jobTypeId, UUID firstAdminAccountId) {
