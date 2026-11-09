@@ -419,11 +419,11 @@ erDiagram
 | `team_module_state` | `team_id`, `module_key`, `enabled` `BOOL`, `changed_by`, `changed_at` | 유일 (`team_id`, `module_key`) |
 | `org_module_setting`, `team_module_setting` | 소속 id, `module_key`, `setting_key` `TEXT(60)`, `setting_value` `TEXT(2000)`, `version` | 유일 (소속 id, `module_key`, `setting_key`). 값의 형식과 기본값은 ModuleDefinition의 설정 스키마([architecture/modules.md](../architecture/modules.md) §5.1)가 검사한다 |
 | `org_holiday` | `org_id`, `day` `LOCAL_DATE`, `name` `TEXT(40)`, `created_by` | 유일 (`org_id`, `day`) |
-| `org_activity_log`, `team_activity_log` | 소속 id, `actor_id`(계정 또는 시스템이면 비움), `action` `CODE`, `target_type` `CODE`, `target_id` `UUID`, `before_value`·`after_value` `TEXT(2000)`, `occurred_at` | 추가만(SEC-LOG-03). 인덱스 (소속 id, `occurred_at`), (소속 id, `actor_id`) |
+| `org_activity_log`, `team_activity_log` | 소속 id, `actor_id`(계정 또는 시스템이면 비움), `action` `CODE`, `target_type` `CODE`, `target_id` `UUID`, `before_value`·`after_value` `TEXT(2000)`, `occurred_at` | 추가만(SEC-LOG-03). DB 트리거가 `UPDATE`(PostgreSQL은 `TRUNCATE`도)를 막는다. 인덱스 (소속 id, `occurred_at`), (소속 id, `actor_id`), 보관 기간 정리용 (`occurred_at`) |
 | `member_presence_status` | `team_id`, `account_id`, `status` `CODE`(`AVAILABLE`·`FOCUS`·`MEETING`·`AWAY`), `away_by_idle` `BOOL`(무활동으로 생긴 `AWAY`. 입력이 생기면 `AVAILABLE`로, UX-FLOW-12), `changed_at` | 유일 (`team_id`, `account_id`). 마지막 상태만 저장한다([architecture/realtime.md](../architecture/realtime.md) `status.changed`) |
 
 - 모듈 켜짐 기록이 있는데 배포에 모듈 코드가 없으면 꺼진 것으로 다룬다(ARCH-MOD-04). 행은 지우지 않는다.
-- 활동 기록의 값 열에 토큰, 세션, 웹훅 주소, 이메일 초대 전체 목록을 넣지 않는다(TEN-LOG-03, SEC-HOOK-03).
+- 활동 기록의 값 열에 토큰, 세션, 웹훅 주소, 이메일 초대 전체 목록을 넣지 않는다(TEN-LOG-03, SEC-HOOK-03). 앱은 값에 이메일 주소, URL, 토큰 모양 문자열(숫자와 글자가 섞인 32자 이상, UUID 제외), 제어 문자가 있으면 기록을 거부하고 트랜잭션 전체를 실패시킨다.
 
 ## 6. core.event·core.notification
 

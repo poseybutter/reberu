@@ -1,7 +1,7 @@
 # 백엔드 규칙
 
-> 버전: v0.6.0\
-> 수정일: 2026-11-06
+> 버전: v0.7.0\
+> 수정일: 2026-11-09
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
 
@@ -70,6 +70,8 @@ team/
 - 스키마는 Flyway 마이그레이션으로만 바꿉니다. 공통 마이그레이션은 `src/main/resources/db/migration/core`에 둡니다.
 - 세 DB의 문법이 달라 공통으로 쓸 수 없는 변경만 `db/migration/vendor/{postgresql,mysql,mariadb}`에 둡니다. 버전 번호는 core와 같은 순서를 쓰고, 한 버전은 core에 있거나 세 DB 폴더 모두에 있어야 합니다. `MigrationLayoutTest`가 이 규칙과 파일 이름 형식을 확인합니다.
 - MySQL·MariaDB는 문자 집합 `utf8mb4`, 정렬 규칙 `utf8mb4_bin`으로 씁니다([architecture/tenancy.md](../architecture/tenancy.md) TEN-DB-04). 테스트 컨테이너도 이 값으로 띄웁니다.
+- 활동 기록 표는 DB 트리거로 수정을 막습니다(TEN-DB-13). MySQL·MariaDB는 `log_bin_trust_function_creators=1`이 있어야 트리거 마이그레이션이 실행되며, 테스트 컨테이너도 이 값으로 띄웁니다.
+- 애플리케이션 로그는 `logback-spring.xml`이 메시지와 예외의 이메일·URL 쿼리·토큰 모양 문자열을 가리고 메시지의 줄바꿈을 글자로 바꿉니다(SEC-LOG-01). 로그 형식을 바꿀 때도 이 변환기를 거치게 합니다.
 - 트랜잭션 격리 수준은 `spring.datasource.hikari.transaction-isolation`으로 READ COMMITTED를 명시합니다(TEN-DB-07). MySQL·MariaDB의 기본값(REPEATABLE READ)과 PostgreSQL의 동작을 맞추기 위해서입니다. `DatabaseSettingsTest`가 세 DB에서 이 값과 문자 집합을 확인합니다.
 - 마이그레이션 파일은 어떤 테이블과 컬럼을 바꿀지 계획을 먼저 보여 주고, 승인을 받은 뒤 작성합니다.
 - 이미 적용된 마이그레이션은 수정하지 않고, 새 버전 파일을 추가합니다.
