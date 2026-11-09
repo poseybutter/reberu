@@ -1,6 +1,6 @@
 # 백엔드 규칙
 
-> 버전: v0.7.0\
+> 버전: v0.8.0\
 > 수정일: 2026-11-09
 
 [`CONTRIBUTING.md`](../../CONTRIBUTING.md)의 공통 기준 위에 백엔드에만 해당하는 규칙을 더합니다.
@@ -56,6 +56,7 @@ team/
 - 이름이 같은 필드를 실행 중에 자동으로 복사하는 매퍼(ModelMapper 등)는 쓰지 않습니다.
 - 여러 단위가 같이 쓰는 응답 모양(오류 본문, 커서 페이지)은 `core.support`의 공개 타입을 씁니다.
 - 새 `/api` 엔드포인트는 [`architecture/api.md`](../architecture/api.md) 표에 먼저 적습니다. 권한 칸이 🔒이면 컨트롤러 메서드에 `@RequiresRecentAuth`를 붙입니다. `EndpointDeclarationTest`가 둘이 맞는지 확인합니다.
+- 표에 `Idempotency-Key`가 있는 `POST`는 컨트롤러에서 `IdempotentRequests.execute`로 처리를 감쌉니다. 토큰 원문이 응답에 담기면 `executeWithoutReplay`를 씁니다(API-CON-05). 컨트롤러는 트랜잭션 밖이므로 키 기록과 service 트랜잭션이 함께 커밋되거나 함께 롤백됩니다.
 
 ## 3. JPA와 트랜잭션
 
