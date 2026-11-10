@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.7.0\
+> 버전: v0.8.0\
 > 수정일: 2026-11-09
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -244,7 +244,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/teams/{teamId}` | 팀 이름, 상태, 공개 범위, 내 역할(조직 관리자 열람이면 `null`), 켜진 모듈 key 목록과 메뉴 | 팀 멤버 | 화면 공통 |
+| `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 모듈 key 목록 `modules`와 메뉴(#22 전까지 빈 목록) | 팀 멤버 | 화면 공통 |
 | `GET` | `/api/teams/{teamId}/overview` | 팀 가입 요청 대기 수, 손님 만료 임박 수, 최근 팀 활동 5개 | 팀 관리자 | E1. 출석 수는 v0.2 |
 | `GET` | `/api/teams/{teamId}/settings` | 팀 설정과 `version` | 팀 관리자 | E4 |
 | `PATCH` | `/api/teams/{teamId}/settings` | 이름(조직 안 유일), 공개 범위, 공개 팀 가입 방식, 리포트 주기 값 | 팀 관리자 | `version` 필수 |

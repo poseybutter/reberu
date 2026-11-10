@@ -7,8 +7,11 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.Immutable;
+import reberu.core.support.Owned;
+import reberu.core.support.Owned.Ownership;
 
 @Entity
+@Owned(Ownership.ACCOUNT)
 @Immutable
 @Table(name = "account_consent")
 public class AccountConsent {

@@ -1,7 +1,7 @@
 # 모듈 구조
 
-> 버전: v0.3.0\
-> 수정일: 2026-11-06
+> 버전: v0.4.0\
+> 수정일: 2026-11-09
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
@@ -272,6 +272,7 @@ flowchart TD
 | ARCH-DATA-01 | 모든 엔티티는 소속을 하나 선언한다: 계정, 조직, 팀([architecture/tenancy.md](tenancy.md) §11.5 TEN-PORT-01). 선언이 없는 엔티티가 있으면 테스트가 실패한다 | 필수 |
 | ARCH-DATA-02 | 팀 소속 엔티티의 저장소 조회 메서드는 팀 식별자를 매개변수로 받는다(TEN-ISO-02). 팀 식별자 없이 자원 식별자만으로 찾는 메서드가 있으면 테스트가 실패한다 | 필수 |
 | ARCH-DATA-03 | 모듈의 테이블 이름은 모듈 key를 접두어로 쓴다(예: `praise_message`). 고정 기능과 core는 접두어 없이 쓴다 | 권장 |
+| ARCH-DATA-04 | 소속은 엔티티에 `@Owned(ACCOUNT·ORG·TEAM)`로 선언한다. 팀 소속 엔티티의 저장소는 식별자만으로 찾는 기본 메서드(`findById`, `findAll` 등)를 물려받지 않도록 `Repository`만 상속하고 필요한 메서드를 직접 선언한다. 조회 메서드(`find`·`get`·`count`·`exists` 등)는 `teamId` 또는 `orgId` 매개변수를 가진다 | 필수 |
 
 ## 8. 경계 검증
 

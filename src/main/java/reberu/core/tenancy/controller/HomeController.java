@@ -4,6 +4,8 @@ import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.tenancy.service.HomeService;
 import reberu.core.tenancy.service.HomeService.Home;
 
@@ -17,6 +19,7 @@ class HomeController {
     }
 
     @GetMapping("/api/me/home")
+    @Access(AccessLevel.ACCOUNT)
     Home home(@AuthenticationPrincipal UUID accountId) {
         return home.home(accountId);
     }

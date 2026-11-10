@@ -1,6 +1,7 @@
 package reberu.core.audit.service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +42,23 @@ class JdbcActivityLogs implements ActivityLogs {
                                                before_value, after_value, occurred_at)
                 VALUES (:id, :owner, :actorId, :action, :targetType, :targetId, :before, :after, :occurredAt)
                 """, Objects.requireNonNull(teamId, "팀 ID 없음"), entry);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean orgRecordedSince(UUID orgId, UUID actorId, String action, UUID targetId, Instant since) {
+        return jdbc.sql("""
+                        SELECT COUNT(*) FROM org_activity_log
+                        WHERE org_id = :org AND actor_id = :actor AND action = :action AND target_id = :target
+                          AND occurred_at >= :since
+                        """)
+                .param("org", Objects.requireNonNull(orgId, "조직 ID 없음").toString())
+                .param("actor", Objects.requireNonNull(actorId, "행위자 ID 없음").toString())
+                .param("action", Objects.requireNonNull(action, "행동 없음"))
+                .param("target", Objects.requireNonNull(targetId, "대상 ID 없음").toString())
+                .param("since", LocalDateTime.ofInstant(since.truncatedTo(ChronoUnit.MICROS), ZoneOffset.UTC))
+                .query(Long.class)
+                .single() > 0;
     }
 
     private void insert(String sql, UUID owner, ActivityEntry entry) {

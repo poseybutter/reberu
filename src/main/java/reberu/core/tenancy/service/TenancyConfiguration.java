@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
+import reberu.core.access.MembershipDirectory;
 import reberu.core.account.Accounts;
 import reberu.core.audit.ActivityLogs;
 import reberu.core.support.CursorCodec;
@@ -48,16 +49,21 @@ class TenancyConfiguration {
     }
 
     @Bean
-    OrgAccess orgAccess(OrganizationRepository organizations, OrgMembershipRepository orgMemberships) {
-        return new OrgAccess(organizations, orgMemberships);
+    MembershipDirectory membershipDirectory(JdbcClient jdbc) {
+        return new JdbcMembershipDirectory(jdbc);
     }
 
     @Bean
-    TeamService teamService(OrgAccess access, TeamRepository teams, TeamMembershipRepository teamMemberships,
+    TeamService teamService(TeamRepository teams, TeamMembershipRepository teamMemberships,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(access, teams, teamMemberships, orgMemberships, jobTypes, nameRules, activityLogs,
+        return new TeamService(teams, teamMemberships, orgMemberships, jobTypes, nameRules, activityLogs,
                 cursors, jdbc, jsonMapper, Clock.systemUTC());
+    }
+
+    @Bean
+    TeamViewService teamViewService(TeamRepository teams, ActivityLogs activityLogs) {
+        return new TeamViewService(teams, activityLogs, Clock.systemUTC());
     }
 
     @Bean

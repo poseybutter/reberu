@@ -77,14 +77,14 @@ class ActivityLogImmutabilityTest {
     }
 
     @Test
-    @DisplayName("T-AUDIT-IMMUTABLE: 공개 API는 기록 추가만 제공")
+    @DisplayName("T-AUDIT-IMMUTABLE: 공개 API는 기록 추가와 조회만 제공, 고치거나 지우는 메서드 없음")
     void publicApiOnlyRecords() {
         List<String> methods = Arrays.stream(ActivityLogs.class.getDeclaredMethods())
                 .filter(method -> Modifier.isPublic(method.getModifiers()))
                 .map(Method::getName)
                 .toList();
 
-        assertThat(methods).containsExactlyInAnyOrder("recordOrg", "recordTeam");
+        assertThat(methods).containsExactlyInAnyOrder("recordOrg", "recordTeam", "orgRecordedSince");
     }
 
     @Test
