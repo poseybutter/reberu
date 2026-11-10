@@ -6,6 +6,7 @@ import java.util.ArrayDeque;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,28 +21,39 @@ class SlidingWindowRateLimits implements RateLimits {
 
     private static final Logger securityLog = LoggerFactory.getLogger(SECURITY_LOGGER);
 
+    private static final long CAP_LOG_INTERVAL = Duration.ofMinutes(1).toMillis();
+
     private final RateLimitProperties properties;
     private final Clock clock;
-    private final Map<RateLimit, ConcurrentHashMap<String, Bucket>> buckets = new EnumMap<>(RateLimit.class);
+    private final Map<RateLimit, Map<RateLimit.Key, Pool>> pools = new EnumMap<>(RateLimit.class);
 
     SlidingWindowRateLimits(RateLimitProperties properties, Clock clock) {
         this.properties = properties;
         this.clock = clock;
         for (RateLimit rule : RateLimit.values()) {
-            buckets.put(rule, new ConcurrentHashMap<>());
+            Map<RateLimit.Key, Pool> byKind = new EnumMap<>(RateLimit.Key.class);
+            for (RateLimit.Key kind : RateLimit.Key.values()) {
+                byKind.put(kind, new Pool());
+            }
+            pools.put(rule, byKind);
         }
     }
 
     @Override
     public void acquire(RateLimit rule, String key) {
         RateLimitProperties.Rule config = properties.rules().get(rule);
-        ConcurrentHashMap<String, Bucket> keys = buckets.get(rule);
+        RateLimit.Key kind = key.startsWith(RateLimits.IP_PREFIX) ? RateLimit.Key.IP : RateLimit.Key.ACCOUNT;
+        Pool pool = pools.get(rule).get(kind);
+        ConcurrentHashMap<String, Bucket> keys = pool.buckets;
         long size = config.window().toMillis();
         long now = clock.millis();
         if (!keys.containsKey(key) && keys.size() >= properties.maxKeysPerRule()) {
-            purge(rule, now, size);
+            purge(keys, now, size);
             if (keys.size() >= properties.maxKeysPerRule()) {
-                securityLog.warn("요청 제한 키 상한 도달: rule={}", rule.id());
+                long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
+                if (pool.lastCapLog.getAndSet(logIndex) != logIndex) {
+                    securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
+                }
                 throw new RateLimitExceededException(rule, config.window());
             }
         }
@@ -70,16 +82,18 @@ class SlidingWindowRateLimits implements RateLimits {
     void purgeStale() {
         long now = clock.millis();
         for (RateLimit rule : RateLimit.values()) {
-            purge(rule, now, properties.rules().get(rule).window().toMillis());
+            long size = properties.rules().get(rule).window().toMillis();
+            for (Pool pool : pools.get(rule).values()) {
+                purge(pool.buckets, now, size);
+            }
         }
     }
 
     int size(RateLimit rule) {
-        return buckets.get(rule).size();
+        return pools.get(rule).values().stream().mapToInt(pool -> pool.buckets.size()).sum();
     }
 
-    private void purge(RateLimit rule, long now, long size) {
-        ConcurrentHashMap<String, Bucket> keys = buckets.get(rule);
+    private static void purge(ConcurrentHashMap<String, Bucket> keys, long now, long size) {
         for (String key : keys.keySet()) {
             keys.computeIfPresent(key, (ignored, bucket) -> bucket.stale(size, now) ? null : bucket);
         }
@@ -90,12 +104,12 @@ class SlidingWindowRateLimits implements RateLimits {
     }
 
     static String maskKey(String key) {
-        if (!key.startsWith("ip:")) {
+        if (!key.startsWith(RateLimits.IP_PREFIX)) {
             return key;
         }
-        String address = key.substring(3);
+        String address = key.substring(RateLimits.IP_PREFIX.length());
         int cut = address.contains(":") ? nthIndexOf(address, ':', 3) : address.lastIndexOf('.');
-        return cut < 0 ? "ip:***" : "ip:" + address.substring(0, cut + 1) + "*";
+        return RateLimits.IP_PREFIX + (cut < 0 ? "***" : address.substring(0, cut + 1) + "*");
     }
 
     private static int nthIndexOf(String text, char target, int n) {
@@ -107,6 +121,13 @@ class SlidingWindowRateLimits implements RateLimits {
             }
         }
         return found;
+    }
+
+    private static final class Pool {
+
+        private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
+        private final AtomicLong lastCapLog = new AtomicLong(Long.MIN_VALUE);
+
     }
 
     private abstract static class Bucket {

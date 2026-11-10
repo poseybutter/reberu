@@ -13,6 +13,11 @@ public class RateLimitExceededException extends ReberuException {
         this.retryAfter = retryAfter;
     }
 
+    @Override
+    public synchronized Throwable fillInStackTrace() {
+        return this;
+    }
+
     public RateLimit rule() {
         return rule;
     }

@@ -19,6 +19,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.RateLimit;
 import reberu.core.support.RateLimitExceededException;
+import reberu.core.support.RateLimits;
 
 @ExtendWith(OutputCaptureExtension.class)
 class SlidingWindowRateLimitsTest {
@@ -161,6 +162,51 @@ class SlidingWindowRateLimitsTest {
         clock.advance(Duration.ofMinutes(2));
         assertThatCode(() -> limits.acquire(RateLimit.LOGIN, "ip:203.0.113.3")).doesNotThrowAnyException();
         assertThat(limits.size(RateLimit.LOGIN)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-13: IP 키가 상한을 채워도 계정 키는 따로 셈")
+    void ipFloodDoesNotBlockAccounts() {
+        SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 2);
+        limits.acquire(RateLimit.DEFAULT, RateLimits.ipKey("203.0.113.1"));
+        limits.acquire(RateLimit.DEFAULT, RateLimits.ipKey("203.0.113.2"));
+
+        assertThatThrownBy(() -> limits.acquire(RateLimit.DEFAULT, RateLimits.ipKey("203.0.113.3")))
+                .isInstanceOf(RateLimitExceededException.class);
+        assertThatCode(() -> limits.acquire(RateLimit.DEFAULT, RateLimits.accountKey("a"))).doesNotThrowAnyException();
+        assertThatCode(() -> limits.acquire(RateLimit.DEFAULT, RateLimits.accountKey("b"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-14: 키 상한 도달 로그는 규칙·키 종류마다 1분에 한 번")
+    void logsCapOncePerMinute(CapturedOutput output) {
+        SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 1);
+        limits.acquire(RateLimit.POSTING, RateLimits.ipKey("203.0.113.1"));
+        for (int i = 2; i < 10; i++) {
+            String key = RateLimits.ipKey("203.0.113." + i);
+            assertThatThrownBy(() -> limits.acquire(RateLimit.POSTING, key))
+                    .isInstanceOf(RateLimitExceededException.class);
+        }
+
+        assertThat(output.getOut().split("rule=SEC-RATE-07, kind=IP", -1)).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-12: IPv6는 /64 단위로 묶고, IPv4와 IPv4 매핑 주소는 그대로")
+    void normalizesIpKeys() {
+        assertThat(RateLimits.ipKey("2001:db8:85a3:8d3:1319:8a2e:370:7348"))
+                .isEqualTo(RateLimits.ipKey("2001:0db8:85a3:08d3::1"))
+                .isEqualTo("ip:2001:db8:85a3:8d3::/64");
+        assertThat(RateLimits.ipKey("2001:db8:85a3:8d4::1")).isNotEqualTo(RateLimits.ipKey("2001:db8:85a3:8d3::1"));
+        assertThat(RateLimits.ipKey("203.0.113.7")).isEqualTo("ip:203.0.113.7");
+        assertThat(RateLimits.ipKey("::ffff:203.0.113.7")).isEqualTo("ip:203.0.113.7");
+        assertThat(RateLimits.ipKey("0:0:0:0:0:0:0:1")).isEqualTo("ip:0:0:0:0::/64");
+    }
+
+    @Test
+    @DisplayName("거부 예외는 스택 트레이스를 모으지 않음")
+    void rejectionHasNoStackTrace() {
+        assertThat(new RateLimitExceededException(RateLimit.DEFAULT, Duration.ofSeconds(1)).getStackTrace()).isEmpty();
     }
 
     @Test
