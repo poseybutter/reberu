@@ -163,4 +163,72 @@ public class Organization {
         return createdBy;
     }
 
+    public String tagline() {
+        return tagline;
+    }
+
+    public String timeZone() {
+        return timeZone;
+    }
+
+    public int guestDefaultDays() {
+        return guestDefaultDays;
+    }
+
+    public int invitationTtlDays() {
+        return invitationTtlDays;
+    }
+
+    public boolean ownerless() {
+        return ownerless;
+    }
+
+    public int version() {
+        return version;
+    }
+
+    public void applySettings(Settings settings, Instant at) {
+        name = settings.name();
+        tagline = settings.tagline();
+        timeZone = settings.timeZone();
+        visibility = settings.visibility();
+        joinLinkEnabled = settings.joinLinkEnabled();
+        joinRequestMode = settings.joinRequestMode();
+        memberAdmissionReview = settings.memberAdmissionReview();
+        guestApprovalRequired = settings.guestApprovalRequired();
+        guestDefaultDays = settings.guestDefaultDays();
+        guestMaxDays = settings.guestMaxDays();
+        guestOrgspaceAllowed = settings.guestOrgspaceAllowed();
+        invitationTtlDays = settings.invitationTtlDays();
+        updatedAt = at;
+    }
+
+    public Settings settings() {
+        return new Settings(name, tagline, timeZone, visibility, joinLinkEnabled, joinRequestMode,
+                memberAdmissionReview, guestApprovalRequired, guestDefaultDays, guestMaxDays, guestOrgspaceAllowed,
+                invitationTtlDays);
+    }
+
+    public void archive(Instant at) {
+        if (state != OrgState.ACTIVE) {
+            throw new IllegalStateException("보관할 수 없는 조직 상태: " + state);
+        }
+        state = OrgState.ARCHIVED;
+        updatedAt = at;
+    }
+
+    public void restore(Instant at) {
+        if (state != OrgState.ARCHIVED || ownerless) {
+            throw new IllegalStateException("복원할 수 없는 조직");
+        }
+        state = OrgState.ACTIVE;
+        updatedAt = at;
+    }
+
+    public record Settings(String name, String tagline, String timeZone, Visibility visibility,
+            boolean joinLinkEnabled, JoinRequestMode joinRequestMode, boolean memberAdmissionReview,
+            boolean guestApprovalRequired, int guestDefaultDays, int guestMaxDays, boolean guestOrgspaceAllowed,
+            int invitationTtlDays) {
+    }
+
 }

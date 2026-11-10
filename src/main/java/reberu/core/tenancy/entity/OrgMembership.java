@@ -92,6 +92,15 @@ public class OrgMembership {
         updatedAt = at;
     }
 
+    public void reject(Instant at) {
+        if (state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("거절할 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.REJECTED;
+        rejectedAt = at;
+        updatedAt = at;
+    }
+
     public UUID id() {
         return id;
     }

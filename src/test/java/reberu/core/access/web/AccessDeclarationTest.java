@@ -39,7 +39,7 @@ class AccessDeclarationTest {
     }
 
     @Test
-    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId, 같은 경로 조각 반복")
+    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId, 같은 경로 조각 반복, 관리자·쓰기 API 손님 허용")
     void detectsViolations() throws Exception {
         Map<RequestMappingInfo, HandlerMethod> handlers = new LinkedHashMap<>();
         handlers.put(info("/api/undeclared"), handler("undeclared"));
@@ -49,10 +49,15 @@ class AccessDeclarationTest {
         handlers.put(info("/api/teams/{teamId}/thing"), handler("teamMember"));
         handlers.put(info("/api/teams/{teamId}/x/{id}/x"), handler("teamMember"));
         handlers.put(info("/api/x/{id}/x"), handler("teamMember"));
+        handlers.put(info("/api/orgs/{orgId}/admin-guest"), handler("orgAdminGuest"));
+        handlers.put(info("/api/orgs/{orgId}/member-guest"), handler("orgMemberGuest"));
+        handlers.put(info("/api/orgs/{orgId}/write-guest"), handler("orgMemberGuestWrite"));
         handlers.put(info("/not-api/thing"), handler("undeclared"));
 
         assertThat(AccessDeclarations.violations(handlers))
-                .hasSize(5)
+                .hasSize(7)
+                .anySatisfy(v -> assertThat(v).startsWith("손님 허용은 읽기 API에만: /api/orgs/{orgId}/write-guest"))
+                .anySatisfy(v -> assertThat(v).startsWith("손님 허용은 조직 멤버 권한에만: /api/orgs/{orgId}/admin-guest"))
                 .anySatisfy(v -> assertThat(v).startsWith("팀 권한인데 {teamId} 경로 없음: /api/x/{id}/x"))
                 .anySatisfy(v -> assertThat(v).startsWith("권한 선언 없음: /api/undeclared"))
                 .anySatisfy(v -> assertThat(v).startsWith("조직·팀 경로인데 조직·팀 권한 아님: /api/orgs/{orgId}/thing"))
@@ -98,6 +103,18 @@ class AccessDeclarationTest {
 
         @Access(AccessLevel.TEAM_MEMBER)
         void teamMember() {
+        }
+
+        @Access(value = AccessLevel.ORG_ADMIN, guestAllowed = true)
+        void orgAdminGuest() {
+        }
+
+        @Access(value = AccessLevel.ORG_MEMBER, guestAllowed = true)
+        void orgMemberGuest() {
+        }
+
+        @Access(value = AccessLevel.ORG_MEMBER, write = true, guestAllowed = true)
+        void orgMemberGuestWrite() {
         }
 
     }

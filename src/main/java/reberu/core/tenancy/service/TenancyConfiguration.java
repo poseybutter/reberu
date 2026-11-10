@@ -62,6 +62,14 @@ class TenancyConfiguration {
     }
 
     @Bean
+    OrgSettingsService orgSettingsService(OrganizationRepository organizations,
+            OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships, NameRules nameRules,
+            ActivityLogs activityLogs, JdbcClient jdbc) {
+        return new OrgSettingsService(organizations, orgMemberships, teamMemberships, nameRules, activityLogs, jdbc,
+                Clock.systemUTC());
+    }
+
+    @Bean
     TeamViewService teamViewService(TeamRepository teams, ActivityLogs activityLogs) {
         return new TeamViewService(teams, activityLogs, Clock.systemUTC());
     }

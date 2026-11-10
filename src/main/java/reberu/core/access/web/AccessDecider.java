@@ -32,7 +32,7 @@ class AccessDecider {
         Instant now = clock.instant();
         OrgView org = directory.org(orgId, accountId).orElseThrow(AccessDecider::notFound);
         OrgMember member = visibleMember(org, now);
-        if (member.guest()) {
+        if (member.guest() && !access.guestAllowed()) {
             throw notFound();
         }
         if (access.write() && org.status() != Status.ACTIVE) {
@@ -41,7 +41,7 @@ class AccessDecider {
         if (access.value() == AccessLevel.ORG_ADMIN && !member.orgAdmin()) {
             throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
         }
-        return new OrgContext(orgId, accountId, member.orgAdmin());
+        return new OrgContext(orgId, accountId, member.orgAdmin(), member.guest());
     }
 
     TeamContext team(Access access, UUID accountId, String teamIdValue) {
