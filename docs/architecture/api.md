@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.9.0\
+> 버전: v0.10.0\
 > 수정일: 2026-11-10
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -200,12 +200,12 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/orgs/{orgId}` | 조직 이름, 시간대, 상태, 내 멤버 종류와 조직 관리자 여부 | 조직 멤버(손님 가능) | |
-| `GET` | `/api/orgs/{orgId}/overview` | 팀 수와 팀별 인원, 가입 요청·초대 승인 대기 수, 최근 조직 활동 5개 | 조직 관리자 | F1. 출석 수는 v0.2 |
-| `GET` | `/api/orgs/{orgId}/settings` | 조직 설정 전체와 `version` | 조직 관리자 | F7 |
-| `PATCH` | `/api/orgs/{orgId}/settings` | 이름, 한 줄 소개, 시간대(OQ-32), 공개 범위, 가입 방법, 새 구성원 조직 관리자 확인(TEN-ADM-01·02), 손님 규칙, 초대 수락 기한 | 조직 관리자 🔒 | `version` 필수 |
-| `POST` | `/api/orgs/{orgId}/archive` | 조직 보관([architecture/tenancy.md](tenancy.md) §14.1) | 조직 관리자 🔒 | |
-| `POST` | `/api/orgs/{orgId}/restore` | 조직 복원. 관리자 없는 보관 조직은 `404 NOT_FOUND` | 조직 관리자 🔒 | |
+| `GET` | `/api/orgs/{orgId}` | `id`, `name`, `timeZone`, `state`, 내 멤버 종류 `myKind`, 조직 관리자 여부 `orgAdmin` | 조직 멤버(손님 가능) | |
+| `GET` | `/api/orgs/{orgId}/overview` | 팀 수와 팀별 `ACTIVE` 인원, 조직 가입 요청 대기 수, 초대 승인 대기 수, 최근 조직 활동 5개(최신부터, 바뀌기 전·후 값 제외) | 조직 관리자 | F1. 초대 수는 #18 전까지 0. 출석 수는 v0.2 |
+| `GET` | `/api/orgs/{orgId}/settings` | 조직 설정 전체, `state`, `version` | 조직 관리자 | F7 |
+| `PATCH` | `/api/orgs/{orgId}/settings` | 이름, 한 줄 소개, 시간대(OQ-32), 공개 범위, 가입 방법, 새 구성원 조직 관리자 확인(TEN-ADM-01·02), 손님 규칙, 초대 수락 기한. 보낸 필드만 바꾸고 새 설정을 돌려준다(TEN-SET-01~04) | 조직 관리자 🔒 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
+| `POST` | `/api/orgs/{orgId}/archive` | 조직 보관([architecture/tenancy.md](tenancy.md) §14.1, TEN-SET-05) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED` |
+| `POST` | `/api/orgs/{orgId}/restore` | 조직 복원. 관리자 없는 보관 조직은 `404 NOT_FOUND`(TEN-SET-06) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED` |
 | `GET` | `/api/orgs/{orgId}/teams` | 조직 관리자: 모든 팀(F2). 구성원: `PUBLIC` 팀과 내 팀(A3 공개 팀 찾기). 항목마다 `id`, `name`, `visibility`, `state`, `jobTypeName`, `memberCount`, `myRole`, `createdAt`. 만든 순서, 커서 페이지(§3.3) | 조직 멤버 | 손님은 `404` |
 | `POST` | `/api/orgs/{orgId}/teams` | 팀 만들기. 본문 `name`, `visibility`, `jobTypeId`, `firstAdminAccountId`(TEN-TEAM-01). 응답 `{ teamId }` | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`(`fields`의 `DUPLICATE`) |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관(TEN-TEAM-04·05) | 조직 관리자 🔒 | `204` |

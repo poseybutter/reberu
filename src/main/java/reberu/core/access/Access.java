@@ -15,4 +15,6 @@ public @interface Access {
 
     boolean write() default false;
 
+    boolean guestAllowed() default false;
+
 }

@@ -82,6 +82,14 @@ public class TeamMembership {
         updatedAt = at;
     }
 
+    public void reject(Instant at) {
+        if (state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("거절할 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.REJECTED;
+        updatedAt = at;
+    }
+
     public Instant expiresAt() {
         return expiresAt;
     }

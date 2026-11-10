@@ -30,6 +30,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import reberu.TestcontainersConfiguration;
@@ -192,7 +193,9 @@ class IsolationTest {
         }
         attempts.add(new Attempt("다온→구름", data.daon, data.gureum, data.gureumSea));
         attempts.add(new Attempt("이슬→파도", data.iseul, data.pado, data.padoSea));
-        attempts.add(new Attempt("새봄→파도(손님)", data.saebom, data.pado, data.padoForest));
+        if (!endpoint.guestAllowed()) {
+            attempts.add(new Attempt("새봄→파도(손님)", data.saebom, data.pado, data.padoForest));
+        }
         attempts.add(new Attempt("다온→없는 조직", data.daon, unknown, unknown));
         if (endpoint.pattern().contains("{teamId}")) {
             attempts.add(new Attempt("도윤→파도 경로의 구름 팀", data.doyun, data.pado, data.gureumSea));
@@ -221,13 +224,16 @@ class IsolationTest {
 
     private List<Endpoint> scopedEndpoints() {
         Map<String, Endpoint> endpoints = new LinkedHashMap<>();
-        for (RequestMappingInfo info : handlerMapping.getHandlerMethods().keySet()) {
+        for (Map.Entry<RequestMappingInfo, HandlerMethod> entry : handlerMapping.getHandlerMethods().entrySet()) {
+            RequestMappingInfo info = entry.getKey();
+            Access access = entry.getValue().getMethodAnnotation(Access.class);
+            boolean guestAllowed = access != null && access.guestAllowed();
             for (String pattern : info.getPatternValues()) {
                 if (!pattern.startsWith("/api/orgs/{orgId}") && !pattern.startsWith("/api/teams/{teamId}")) {
                     continue;
                 }
                 for (RequestMethod method : info.getMethodsCondition().getMethods()) {
-                    endpoints.put(method + " " + pattern, new Endpoint(method, pattern));
+                    endpoints.put(method + " " + pattern, new Endpoint(method, pattern, guestAllowed));
                 }
             }
         }
@@ -250,7 +256,7 @@ class IsolationTest {
         return body;
     }
 
-    private record Endpoint(RequestMethod method, String pattern) {
+    private record Endpoint(RequestMethod method, String pattern, boolean guestAllowed) {
     }
 
     private record Attempt(String who, UUID account, UUID orgId, UUID teamId) {

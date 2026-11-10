@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -12,9 +13,12 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
+import reberu.core.audit.ActivityRecord;
 import reberu.core.support.Uuids;
 
 class JdbcActivityLogs implements ActivityLogs {
+
+    static final int MAX_RECENT = 50;
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -59,6 +63,32 @@ class JdbcActivityLogs implements ActivityLogs {
                 .param("since", LocalDateTime.ofInstant(since.truncatedTo(ChronoUnit.MICROS), ZoneOffset.UTC))
                 .query(Long.class)
                 .single() > 0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActivityRecord> recentOrg(UUID orgId, int limit) {
+        if (limit < 1 || limit > MAX_RECENT) {
+            throw new IllegalArgumentException("최근 활동 개수 범위 오류(1~" + MAX_RECENT + ")");
+        }
+        return jdbc.sql("""
+                        SELECT id, occurred_at, actor_id, action, target_type, target_id, before_value, after_value
+                        FROM org_activity_log
+                        WHERE org_id = :org
+                        ORDER BY occurred_at DESC, id DESC
+                        LIMIT :limit
+                        """)
+                .param("org", Objects.requireNonNull(orgId, "조직 ID 없음").toString())
+                .param("limit", limit)
+                .query((rs, rowNum) -> {
+                    String actor = rs.getString("actor_id");
+                    return new ActivityRecord(UUID.fromString(rs.getString("id")),
+                            rs.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                            actor == null ? null : UUID.fromString(actor), rs.getString("action"),
+                            rs.getString("target_type"), UUID.fromString(rs.getString("target_id")),
+                            rs.getString("before_value"), rs.getString("after_value"));
+                })
+                .list();
     }
 
     private void insert(String sql, UUID owner, ActivityEntry entry) {

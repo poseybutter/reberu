@@ -6,6 +6,7 @@ import java.util.Map;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.access.AccessLevel.Scope;
 
 final class AccessDeclarations {
@@ -35,6 +36,9 @@ final class AccessDeclarations {
                     continue;
                 }
                 Scope scope = access.value().scope();
+                if (access.guestAllowed() && access.value() != AccessLevel.ORG_MEMBER) {
+                    violations.add("손님 허용은 조직 멤버 권한에만: " + where);
+                }
                 if (scope == Scope.ORG && !has(pattern, ORG_ID)) {
                     violations.add("조직 권한인데 {orgId} 경로 없음: " + where);
                 }
