@@ -37,6 +37,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reberu.TestcontainersConfiguration;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ErrorResponseWriter;
 import reberu.core.support.ReberuException;
@@ -241,36 +243,50 @@ class ApiErrorTest {
         }
 
         @GetMapping("/ok")
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> ok() {
             return ResponseEntity.noContent().build();
         }
 
         @GetMapping("/conflict")
+
+        @Access(AccessLevel.ACCOUNT)
         void conflict() {
             throw new ReberuException(ErrorCode.LAST_ADMIN_REQUIRED);
         }
 
         @GetMapping("/boom")
+
+        @Access(AccessLevel.ACCOUNT)
         void boom() {
             throw new IllegalStateException(SECRET_DETAIL);
         }
 
         @PostMapping("/body")
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> body(@Valid @RequestBody ProbeBody body) {
             return ResponseEntity.noContent().build();
         }
 
         @GetMapping("/limit")
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> limit(@RequestParam @Max(100) int limit) {
             return ResponseEntity.noContent().build();
         }
 
         @GetMapping("/written")
+
+        @Access(AccessLevel.ACCOUNT)
         void written(HttpServletRequest request, HttpServletResponse response) throws IOException {
             writer.write(request, response, ErrorCode.RATE_LIMITED);
         }
 
         @GetMapping("/denied")
+
+        @Access(AccessLevel.ACCOUNT)
         void denied() {
             throw new AccessDeniedException("denied");
         }

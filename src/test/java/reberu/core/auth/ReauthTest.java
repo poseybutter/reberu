@@ -30,6 +30,8 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reberu.TestcontainersConfiguration;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.FakeGoogle.IdToken;
@@ -224,6 +226,8 @@ class ReauthTest {
     static class ProbeController {
 
         @GetMapping(LOCKED)
+
+        @Access(AccessLevel.ACCOUNT)
         @RequiresRecentAuth
         ResponseEntity<Void> locked() {
             return ResponseEntity.noContent().build();

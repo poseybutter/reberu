@@ -9,11 +9,14 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
+import reberu.core.support.Owned;
+import reberu.core.support.Owned.Ownership;
 import reberu.core.tenancy.entity.TenancyCodes.JoinRequestMode;
 import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.Visibility;
 
 @Entity
+@Owned(Ownership.ORG)
 @Table(name = "organization")
 public class Organization {
 

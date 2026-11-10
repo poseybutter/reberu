@@ -9,11 +9,14 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.UUID;
+import reberu.core.support.Owned;
+import reberu.core.support.Owned.Ownership;
 import reberu.core.tenancy.entity.TenancyCodes.JoinedVia;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 
 @Entity
+@Owned(Ownership.TEAM)
 @Table(name = "team_membership")
 public class TeamMembership {
 

@@ -10,8 +10,11 @@ import java.time.Instant;
 import java.util.UUID;
 import reberu.core.account.AccountState;
 import reberu.core.account.GoogleProfile;
+import reberu.core.support.Owned;
+import reberu.core.support.Owned.Ownership;
 
 @Entity
+@Owned(Ownership.ACCOUNT)
 @Table(name = "account")
 public class Account {
 

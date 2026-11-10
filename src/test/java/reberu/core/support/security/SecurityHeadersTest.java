@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reberu.TestcontainersConfiguration;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
@@ -134,16 +136,22 @@ class SecurityHeadersTest {
     static class ProbeController {
 
         @GetMapping("/ok")
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> ok() {
             return ResponseEntity.noContent().build();
         }
 
         @GetMapping("/denied")
+
+        @Access(AccessLevel.ACCOUNT)
         void denied() {
             throw new AccessDeniedException("denied");
         }
 
         @GetMapping("/boom")
+
+        @Access(AccessLevel.ACCOUNT)
         void boom() {
             throw new IllegalStateException("boom");
         }

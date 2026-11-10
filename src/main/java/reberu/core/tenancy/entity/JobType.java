@@ -6,8 +6,11 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import reberu.core.support.Owned;
+import reberu.core.support.Owned.Ownership;
 
 @Entity
+@Owned(Ownership.ORG)
 @Table(name = "job_type")
 public class JobType {
 

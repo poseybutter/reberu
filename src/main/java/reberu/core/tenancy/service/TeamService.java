@@ -44,7 +44,6 @@ public class TeamService {
     public static final int DEFAULT_LIMIT = 20;
     public static final int MAX_LIMIT = 100;
 
-    private final OrgAccess access;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
     private final OrgMembershipRepository orgMemberships;
@@ -56,10 +55,9 @@ public class TeamService {
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    TeamService(OrgAccess access, TeamRepository teams, TeamMembershipRepository teamMemberships,
+    TeamService(TeamRepository teams, TeamMembershipRepository teamMemberships,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
-        this.access = access;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
         this.orgMemberships = orgMemberships;
@@ -73,11 +71,10 @@ public class TeamService {
     }
 
     @Transactional(readOnly = true)
-    public CursorPage<TeamSummary> list(UUID orgId, UUID accountId, String cursor, int limit) {
-        OrgAccess.Member member = access.requireMember(orgId, accountId);
+    public CursorPage<TeamSummary> list(UUID orgId, UUID accountId, boolean orgAdmin, String cursor, int limit) {
         String scope = "org-teams:" + orgId;
         Position after = cursor == null ? null : position(cursors.decode(scope, cursor));
-        String visibleFilter = member.membership().orgAdmin() ? "" : """
+        String visibleFilter = orgAdmin ? "" : """
                  AND (t.visibility = 'PUBLIC' OR EXISTS (SELECT 1 FROM team_membership v
                       WHERE v.team_id = t.id AND v.account_id = :account AND v.state = 'ACTIVE'))
                 """;
@@ -111,8 +108,6 @@ public class TeamService {
 
     @Transactional
     public UUID create(UUID orgId, UUID accountId, NewTeam input) {
-        OrgAccess.Member admin = access.requireAdmin(orgId, accountId);
-        OrgAccess.requireWritable(admin.organization());
         List<FieldViolation> violations = new ArrayList<>();
         FieldViolation name = nameRules.checkName("name", input.name(), 1, Team.NAME_MAX);
         String nameKey = name == null ? NameRules.nameKey(input.name()) : null;
@@ -167,9 +162,7 @@ public class TeamService {
 
     @Transactional
     public void archive(UUID orgId, UUID teamId, UUID accountId) {
-        OrgAccess.Member admin = access.requireAdmin(orgId, accountId);
-        OrgAccess.requireWritable(admin.organization());
-        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(OrgAccess::notFound);
+        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamService::notFound);
         if (team.state() != TeamState.ACTIVE) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
         }
@@ -180,9 +173,7 @@ public class TeamService {
 
     @Transactional
     public void restore(UUID orgId, UUID teamId, UUID accountId, UUID newAdminAccountId) {
-        OrgAccess.Member admin = access.requireAdmin(orgId, accountId);
-        OrgAccess.requireWritable(admin.organization());
-        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(OrgAccess::notFound);
+        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamService::notFound);
         if (team.state() != TeamState.ARCHIVED) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
         }
@@ -246,6 +237,10 @@ public class TeamService {
                 .map(OrgMembership::kind)
                 .filter(MembershipKind.MEMBER::equals)
                 .isPresent();
+    }
+
+    private static ReberuException notFound() {
+        return new ReberuException(ErrorCode.NOT_FOUND);
     }
 
     private static ReberuException invalid(String field, FieldReason reason) {

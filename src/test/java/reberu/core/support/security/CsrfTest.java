@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 import reberu.TestcontainersConfiguration;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import tools.jackson.databind.json.JsonMapper;
 
 @SpringBootTest
@@ -134,11 +136,15 @@ class CsrfTest {
     static class ProbeController {
 
         @GetMapping
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> read() {
             return ResponseEntity.noContent().build();
         }
 
         @RequestMapping(method = {RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
+
+        @Access(AccessLevel.ACCOUNT)
         ResponseEntity<Void> change() {
             return ResponseEntity.noContent().build();
         }

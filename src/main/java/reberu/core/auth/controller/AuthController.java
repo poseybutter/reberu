@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.auth.dto.ConsentRequest;
 import reberu.core.auth.dto.ConsentResponse;
 import reberu.core.auth.dto.SessionResponse;
@@ -41,6 +43,7 @@ class AuthController {
     }
 
     @GetMapping("/session")
+    @Access(AccessLevel.PUBLIC)
     SessionResponse session(Authentication authentication) {
         if (authentication instanceof AccountAuthentication account) {
             return SessionResponse.authenticated(deployment.mode(), account.accountId(), account.authenticatedAt(),
@@ -53,11 +56,13 @@ class AuthController {
     }
 
     @GetMapping("/signup")
+    @Access(AccessLevel.SIGNUP_PENDING)
     SignupResponse signup(PendingSignupAuthentication pending) {
         return SignupResponse.from(pending.profile(), signupService.termsVersion(), signupService.privacyVersion());
     }
 
     @PostMapping("/signup/consent")
+    @Access(AccessLevel.SIGNUP_PENDING)
     ResponseEntity<ConsentResponse> consent(PendingSignupAuthentication pending,
             @Valid @RequestBody ConsentRequest body, HttpServletRequest request) {
         SignedIn signedIn = signupService.consent(pending.sessionIdHash(), pending.profile(),
@@ -69,6 +74,7 @@ class AuthController {
     }
 
     @DeleteMapping("/signup")
+    @Access(AccessLevel.SIGNUP_PENDING)
     ResponseEntity<Void> decline(PendingSignupAuthentication pending, HttpServletRequest request) {
         signupService.decline(pending.sessionIdHash());
         invalidate(request);
@@ -76,6 +82,7 @@ class AuthController {
     }
 
     @PostMapping("/logout")
+    @Access(AccessLevel.PUBLIC)
     ResponseEntity<Void> logout(HttpServletRequest request) {
         invalidate(request);
         return ResponseEntity.noContent().build();

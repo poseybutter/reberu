@@ -115,11 +115,14 @@ class TeamTest {
     }
 
     @Test
-    @DisplayName("SEC-AUTHZ-05·08·09: 구성원·손님·비멤버·다른 조직 관리자는 팀 만들기 404")
+    @DisplayName("SEC-AUTHZ-05·08·09·TEN-CTX: 구성원은 403, 손님·비멤버·다른 조직 관리자는 팀 만들기 404")
     void onlyOrgAdminCreatesTeam() throws Exception {
         String otherOrg = json(createOrg(outsider, "다른 조직")).get("orgId").asString();
 
-        for (UUID actor : List.of(member, guest, outsider)) {
+        MockHttpServletResponse byMember = createTeam(member, orgId, team("몰래 팀", "PRIVATE", jobType("기본"), member));
+        assertThat(byMember.getStatus()).isEqualTo(403);
+        assertThat(code(byMember)).isEqualTo("FORBIDDEN_ACTION");
+        for (UUID actor : List.of(guest, outsider)) {
             MockHttpServletResponse response = createTeam(actor, orgId, team("몰래 팀", "PRIVATE", jobType("기본"),
                     actor));
             assertThat(response.getStatus()).as(actor.toString()).isEqualTo(404);
@@ -198,7 +201,7 @@ class TeamTest {
     }
 
     @Test
-    @DisplayName("보관·복원은 최근 인증 필요(401 REAUTH_REQUIRED), 구성원은 404")
+    @DisplayName("보관·복원은 최근 인증 필요(401 REAUTH_REQUIRED), 구성원은 403, 없는 팀은 404")
     void archiveRequiresRecentAuthAndAdmin() throws Exception {
         MockHttpServletResponse stale = mockMvc.perform(post(teamPath(firstTeamId) + "/archive")
                 .with(authentication(new AccountAuthentication(admin, Instant.now().minus(Duration.ofHours(2)))))
@@ -206,7 +209,7 @@ class TeamTest {
 
         assertThat(stale.getStatus()).isEqualTo(401);
         assertThat(code(stale)).isEqualTo("REAUTH_REQUIRED");
-        assertThat(perform(post(teamPath(firstTeamId) + "/archive"), member).getStatus()).isEqualTo(404);
+        assertThat(perform(post(teamPath(firstTeamId) + "/archive"), member).getStatus()).isEqualTo(403);
         assertThat(perform(post("/api/orgs/" + orgId + "/teams/" + UUID.randomUUID() + "/archive"), admin)
                 .getStatus()).isEqualTo(404);
         assertThat(state(firstTeamId)).isEqualTo("ACTIVE");
@@ -315,7 +318,8 @@ class TeamTest {
         assertThat(state(firstTeamId)).isEqualTo("ACTIVE");
 
         perform(post(teamPath(firstTeamId) + "/archive"), admin);
-        for (UUID actor : List.of(member, guest, outsider)) {
+        assertThat(perform(post(teamPath(firstTeamId) + "/restore"), member).getStatus()).isEqualTo(403);
+        for (UUID actor : List.of(guest, outsider)) {
             assertThat(perform(post(teamPath(firstTeamId) + "/restore"), actor).getStatus())
                     .as("복원 " + actor).isEqualTo(404);
         }

@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.support.IdempotentRequest;
 import reberu.core.support.IdempotentRequests;
 import reberu.core.tenancy.dto.CreateOrgRequest;
@@ -40,6 +42,7 @@ class OrgController {
     }
 
     @PostMapping("/orgs")
+    @Access(AccessLevel.ACCOUNT)
     ResponseEntity<String> create(@AuthenticationPrincipal UUID accountId,
             @RequestHeader(name = IdempotentRequest.HEADER, required = false) String key,
             @Valid @RequestBody CreateOrgRequest body, HttpServletRequest request) {
@@ -52,6 +55,7 @@ class OrgController {
     }
 
     @GetMapping("/default-job-types")
+    @Access(AccessLevel.ACCOUNT)
     List<DefaultJobTypeResponse> defaultJobTypes() {
         return defaultJobTypes.all().stream()
                 .map(type -> new DefaultJobTypeResponse(type.key(), type.name(), type.description()))
