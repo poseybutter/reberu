@@ -39,6 +39,9 @@ final class AccessDeclarations {
                 if (access.guestAllowed() && access.value() != AccessLevel.ORG_MEMBER) {
                     violations.add("손님 허용은 조직 멤버 권한에만: " + where);
                 }
+                if (access.guestAllowed() && access.write()) {
+                    violations.add("손님 허용은 읽기 API에만: " + where);
+                }
                 if (scope == Scope.ORG && !has(pattern, ORG_ID)) {
                     violations.add("조직 권한인데 {orgId} 경로 없음: " + where);
                 }

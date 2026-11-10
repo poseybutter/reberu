@@ -689,7 +689,7 @@ flowchart TD
 | TEN-CTX-04 | 모듈 코드는 확정된 지금 팀만 받는다. 모듈이 스스로 팀을 찾지 않는다 | 필수 |
 | TEN-CTX-05 | CSRF 실패(403), 최근 인증 필요(401 `REAUTH_REQUIRED`), 요청 제한(429)은 [architecture/security.md](security.md)를 따르며 1단계 전에 판정한다 | 필수 |
 | TEN-CTX-06 | 모든 `/api` 컨트롤러 메서드는 권한 수준 하나를 선언한다: `PUBLIC`, `SIGNUP_PENDING`, `ACCOUNT`(경로에 조직·팀 없음), `ORG_MEMBER`·`ORG_ADMIN`(`{orgId}` 경로, 1~4단계), `TEAM_VIEWER`·`TEAM_MEMBER`·`TEAM_ADMIN`(`{teamId}` 경로, 1~6단계). 쓰기 API는 쓰기 표시를 함께 단다(9단계). 판정은 요청 본문을 읽기 전에 한다 | 필수 |
-| TEN-CTX-07 | 조직 수준에서 손님은 4단계에서 `404`다(TEN-GUEST-05). 예외는 [architecture/api.md](api.md) 표에 "손님 가능"으로 적은 `ORG_MEMBER` API뿐이며, 권한 선언에 손님 허용(`guestAllowed`)을 함께 단다. 손님 허용은 `ORG_MEMBER`에만 달 수 있고, 어기면 서버가 시작하지 않는다. 조직 구성원이 `ORG_ADMIN` API를, 팀 멤버가 자기 역할보다 높은 팀 API를 부르면 볼 수 있는 대상이므로 10단계 `403 FORBIDDEN_ACTION`이다 | 필수 |
+| TEN-CTX-07 | 조직 수준에서 손님은 4단계에서 `404`다(TEN-GUEST-05). 예외는 [architecture/api.md](api.md) 표에 "손님 가능"으로 적은 `ORG_MEMBER` API뿐이며, 권한 선언에 손님 허용(`guestAllowed`)을 함께 단다. 손님 허용은 `ORG_MEMBER`의 읽기 API에만 달 수 있고(쓰기 표시와 함께 쓸 수 없다), 어기면 서버가 시작하지 않는다. 조직 구성원이 `ORG_ADMIN` API를, 팀 멤버가 자기 역할보다 높은 팀 API를 부르면 볼 수 있는 대상이므로 10단계 `403 FORBIDDEN_ACTION`이다 | 필수 |
 | TEN-CTX-08 | 조직 경로 아래 팀 자원(`/api/orgs/{orgId}/teams/{teamId}/...`)은 조직 컨텍스트를 확정한 뒤 "조직 식별자 + 팀 식별자"로 찾는다. 다른 조직의 팀이면 `404`다 | 필수 |
 
 ## 11. 데이터 소속과 격리
