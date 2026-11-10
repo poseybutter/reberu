@@ -19,7 +19,7 @@
 - Spring Session은 `spring-session-core`(인터페이스)만 씁니다. 자동 구성 모듈과 Spring Session JDBC는 넣지 않습니다
 - Spring Modulith는 BOM(`spring-modulith-bom`)으로 판을 정합니다. Spring Boot BOM에 들어 있지 않기 때문입니다
 - Spring Boot BOM이 정한 판에 알려진 취약점이 있으면 `build.gradle.kts`의 `extra["<이름>.version"]`으로 수정판을 고정하고, 이유는 커밋 메시지와 PR에 적습니다. BOM이 수정판 이상을 정하면 그 줄을 지웁니다
-- 요청 제한은 라이브러리 없이 직접 만든 메모리 미끄러운 창입니다(`core.support.ratelimit`, [architecture/security.md](../architecture/security.md) §13.2). 서버를 여러 대로 늘릴 때 공유 저장소로 바꿉니다
+- 요청 제한은 라이브러리 없이 직접 만든 메모리 미끄러운 창입니다. 한도가 작으면 요청 시각 기록, 크면 두 창 근사입니다(`core.support.ratelimit`, [architecture/security.md](../architecture/security.md) §13.2). 서버를 여러 대로 늘릴 때 공유 저장소로 바꿉니다
 - Lombok, Spotless는 현재 사용하지 않음
 
 이 목록을 바꾸려면 [`docs/adr/`](../adr/README.md)에 ADR을 남기고, 바뀐 내용을 이 문서에 반영합니다. 의존성 추가·변경은 따로 승인을 받습니다.

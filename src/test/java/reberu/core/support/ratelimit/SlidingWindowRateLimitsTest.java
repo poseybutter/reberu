@@ -13,10 +13,14 @@ import java.util.EnumMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.RateLimit;
 import reberu.core.support.RateLimitExceededException;
 
+@ExtendWith(OutputCaptureExtension.class)
 class SlidingWindowRateLimitsTest {
 
     private static final Instant START = Instant.parse("2026-11-10T00:00:00Z");
@@ -50,17 +54,67 @@ class SlidingWindowRateLimitsTest {
     }
 
     @Test
-    @DisplayName("T-RATE: 창 경계 직후에도 한도의 두 배 불허, 지난 창 비중만큼 대기")
-    void slidesAcrossBoundary() {
-        SlidingWindowRateLimits limits = limits(10, Duration.ofMinutes(1), 100);
+    @DisplayName("T-RATE: 작은 한도는 요청 시각 기록, 가장 오래된 요청에서 창 길이가 지나면 허용")
+    void exactWindowWaitsUntilOldestExpires() {
+        SlidingWindowRateLimits limits = limits(3, Duration.ofDays(1), 100);
+        clock.advance(Duration.ofHours(23).plusMinutes(59));
+        for (int i = 0; i < 3; i++) {
+            limits.acquire(RateLimit.DEFAULT, "account:a");
+        }
+        clock.advance(Duration.ofMinutes(2));
+
+        RateLimitExceededException limited = rejected(limits, "account:a");
+
+        assertThat(limited.retryAfter()).isEqualTo(Duration.ofDays(1).minusMinutes(2));
+        clock.advance(limited.retryAfter().minusMillis(1));
+        rejected(limits, "account:a");
+        clock.advance(Duration.ofMillis(1));
+        assertThatCode(() -> limits.acquire(RateLimit.DEFAULT, "account:a")).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("T-RATE: 큰 한도는 두 창 근사, 창 경계 직후에도 한도의 두 배 불허, 지난 창 비중만큼 대기")
+    void countingWindowSlidesAcrossBoundary() {
+        int limit = SlidingWindowRateLimits.EXACT_MAX_LIMIT + 100;
+        SlidingWindowRateLimits limits = limits(limit, Duration.ofMinutes(1), 100);
         clock.advance(Duration.ofSeconds(59));
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < limit; i++) {
             limits.acquire(RateLimit.DEFAULT, "account:a");
         }
         clock.advance(Duration.ofSeconds(2));
 
+        int extra = 0;
+        RateLimitExceededException limited = null;
+        while (limited == null) {
+            try {
+                limits.acquire(RateLimit.DEFAULT, "account:a");
+                extra++;
+            }
+            catch (RateLimitExceededException exception) {
+                limited = exception;
+            }
+        }
+
+        assertThat(extra).isLessThanOrEqualTo(limit / 60 + 1);
+        assertThat(limited.retryAfter()).isLessThan(Duration.ofMinutes(1));
+        clock.advance(limited.retryAfter().minusMillis(1));
+        rejected(limits, "account:a");
+        clock.advance(Duration.ofMillis(1));
+        assertThatCode(() -> limits.acquire(RateLimit.DEFAULT, "account:a")).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("T-RATE: 큰 한도도 지금 창을 다 쓰면 다음 창 중간까지 대기")
+    void countingWindowWaitsIntoNextWindow() {
+        int limit = SlidingWindowRateLimits.EXACT_MAX_LIMIT + 100;
+        SlidingWindowRateLimits limits = limits(limit, Duration.ofMinutes(1), 100);
+        for (int i = 0; i < limit; i++) {
+            limits.acquire(RateLimit.DEFAULT, "account:a");
+        }
+
         RateLimitExceededException limited = rejected(limits, "account:a");
 
+        assertThat(limited.retryAfter()).isGreaterThan(Duration.ofMinutes(1)).isLessThan(Duration.ofMinutes(2));
         clock.advance(limited.retryAfter().minusMillis(1));
         rejected(limits, "account:a");
         clock.advance(Duration.ofMillis(1));
@@ -110,17 +164,39 @@ class SlidingWindowRateLimitsTest {
     }
 
     @Test
-    @DisplayName("오래된 키 주기 정리")
+    @DisplayName("오래된 키 주기 정리: 기록 방식은 창 하나, 근사 방식은 창 둘이 지나면")
     void purgesStaleKeys() {
-        SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 100);
-        limits.acquire(RateLimit.DEFAULT, "account:a");
-        clock.advance(Duration.ofMinutes(1));
-        limits.purgeStale();
-        assertThat(limits.size(RateLimit.DEFAULT)).isEqualTo(1);
+        SlidingWindowRateLimits exact = limits(5, Duration.ofMinutes(1), 100);
+        SlidingWindowRateLimits counting = limits(SlidingWindowRateLimits.EXACT_MAX_LIMIT + 1, Duration.ofMinutes(1), 100);
+        exact.acquire(RateLimit.DEFAULT, "account:a");
+        counting.acquire(RateLimit.DEFAULT, "account:a");
+
+        clock.advance(Duration.ofSeconds(59));
+        exact.purgeStale();
+        assertThat(exact.size(RateLimit.DEFAULT)).isEqualTo(1);
+        clock.advance(Duration.ofSeconds(1));
+        exact.purgeStale();
+        counting.purgeStale();
+        assertThat(exact.size(RateLimit.DEFAULT)).isZero();
+        assertThat(counting.size(RateLimit.DEFAULT)).isEqualTo(1);
 
         clock.advance(Duration.ofMinutes(1));
-        limits.purgeStale();
-        assertThat(limits.size(RateLimit.DEFAULT)).isZero();
+        counting.purgeStale();
+        assertThat(counting.size(RateLimit.DEFAULT)).isZero();
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-14: 보안 로그는 막히기 시작할 때 한 번, 다시 허용된 뒤 막히면 또 한 번")
+    void logsOncePerBlockedStreak(CapturedOutput output) {
+        SlidingWindowRateLimits limits = limits(1, Duration.ofMinutes(1), 100);
+        limits.acquire(RateLimit.DEFAULT, "account:log-check");
+        rejected(limits, "account:log-check");
+        rejected(limits, "account:log-check");
+        clock.advance(Duration.ofMinutes(1));
+        limits.acquire(RateLimit.DEFAULT, "account:log-check");
+        rejected(limits, "account:log-check");
+
+        assertThat(output.getOut().split("rule=SEC-RATE-08, key=account:log-check", -1)).hasSize(3);
     }
 
     @Test
