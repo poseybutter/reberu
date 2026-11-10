@@ -26,7 +26,9 @@ class AccessInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (!(handler instanceof HandlerMethod method) || !AccessDeclarations.isApi(request.getRequestURI())) {
+        Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        if (!(handler instanceof HandlerMethod method) || pattern == null
+                || !AccessDeclarations.isApi(pattern.toString())) {
             return true;
         }
         Access access = method.getMethodAnnotation(Access.class);

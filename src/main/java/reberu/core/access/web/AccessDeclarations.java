@@ -3,7 +3,6 @@ package reberu.core.access.web;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.mvc.method.RequestMappingInfo;
 import reberu.core.access.Access;
@@ -54,7 +53,7 @@ final class AccessDeclarations {
     }
 
     private static boolean has(String pattern, String variable) {
-        return Set.of(pattern.split("/")).contains("{" + variable + "}");
+        return List.of(pattern.split("/")).contains("{" + variable + "}");
     }
 
 }

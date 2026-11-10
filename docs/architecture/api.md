@@ -1,7 +1,7 @@
 # API 목록
 
 > 버전: v0.8.0\
-> 수정일: 2026-11-09
+> 수정일: 2026-11-10
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -237,14 +237,14 @@
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | API-OADM-01 | 경로의 `accountId`, `teamId`, `invitationId`, `jobTypeId`는 늘 경로의 `orgId`와 함께 찾는다. 다른 조직의 것이면 `404 NOT_FOUND`다(TEN-ISO-02) | 필수 |
-| API-OADM-02 | 조직 관리자가 팀 API(§9)를 팀 멤버십 없이 부르면 그 열람을 조직 활동 기록에 남긴다(TEN-PERM-04). 한 사람이 같은 팀을 연속으로 열면 30분에 한 번만 남긴다 | 필수 |
+| API-OADM-02 | 조직 관리자가 팀 API(§9)를 팀 멤버십 없이 부르면 그 열람을 조직 활동 기록에 남긴다(TEN-PERM-04). 한 사람이 같은 팀을 연속으로 열면 1시간에 한 번만 남긴다(TEN-PERM-05) | 필수 |
 | API-OADM-03 | 설정 응답과 목록 응답에 토큰 해시, 세션 정보, 웹훅 주소 원문을 담지 않는다(TEN-LOG-03) | 필수 |
 
 ## 9. 팀 관리 (`/api/teams/{teamId}`)
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 모듈 key 목록 `modules`와 메뉴(#22 전까지 빈 목록) | 팀 멤버 | 화면 공통 |
+| `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 모듈 key 목록 `modules`와 메뉴(#22 전까지 빈 목록) | 팀 멤버, 조직 관리자 | 화면 공통 |
 | `GET` | `/api/teams/{teamId}/overview` | 팀 가입 요청 대기 수, 손님 만료 임박 수, 최근 팀 활동 5개 | 팀 관리자 | E1. 출석 수는 v0.2 |
 | `GET` | `/api/teams/{teamId}/settings` | 팀 설정과 `version` | 팀 관리자 | E4 |
 | `PATCH` | `/api/teams/{teamId}/settings` | 이름(조직 안 유일), 공개 범위, 공개 팀 가입 방식, 리포트 주기 값 | 팀 관리자 | `version` 필수 |
@@ -273,7 +273,7 @@
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | API-TADM-01 | 팀 API는 [architecture/tenancy.md](tenancy.md) §10의 순서로만 판정한다. 1~8단계 실패는 같은 `404`, 쓰기인데 보관 상태면 `409 READ_ONLY`, 볼 수 있는데 권한이 없으면 `403 FORBIDDEN_ACTION`이다 | 필수 |
-| API-TADM-02 | 팀원·읽기 전용이 관리 API(§9 표에서 권한이 팀 관리자인 것)를 부르면 `404 NOT_FOUND`다. 관리 자원의 존재를 드러내지 않는다([architecture/security.md](security.md) §9.2 H단계) | 필수 |
+| API-TADM-02 | 팀원·읽기 전용이 관리 API(§9 표에서 권한이 팀 관리자인 것)를 부르면 `403 FORBIDDEN_ACTION`이다. 팀을 볼 수 있는 사용자이므로 `404`로 숨기지 않는다(TEN-CTX-07, [architecture/security.md](security.md) §9.2 H단계) | 필수 |
 | API-TADM-03 | 경로의 `accountId`, `linkId`, `invitationId`, `labelId`, `fieldId`는 늘 경로의 `teamId`와 함께 찾는다(TEN-ISO-02) | 필수 |
 
 ## 10. 이후 단계의 자리

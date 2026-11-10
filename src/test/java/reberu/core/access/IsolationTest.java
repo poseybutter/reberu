@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 import static reberu.TestCsrf.csrfToken;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -157,6 +158,24 @@ class IsolationTest {
         for (String path : List.of("/api/teams/not-a-uuid", "/api/teams/" + data.padoSea.toString().toUpperCase(),
                 "/api/orgs/not-a-uuid/teams")) {
             assertThat(perform(get(path), data.daon).getStatus()).as(path).isEqualTo(404);
+        }
+    }
+
+    @Test
+    @DisplayName("TEN-CTX: context-path와 인코딩된 경로도 같은 판정, 제 팀 200·남의 팀 같은 404")
+    void contextPathAndEncodedPathAreDecided() throws Exception {
+        List<MockHttpServletRequestBuilder> own = List.of(
+                get("/app/api/teams/" + data.padoSea).contextPath("/app"),
+                get(URI.create("/%61pi/teams/" + data.padoSea)));
+        List<MockHttpServletRequestBuilder> others = List.of(
+                get("/app/api/teams/" + data.gureumSea).contextPath("/app"),
+                get(URI.create("/%61pi/teams/" + data.gureumSea)));
+
+        for (MockHttpServletRequestBuilder request : own) {
+            assertThat(json(perform(request, data.daon), 200).get("myRole").asString()).isEqualTo("TEAM_ADMIN");
+        }
+        for (MockHttpServletRequestBuilder request : others) {
+            assertThat(json(perform(request, data.daon), 404).get("code").asString()).isEqualTo("NOT_FOUND");
         }
     }
 

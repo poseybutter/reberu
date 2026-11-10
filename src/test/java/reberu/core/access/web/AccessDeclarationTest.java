@@ -39,7 +39,7 @@ class AccessDeclarationTest {
     }
 
     @Test
-    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId")
+    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId, 같은 경로 조각 반복")
     void detectsViolations() throws Exception {
         Map<RequestMappingInfo, HandlerMethod> handlers = new LinkedHashMap<>();
         handlers.put(info("/api/undeclared"), handler("undeclared"));
@@ -47,10 +47,13 @@ class AccessDeclarationTest {
         handlers.put(info("/api/thing"), handler("orgAdmin"));
         handlers.put(info("/api/orgs/{orgId}/teams/{teamId}/thing"), handler("teamMember"));
         handlers.put(info("/api/teams/{teamId}/thing"), handler("teamMember"));
+        handlers.put(info("/api/teams/{teamId}/x/{id}/x"), handler("teamMember"));
+        handlers.put(info("/api/x/{id}/x"), handler("teamMember"));
         handlers.put(info("/not-api/thing"), handler("undeclared"));
 
         assertThat(AccessDeclarations.violations(handlers))
-                .hasSize(4)
+                .hasSize(5)
+                .anySatisfy(v -> assertThat(v).startsWith("팀 권한인데 {teamId} 경로 없음: /api/x/{id}/x"))
                 .anySatisfy(v -> assertThat(v).startsWith("권한 선언 없음: /api/undeclared"))
                 .anySatisfy(v -> assertThat(v).startsWith("조직·팀 경로인데 조직·팀 권한 아님: /api/orgs/{orgId}/thing"))
                 .anySatisfy(v -> assertThat(v).startsWith("조직 권한인데 {orgId} 경로 없음: /api/thing"))
