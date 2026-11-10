@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +46,7 @@ class AuthSessionRepositoryTest {
     @Autowired
     TransactionTemplate transactions;
 
-    private final MutableClock clock = new MutableClock(Instant.parse("2026-11-06T00:00:00Z"));
+    private final MutableClock clock = new MutableClock(Instant.now().truncatedTo(ChronoUnit.SECONDS));
     private JdbcAuthSessionRepository repository;
 
     @BeforeEach
@@ -236,6 +237,16 @@ class AuthSessionRepositoryTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("테스트 세션은 실제 시계로 도는 만료 정리 작업에 지워지지 않음")
+    void realClockCleanupKeepsTestSessions() {
+        AuthSession session = withLogin();
+
+        new JdbcAuthSessionRepository(jdbc, transactions, PROPERTIES, Clock.systemUTC()).deleteExpired();
+
+        assertThat(repository.consumeLogin(session.getId(), STATE_HASH)).isPresent();
     }
 
     @Test
