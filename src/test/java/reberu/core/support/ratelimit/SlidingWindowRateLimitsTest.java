@@ -9,8 +9,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -165,6 +172,29 @@ class SlidingWindowRateLimitsTest {
     }
 
     @Test
+    @DisplayName("T-RATE: 같은 키에 동시 요청 2N개면 정확히 N개만 허용")
+    void concurrentRequestsOnSameKeyRespectLimit() throws Exception {
+        assertConcurrentLimit(10);
+        assertConcurrentLimit(SlidingWindowRateLimits.EXACT_MAX_LIMIT + 50);
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-13: 서로 다른 새 키가 동시에 몰려도 키 수 상한을 넘지 않음")
+    void concurrentNewKeysRespectCap() throws Exception {
+        SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 10);
+        List<Callable<Boolean>> attempts = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            String key = RateLimits.ipKey("203.0.113." + i);
+            attempts.add(() -> allowed(limits, key));
+        }
+
+        long allowed = runTogether(attempts).stream().filter(Boolean::booleanValue).count();
+
+        assertThat(allowed).isEqualTo(10);
+        assertThat(limits.size(RateLimit.DEFAULT)).isEqualTo(10);
+    }
+
+    @Test
     @DisplayName("SEC-RATE-13: IP 키가 상한을 채워도 계정 키는 따로 셈")
     void ipFloodDoesNotBlockAccounts() {
         SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 2);
@@ -279,6 +309,50 @@ class SlidingWindowRateLimitsTest {
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new RateLimitProperties(0, rules(5, Duration.ofMinutes(1))))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    private void assertConcurrentLimit(int limit) throws Exception {
+        SlidingWindowRateLimits limits = limits(limit, Duration.ofMinutes(1), 100);
+        List<Callable<Boolean>> attempts = new ArrayList<>();
+        for (int i = 0; i < limit * 2; i++) {
+            attempts.add(() -> allowed(limits, "account:concurrent"));
+        }
+
+        List<Boolean> results = runTogether(attempts);
+
+        assertThat(results).as("한도 " + limit).filteredOn(Boolean::booleanValue).hasSize(limit);
+    }
+
+    private static boolean allowed(SlidingWindowRateLimits limits, String key) {
+        try {
+            limits.acquire(RateLimit.DEFAULT, key);
+            return true;
+        }
+        catch (RateLimitExceededException limited) {
+            return false;
+        }
+    }
+
+    private static List<Boolean> runTogether(List<Callable<Boolean>> attempts) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(16);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<Boolean>> futures = new ArrayList<>();
+            for (Callable<Boolean> attempt : attempts) {
+                futures.add(executor.submit(() -> {
+                    start.await();
+                    return attempt.call();
+                }));
+            }
+            start.countDown();
+            List<Boolean> results = new ArrayList<>();
+            for (Future<Boolean> future : futures) {
+                results.add(future.get());
+            }
+            return results;
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     private SlidingWindowRateLimits limits(int limit, Duration window, int maxKeys) {

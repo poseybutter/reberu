@@ -47,14 +47,21 @@ class SlidingWindowRateLimits implements RateLimits {
         ConcurrentHashMap<String, Bucket> keys = pool.buckets;
         long size = config.window().toMillis();
         long now = clock.millis();
-        if (!keys.containsKey(key) && keys.size() >= properties.maxKeysPerRule()) {
-            purge(keys, now, size);
-            if (keys.size() >= properties.maxKeysPerRule()) {
-                long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
-                if (pool.lastCapLog.getAndSet(logIndex) != logIndex) {
-                    securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
+        if (!keys.containsKey(key)) {
+            synchronized (pool) {
+                if (!keys.containsKey(key)) {
+                    if (keys.size() >= properties.maxKeysPerRule()) {
+                        purge(keys, now, size);
+                    }
+                    if (keys.size() >= properties.maxKeysPerRule()) {
+                        long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
+                        if (pool.lastCapLog.getAndSet(logIndex) != logIndex) {
+                            securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
+                        }
+                        throw new RateLimitExceededException(rule, config.window());
+                    }
+                    keys.put(key, newBucket(config.limit()));
                 }
-                throw new RateLimitExceededException(rule, config.window());
             }
         }
         long[] wait = {0};
