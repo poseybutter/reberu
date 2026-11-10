@@ -222,6 +222,27 @@ class SlidingWindowRateLimitsTest {
     }
 
     @Test
+    @DisplayName("SEC-RATE-14: 늦게 도착한 이전 분 요청은 상한 도달 로그 시점을 되돌리지 않음")
+    void lateRequestDoesNotRewindCapLog(CapturedOutput output) {
+        SlidingWindowRateLimits limits = limits(5, Duration.ofDays(1), 1);
+        limits.acquire(RateLimit.INVITATION, RateLimits.ipKey("203.0.113.1"));
+        rejectedNewKey(limits, "203.0.113.2");
+        clock.advance(Duration.ofMinutes(1));
+        rejectedNewKey(limits, "203.0.113.3");
+        clock.advance(Duration.ofMinutes(-1));
+        rejectedNewKey(limits, "203.0.113.4");
+        clock.advance(Duration.ofMinutes(1));
+        rejectedNewKey(limits, "203.0.113.5");
+
+        assertThat(output.getOut().split("rule=SEC-RATE-03, kind=IP", -1)).hasSize(3);
+    }
+
+    private static void rejectedNewKey(SlidingWindowRateLimits limits, String address) {
+        assertThatThrownBy(() -> limits.acquire(RateLimit.INVITATION, RateLimits.ipKey(address)))
+                .isInstanceOf(RateLimitExceededException.class);
+    }
+
+    @Test
     @DisplayName("SEC-RATE-12: IPv6는 /64 단위로 묶고, IPv4와 IPv4 매핑 주소는 그대로")
     void normalizesIpKeys() {
         assertThat(RateLimits.ipKey("2001:db8:85a3:8d3:1319:8a2e:370:7348"))
