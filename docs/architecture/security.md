@@ -1,6 +1,6 @@
 # 보안 설계
 
-> 버전: v0.9.0\
+> 버전: v0.10.0\
 > 수정일: 2026-11-10
 
 reberu의 보안 요구사항과 검증 기준을 정한다. 요구사항 ID 접두어는 `SEC`다. 테넌시·멤버십 규칙은 [architecture/tenancy.md](tenancy.md), 실시간 채널 규칙은 [architecture/realtime.md](realtime.md)를 따른다.
@@ -413,8 +413,18 @@ flowchart TD
 | SEC-RATE-07 | 글쓰기(채팅, 질문, 남긴 말, 칭찬) | 계정 | 1분 30회 | `429` |
 | SEC-RATE-08 | 그 밖의 API | 계정 | 1분 300회 | `429` |
 
-- 한도는 초안이며 환경 변수로 바꾼다. 수준: 필수.
-- `429` 응답은 `Retry-After` 헤더를 담는다.
+- 한도는 초안이며 환경 변수(`RATE_LIMIT_*`)로 바꾼다. 시간 창은 설정 파일(`reberu.rate-limit.rules`) 값이다. 수준: 필수.
+- `429` 응답은 `Retry-After` 헤더(초, 올림, 최소 1)를 담는다.
+- SEC-RATE-02의 실패 연속 차단은 초대 링크 사용(#19)과 함께 만든다.
+
+| ID | 요구사항 | 수준 |
+| --- | --- | --- |
+| SEC-RATE-09 | 시간 창은 미끄러운 창으로 센다. 지난 창의 횟수를 지금 창에 남은 비율만큼 더해, 창 경계 직후에도 한도의 두 배가 통과하지 않는다. 거부한 요청은 세지 않는다 | 필수 |
+| SEC-RATE-10 | 엔드포인트마다 규칙은 하나다. `/api` 컨트롤러 메서드는 `@RateLimited`로 규칙을 선언하고, 선언이 없으면 SEC-RATE-08이다. 판정은 권한 판정과 요청 본문 읽기보다 먼저 하므로 실패한 요청도 센다 | 필수 |
+| SEC-RATE-11 | 계정 기준 규칙은 로그인한 계정 ID를 키로 쓴다. 로그인 전 요청(가입 대기 포함)은 접속 IP를 키로 쓴다 | 필수 |
+| SEC-RATE-12 | IP는 서블릿 컨테이너가 준 접속 주소만 쓴다. 앱 코드는 `X-Forwarded-For`를 직접 읽지 않는다. 앞단 리버스 프록시가 있는 배포만 `FORWARD_HEADERS_STRATEGY=native`로 켜며, 이때도 사설·루프백 주소에서 온 프록시 헤더만 믿는다(바꾸려면 `SERVER_TOMCAT_REMOTEIP_INTERNAL_PROXIES`) | 필수 |
+| SEC-RATE-13 | 셈은 서버 한 대의 메모리에 둔다(RT-LOAD-02와 같은 단계). 규칙마다 키 수 상한(기본 10만, `RATE_LIMIT_MAX_KEYS_PER_RULE`)을 두고, 두 창이 지난 키를 정리한 뒤에도 자리가 없으면 새 키를 `429`로 거부한다. 서버를 다시 시작하면 셈이 처음부터 시작한다 | 필수 |
+| SEC-RATE-14 | 한도를 넘으면 키·창마다 처음 한 번만 보안 로그(`reberu.security`)에 규칙 ID와 키를 남긴다(SEC-LOG-04). IP는 IPv4 끝 자리, IPv6 넷째 묶음부터 가린다 | 필수 |
 
 ### 13.3 비밀값
 
@@ -508,7 +518,7 @@ flowchart TD
 | T-ORG-LIMIT | 조직 만들기 상한·요청 제한 | SEC-ORG-04, SEC-RATE-05 |
 | T-ORG-OPEN | 바로 가입이 팀 데이터를 열지 않음 | SEC-ORG-11 |
 | T-HDR | 보안 헤더·CORS | SEC-HDR-01~07 |
-| T-RATE | 요청 제한 `429`와 `Retry-After` | SEC-RATE-01~08 |
+| T-RATE | 요청 제한 `429`와 `Retry-After` | SEC-RATE-01~14 |
 | T-LOG-MASK, T-AUDIT-RECORD, T-AUDIT-IMMUTABLE | 로그 마스킹, 활동 기록 생성, 수정·삭제 API 없음 | SEC-LOG-01~03 |
 | T-PRIV-DELETE | 탈퇴 시 개인정보 삭제·가명 처리, 마지막 관리자 탈퇴 거부 | SEC-PRIV-02~04 |
 | T-MODULE-OFF | 꺼진 모듈의 API `404` | SEC-MOD-04 |

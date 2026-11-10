@@ -42,6 +42,9 @@ spring:
           enabled: false
       republish-outstanding-events-on-restart: true
 
+server:
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
+
 logging:
   pattern:
     correlation: "[%X{traceId:-}] "
@@ -54,6 +57,17 @@ reberu:
     retention: ${ACTIVITY_LOG_RETENTION:365d}
   cursor:
     signing-key: ${CURSOR_SIGNING_KEY}
+  rate-limit:
+    max-keys-per-rule: ${RATE_LIMIT_MAX_KEYS_PER_RULE:100000}
+    rules:
+      login: { limit: "${RATE_LIMIT_LOGIN:20}", window: 1m }
+      invite-link: { limit: "${RATE_LIMIT_INVITE_LINK:10}", window: 1m }
+      invitation: { limit: "${RATE_LIMIT_INVITATION:200}", window: 1h }
+      join-request: { limit: "${RATE_LIMIT_JOIN_REQUEST:10}", window: 1d }
+      org-create: { limit: "${RATE_LIMIT_ORG_CREATE:3}", window: 1d }
+      public-org-search: { limit: "${RATE_LIMIT_PUBLIC_ORG_SEARCH:30}", window: 1m }
+      posting: { limit: "${RATE_LIMIT_POSTING:30}", window: 1m }
+      default: { limit: "${RATE_LIMIT_DEFAULT:300}", window: 1m }
   legal:
     terms-version: ${TERMS_VERSION:v1}
     privacy-version: ${PRIVACY_VERSION:v1}
