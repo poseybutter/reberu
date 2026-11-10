@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.10.0\
+> 버전: v0.11.0\
 > 수정일: 2026-11-10
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -211,10 +211,10 @@
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관(TEN-TEAM-04·05) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/restore` | 팀 복원. 본문 `newAdminAccountId`는 팀 관리자가 없을 때만 필수이고, 있을 때 보내면 `400`(TEN-TEAM-02·03) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/join` | 공개 팀 가입 요청 또는 바로 들어가기([architecture/tenancy.md](tenancy.md) §7.5) | 조직 멤버 | 구성원만, 제한 SEC-RATE-04 |
-| `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록(숨김 포함 여부 쿼리) | 조직 관리자 | F3 |
-| `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가 | 조직 관리자 | `201`, `Idempotency-Key` |
-| `PATCH` | `/api/orgs/{orgId}/job-types/{jobTypeId}` | 직무 유형 고치기. 이미 만든 팀은 바뀌지 않는다 | 조직 관리자 | `version` |
-| `POST` | `/api/orgs/{orgId}/job-types/{jobTypeId}/hide`, `/unhide` | 숨기기, 다시 보이기 | 조직 관리자 | |
+| `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록. 쿼리 `includeHidden`(기본 거짓). 항목마다 `id`, `name`, `description`, `hidden`, `defaults`(`modules`, `taskLabels`, `noticeTitles`, `reportWeekStart`), `teamCount`, `version` | 조직 관리자 | F3 |
+| `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가. 본문 `name`, `description`, `defaults`. 응답 `{ jobTypeId }`(TEN-JOB-03~05) | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`, 50개 넘으면 `409 LIMIT_EXCEEDED` |
+| `PATCH` | `/api/orgs/{orgId}/job-types/{jobTypeId}` | 직무 유형 고치기. 보낸 필드만 바꾸고 고친 유형을 돌려준다. 이미 만든 팀은 바뀌지 않는다(TEN-JOB-06) | 조직 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
+| `POST` | `/api/orgs/{orgId}/job-types/{jobTypeId}/hide`, `/unhide` | 숨기기, 다시 보이기(TEN-JOB-07) | 조직 관리자 | `204`, 반복 `409 ALREADY_PROCESSED` |
 | `GET` | `/api/orgs/{orgId}/members` | 구성원·손님 목록. 쿼리 `state`, `kind`, `teamId` | 조직 관리자 | F5 |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/suspend`, `/unsuspend` | 조직 멤버십 정지·해제 | 조직 관리자 🔒 | 마지막 관리자 `409` |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/remove` | 조직에서 내보내기 | 조직 관리자 🔒 | 마지막 관리자 `409` |

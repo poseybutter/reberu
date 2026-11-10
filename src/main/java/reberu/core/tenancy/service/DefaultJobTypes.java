@@ -42,8 +42,9 @@ public class DefaultJobTypes {
     Map<String, JobType> copyTo(UUID orgId, Instant at) {
         Map<String, JobType> copied = new LinkedHashMap<>();
         for (DefaultJobType type : ALL) {
-            copied.put(type.key(), jobTypes.save(JobType.create(Uuids.v7(), orgId, type.name(), type.description(),
-                    jsonMapper.writeValueAsString(type.defaults()), at)));
+            copied.put(type.key(), jobTypes.save(JobType.create(Uuids.v7(), orgId, type.name(),
+                    NameRules.nameKey(type.name()), type.description(), jsonMapper.writeValueAsString(type.defaults()),
+                    at)));
         }
         return copied;
     }

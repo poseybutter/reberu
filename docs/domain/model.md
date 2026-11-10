@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.10.0\
-> 수정일: 2026-11-09
+> 버전: v0.11.0\
+> 수정일: 2026-11-10
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -388,9 +388,11 @@ erDiagram
 | --- | --- | --- | --- |
 | `org_id` | `UUID` | ○ | 조직을 만들 때 기본 직무 유형을 복사한다([architecture/tenancy.md](../architecture/tenancy.md) §12) |
 | `name` | `TEXT(40)` | ○ | |
+| `name_key` | `TEXT(40)` | ○ | 이름 비교 키. 유일: (`org_id`, `name_key`)(TEN-JOB-03) |
 | `description` | `TEXT(200)` | | |
 | `hidden` | `BOOL` | ○ | 쓰는 팀이 있으면 지우지 않고 숨긴다 |
 | `defaults` | `LONG_TEXT` | ○ | 켤 모듈, 라벨, 추가 항목, 공지 칸 제목, 리포트 주기 기본값을 담은 앱 직렬화 값. 팀을 만들 때 각 팀 테이블로 복사한다(TEN-JOB-02). JSON 문자열이며 DB JSON 타입을 쓰지 않는다 |
+| `version` | `INT` | ○ | 잠금(TEN-JOB-06) |
 
 ### team_task_label, team_custom_field
 

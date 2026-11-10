@@ -70,6 +70,13 @@ class TenancyConfiguration {
     }
 
     @Bean
+    JobTypeService jobTypeService(JobTypeRepository jobTypes, OrganizationRepository organizations,
+            NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new JobTypeService(jobTypes, organizations, nameRules, activityLogs, jdbc, jsonMapper,
+                Clock.systemUTC());
+    }
+
+    @Bean
     TeamViewService teamViewService(TeamRepository teams, ActivityLogs activityLogs) {
         return new TeamViewService(teams, activityLogs, Clock.systemUTC());
     }
