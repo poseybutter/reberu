@@ -18,6 +18,8 @@ import reberu.core.access.Access;
 import reberu.core.access.AccessLevel;
 import reberu.core.support.IdempotentRequest;
 import reberu.core.support.IdempotentRequests;
+import reberu.core.support.RateLimit;
+import reberu.core.support.RateLimited;
 import reberu.core.tenancy.dto.CreateOrgRequest;
 import reberu.core.tenancy.dto.CreateOrgResponse;
 import reberu.core.tenancy.dto.DefaultJobTypeResponse;
@@ -43,6 +45,7 @@ class OrgController {
 
     @PostMapping("/orgs")
     @Access(AccessLevel.ACCOUNT)
+    @RateLimited(RateLimit.ORG_CREATE)
     ResponseEntity<String> create(@AuthenticationPrincipal UUID accountId,
             @RequestHeader(name = IdempotentRequest.HEADER, required = false) String key,
             @Valid @RequestBody CreateOrgRequest body, HttpServletRequest request) {

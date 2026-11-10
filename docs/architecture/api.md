@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.8.0\
+> 버전: v0.9.0\
 > 수정일: 2026-11-10
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -113,7 +113,7 @@
 | 팀 관리자 | 그 팀의 `TEAM_ADMIN` 또는 조직 관리자 |
 | 운영자 | 배포 설정(환경 변수)으로 정한 운영자 계정 |
 | 🔒 | 최근 인증 필요(SEC-SESS-10). 지났으면 `401 REAUTH_REQUIRED` |
-| 제한 | 적용하는 요청 제한 ID([architecture/security.md](security.md) §13.2). 표에 없으면 SEC-RATE-08 |
+| 제한 | 적용하는 요청 제한 ID([architecture/security.md](security.md) §13.2). 표에 없으면 SEC-RATE-08. 넘으면 `429 RATE_LIMITED`와 `Retry-After`(초). 코드의 `@RateLimited`와 이 칸이 같아야 한다(T-RATE) |
 
 ## 4. 로그인과 세션
 

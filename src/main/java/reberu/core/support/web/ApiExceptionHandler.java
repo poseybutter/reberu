@@ -10,6 +10,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -29,6 +30,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ErrorResponse;
 import reberu.core.support.FieldViolation;
+import reberu.core.support.RateLimitExceededException;
 import reberu.core.support.ReberuException;
 import reberu.core.support.TraceIds;
 
@@ -47,7 +49,11 @@ class ApiExceptionHandler {
             log.error("처리하지 못한 예외", exception);
         }
         ErrorResponse body = ErrorResponse.of(resolved.code(), TraceIds.current(request), resolved.fields());
-        return ResponseEntity.status(resolved.code().status()).body(body);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(resolved.code().status());
+        if (resolved instanceof RateLimitExceededException limited) {
+            response.header(HttpHeaders.RETRY_AFTER, limited.retryAfterSeconds());
+        }
+        return response.body(body);
     }
 
     private static ReberuException resolve(Exception exception) {
