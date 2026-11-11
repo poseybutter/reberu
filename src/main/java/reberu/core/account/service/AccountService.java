@@ -1,11 +1,16 @@
 package reberu.core.account.service;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import reberu.core.account.AccountProfile;
 import reberu.core.account.AccountState;
 import reberu.core.account.AccountSummary;
 import reberu.core.account.Accounts;
@@ -31,6 +36,20 @@ class AccountService implements Accounts {
     @Transactional(readOnly = true)
     public Optional<AccountSummary> findByGoogleSub(String googleSub) {
         return accounts.findByGoogleSub(googleSub).map(account -> new AccountSummary(account.id(), account.state()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, AccountProfile> profiles(Collection<UUID> accountIds) {
+        if (accountIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, AccountProfile> profiles = new HashMap<>();
+        for (Account account : accounts.findAllById(Set.copyOf(accountIds))) {
+            profiles.put(account.id(), new AccountProfile(account.id(), account.state(), account.displayName(),
+                    account.email(), account.lastLoginAt()));
+        }
+        return profiles;
     }
 
     @Override

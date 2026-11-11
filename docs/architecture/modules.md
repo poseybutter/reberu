@@ -1,7 +1,7 @@
 # 모듈 구조
 
-> 버전: v0.4.0\
-> 수정일: 2026-11-09
+> 버전: v0.5.0\
+> 수정일: 2026-11-11
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
@@ -181,6 +181,7 @@ sequenceDiagram
 | `PraiseSent` | praise | progression(받는 사람 EXP), notification, realtime |
 | `RestEnded` | healing | progression(업적만, EXP 없음), quest |
 | `MemberJoined`, `MembershipEnded` | core.tenancy | realtime(구독 해제), space, progression(정리 없음) |
+| `OrgAdminGranted` | core.tenancy | core.auth(대상의 세션 모두 끊기, SEC-SESS-03) |
 | `TeamModuleChanged`, `OrgModuleChanged` | core.module | realtime, 해당 모듈 |
 | `WorkdayStarted` | core.calendar (팀마다 조직 시간대 근무일 시작) | briefing(모닝 브리핑), attendance(없음), certificate |
 

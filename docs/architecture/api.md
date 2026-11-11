@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.11.0\
-> 수정일: 2026-11-10
+> 버전: v0.12.0\
+> 수정일: 2026-11-11
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -215,10 +215,10 @@
 | `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가. 본문 `name`, `description`, `defaults`. 응답 `{ jobTypeId }`(TEN-JOB-03~05) | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`, 50개 넘으면 `409 LIMIT_EXCEEDED` |
 | `PATCH` | `/api/orgs/{orgId}/job-types/{jobTypeId}` | 직무 유형 고치기. 보낸 필드만 바꾸고 고친 유형을 돌려준다. 이미 만든 팀은 바뀌지 않는다(TEN-JOB-06) | 조직 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
 | `POST` | `/api/orgs/{orgId}/job-types/{jobTypeId}/hide`, `/unhide` | 숨기기, 다시 보이기(TEN-JOB-07) | 조직 관리자 | `204`, 반복 `409 ALREADY_PROCESSED` |
-| `GET` | `/api/orgs/{orgId}/members` | 구성원·손님 목록. 쿼리 `state`, `kind`, `teamId` | 조직 관리자 | F5 |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/suspend`, `/unsuspend` | 조직 멤버십 정지·해제 | 조직 관리자 🔒 | 마지막 관리자 `409` |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/remove` | 조직에서 내보내기 | 조직 관리자 🔒 | 마지막 관리자 `409` |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/grant-org-admin`, `/revoke-org-admin` | 조직 관리자 지정·해제. 손님은 지정 불가(TEN-INV-07) | 조직 관리자 🔒 | 지정 직후 대상의 세션 ID 재발급(SEC-SESS-03) |
+| `GET` | `/api/orgs/{orgId}/members` | 구성원·손님 목록. 쿼리 `state`, `kind`, `teamId`(TEN-MEM-07). 항목마다 `accountId`, `displayName`, `email`, `kind`, `state`, `orgAdmin`, `joinedAt`, `expiresAt`, `lastLoginAt`, `teams`(`teamId`, `name`, `role`, `state`). 들어온 순서, 커서 페이지(§3.3) | 조직 관리자 | F5 |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/suspend`, `/unsuspend` | 조직 멤버십 정지·해제(TEN-MEM-01·02·05) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/remove` | 조직에서 내보내기(TEN-MEM-01·03·05) | 조직 관리자 🔒 | `204`, 마지막 조직·팀 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/grant-org-admin`, `/revoke-org-admin` | 조직 관리자 지정·해제. 손님·정지된 사람은 지정 불가(TEN-INV-07, TEN-MEM-04) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 해제 `409 LAST_ADMIN_REQUIRED`. 지정이 커밋되면 대상의 세션을 모두 끊는다(SEC-SESS-03) |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/convert-to-member` | 손님을 구성원으로 바꾸기(TEN-GUEST-07) | 조직 관리자 🔒 | |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/extend-guest` | 손님 이용 기간 연장. 본문 `teamId`, `days`(상한 TEN-GUEST-03) | 조직 관리자 🔒 | 연장 요청 API는 없다. 팀 관리자는 조직 관리자에게 직접 알린다 |
 | `GET` | `/api/orgs/{orgId}/join-requests` | 조직 가입 요청과 팀 관리자 링크로 온 새 구성원 확인 대기(TEN-ADM-01) | 조직 관리자 | F5 |
@@ -232,7 +232,7 @@
 | `GET` | `/api/orgs/{orgId}/modules/{moduleKey}/impact` | 허용을 거두거나 끌 때 영향: 꺼질 팀 수, 함께 꺼질 모듈 | 조직 관리자 | TEN-MOD-04 확인 화면 |
 | `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/allowed` | `TEAM` 모듈 허용·거두기. 본문 `allowed` | 조직 관리자 🔒 | TEN-MOD-03 |
 | `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/enabled` | `ORG` 모듈 켜기·끄기. 본문 `enabled` | 조직 관리자 🔒 | TEN-MOD-04 |
-| `GET` | `/api/orgs/{orgId}/activity` | 조직 활동 기록. 쿼리 `from`, `to`, `actorId`, `action`, `teamId` | 조직 관리자 | F6 |
+| `GET` | `/api/orgs/{orgId}/activity` | 조직 활동 기록(조직과 모든 팀, TEN-LOG-06). 쿼리 `from`, `to`(ISO 시각), `actorId`, `action`, `teamId`. 항목마다 `id`, `occurredAt`, `teamId`, `teamName`, `actorId`, `actorName`, `action`, `targetType`, `targetId`, `targetName`, `beforeValue`, `afterValue`. 최신부터, 커서 페이지(§3.3) | 조직 관리자 | F6 |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |

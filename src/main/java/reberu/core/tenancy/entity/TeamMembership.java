@@ -82,6 +82,16 @@ public class TeamMembership {
         updatedAt = at;
     }
 
+    public void remove(Instant at) {
+        if (state != MembershipState.ACTIVE && state != MembershipState.SUSPENDED
+                && state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("내보낼 수 없는 팀 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        leftReason = OrgMembership.LEFT_REMOVED;
+        updatedAt = at;
+    }
+
     public void reject(Instant at) {
         if (state != MembershipState.REQUESTED) {
             throw new IllegalStateException("거절할 수 없는 멤버십 상태: " + state);

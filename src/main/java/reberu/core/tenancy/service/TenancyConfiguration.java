@@ -2,6 +2,7 @@ package reberu.core.tenancy.service;
 
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -54,11 +55,12 @@ class TenancyConfiguration {
     }
 
     @Bean
-    TeamService teamService(TeamRepository teams, TeamMembershipRepository teamMemberships,
-            OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
-            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(teams, teamMemberships, orgMemberships, jobTypes, nameRules, activityLogs,
-                cursors, jdbc, jsonMapper, Clock.systemUTC());
+    TeamService teamService(OrganizationRepository organizations, TeamRepository teams,
+            TeamMembershipRepository teamMemberships, OrgMembershipRepository orgMemberships,
+            JobTypeRepository jobTypes, NameRules nameRules, ActivityLogs activityLogs, CursorCodec cursors,
+            JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new TeamService(organizations, teams, teamMemberships, orgMemberships, jobTypes, nameRules,
+                activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean
@@ -74,6 +76,20 @@ class TenancyConfiguration {
             NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
         return new JobTypeService(jobTypes, organizations, nameRules, activityLogs, jdbc, jsonMapper,
                 Clock.systemUTC());
+    }
+
+    @Bean
+    MemberService memberService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+            TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
+            ActivityLogs activityLogs, ApplicationEventPublisher events, CursorCodec cursors, JdbcClient jdbc) {
+        return new MemberService(organizations, orgMemberships, teams, teamMemberships, accounts, activityLogs,
+                events, cursors, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
+    OrgActivityService orgActivityService(ActivityLogs activityLogs, Accounts accounts, CursorCodec cursors,
+            JdbcClient jdbc) {
+        return new OrgActivityService(activityLogs, accounts, cursors, jdbc);
     }
 
     @Bean

@@ -20,6 +20,8 @@ import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
 @Table(name = "org_membership")
 public class OrgMembership {
 
+    public static final String LEFT_REMOVED = "REMOVED";
+
     @Id
     private UUID id;
 
@@ -89,6 +91,44 @@ public class OrgMembership {
             throw new IllegalStateException("조직 관리자로 지정할 수 없는 멤버십");
         }
         orgAdmin = true;
+        updatedAt = at;
+    }
+
+    public boolean current() {
+        return state == MembershipState.ACTIVE || state == MembershipState.SUSPENDED;
+    }
+
+    public void revokeAdmin(Instant at) {
+        if (!orgAdmin) {
+            throw new IllegalStateException("조직 관리자가 아닌 멤버십");
+        }
+        orgAdmin = false;
+        updatedAt = at;
+    }
+
+    public void suspend(Instant at) {
+        if (state != MembershipState.ACTIVE) {
+            throw new IllegalStateException("정지할 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.SUSPENDED;
+        updatedAt = at;
+    }
+
+    public void unsuspend(Instant at) {
+        if (state != MembershipState.SUSPENDED) {
+            throw new IllegalStateException("정지 해제할 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.ACTIVE;
+        updatedAt = at;
+    }
+
+    public void remove(Instant at) {
+        if (!current()) {
+            throw new IllegalStateException("내보낼 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        leftReason = LEFT_REMOVED;
+        orgAdmin = false;
         updatedAt = at;
     }
 
