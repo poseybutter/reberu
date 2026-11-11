@@ -37,6 +37,10 @@ import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.security.AccountAuthentication;
+import reberu.core.support.ErrorCode;
+import reberu.core.support.ReberuException;
+import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
+import reberu.core.tenancy.service.TeamMemberService;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -60,6 +64,9 @@ class TeamMemberTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    TeamMemberService teamMembers;
 
     private UUID orgAdmin;
     private UUID teamAdmin;
@@ -206,6 +213,26 @@ class TeamMemberTest {
     }
 
     @Test
+    @DisplayName("TEN-TMEM-06: 권한 판정 뒤 잠그기 전에 팀·조직이 보관되면 잠근 뒤 다시 확인해 READ_ONLY, 팀원은 그대로")
+    void rechecksStateAfterLocking() {
+        jdbc.sql("UPDATE team SET state = 'ARCHIVED' WHERE id = :id").param("id", teamId).update();
+        UUID team = UUID.fromString(teamId);
+        UUID org = UUID.fromString(orgId);
+
+        assertThat(readOnly(() -> teamMembers.suspend(org, team, teamAdmin, member))).isTrue();
+        assertThat(readOnly(() -> teamMembers.add(org, team, teamAdmin, candidate, TeamRole.VIEWER))).isTrue();
+
+        jdbc.sql("UPDATE team SET state = 'ACTIVE' WHERE id = :id").param("id", teamId).update();
+        jdbc.sql("UPDATE organization SET state = 'ARCHIVED' WHERE id = :id").param("id", orgId).update();
+        assertThat(readOnly(() -> teamMembers.remove(org, team, teamAdmin, member))).isTrue();
+        assertThat(readOnly(() -> teamMembers.changeRole(org, team, teamAdmin, member, TeamRole.VIEWER, 0))).isTrue();
+        assertThat(jdbc.sql("SELECT CONCAT(state, ':', role) FROM team_membership WHERE team_id = :team"
+                        + " AND account_id = :account")
+                .param("team", teamId).param("account", member.toString()).query(String.class).single())
+                .isEqualTo("ACTIVE:TEAM_MEMBER");
+    }
+
+    @Test
     @DisplayName("SEC-SESS-10·API-TADM-03: 최근 인증 지나면 401, 다른 팀의 팀원은 내 팀 경로로 404, 팀원·읽기 전용 403")
     void requiresRecentAuthAndIsolates() throws Exception {
         Instant stale = Instant.now().minus(Duration.ofHours(2));
@@ -293,6 +320,16 @@ class TeamMemberTest {
         assertThat(paged).isEqualTo(values(all, "id"));
         assertThat(jdbc.sql("SELECT COUNT(*) FROM team_activity_log WHERE team_id = :team").param("team", teamId)
                 .query(Integer.class).single()).isEqualTo(paged.size());
+    }
+
+    private static boolean readOnly(Runnable call) {
+        try {
+            call.run();
+            return false;
+        }
+        catch (ReberuException rejected) {
+            return rejected.code() == ErrorCode.READ_ONLY;
+        }
     }
 
     private int race(CountDownLatch start, UUID actor, UUID target, String action) {

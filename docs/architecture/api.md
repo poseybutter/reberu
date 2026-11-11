@@ -257,7 +257,7 @@
 | `GET` | `/api/teams/{teamId}/members` | 팀원 목록: `accountId`, `displayName`, `email`(관리자에게만), `kind`, `role`, `state`, `joinedAt`, `expiresAt`. 쿼리 `state`(관리자만, TEN-TMEM-01). 들어온 순서, 커서 페이지(§3.3) | 팀 멤버 | E3. 팀원·읽기 전용에게는 이메일 없이 `ACTIVE`만 |
 | `POST` | `/api/teams/{teamId}/members` | 바로 추가. 본문 `accountId`(그 조직 `ACTIVE` 구성원), `role`(`TEAM_MEMBER`·`VIEWER`, TEN-TMEM-02). 응답 `{ accountId }` | 팀 관리자 | E2. `201`, 이미 있으면 `409 ALREADY_PROCESSED` |
 | `PUT` | `/api/teams/{teamId}/members/{accountId}/role` | 팀 역할 바꾸기. 본문 `role`, `version`. 손님은 `TEAM_ADMIN` 불가(TEN-TMEM-03) | 팀 관리자 🔒 | `204`, 같은 역할 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED` |
-| `POST` | `/api/teams/{teamId}/members/{accountId}/suspend`, `/unsuspend` | 팀 멤버십 정지·해제(TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
+| `POST` | `/api/teams/{teamId}/members/{accountId}/suspend`, `/unsuspend` | 팀 멤버십 정지·해제(TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 정지는 마지막 관리자 `409 LAST_ADMIN_REQUIRED`·자기 자신 `400` |
 | `POST` | `/api/teams/{teamId}/members/{accountId}/remove` | 팀에서 내보내기 → `LEFT`(사유 `REMOVED`, TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
 | `GET` | `/api/teams/{teamId}/join-requests` | 팀 가입 요청(공개 팀 요청, 승인 필요 링크) | 팀 관리자 | E2 |
 | `POST` | `/api/teams/{teamId}/join-requests/{accountId}/approve`, `/reject` | 승인·거절. 조직 멤버십이 확인 대기면 승인할 수 없다(TEN-ADM-01) | 팀 관리자 | `409 ALREADY_PROCESSED` |

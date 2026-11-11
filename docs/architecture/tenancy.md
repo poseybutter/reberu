@@ -914,7 +914,7 @@ flowchart LR
 | TEN-TMEM-03 | 역할 바꾸기는 `version`이 필수이고, 같은 역할이면 `409 ALREADY_PROCESSED`다. `TEAM_ADMIN`으로 올리는 것은 팀 멤버십과 조직 멤버십이 모두 `ACTIVE`인 구성원만 된다(손님은 `400`, TEN-INV-07) | 필수 |
 | TEN-TMEM-04 | 활동 중인 팀(`ACTIVE`)의 활동 중인 팀 관리자를 0명으로 만드는 강등·정지·내보내기는 `409 LAST_ADMIN_REQUIRED`다(TEN-INV-06). 팀 관리자 수에는 조직 멤버십도 `ACTIVE`인 사람만 센다. 조직 단위 정지(TEN-MEM-02)와 달리 팀 단위 정지도 막는다 | 필수 |
 | TEN-TMEM-05 | 대상은 그 팀의 `ACTIVE`·`SUSPENDED` 팀 멤버십뿐이다(아니면 `404`, API-TADM-03). 자기 자신의 정지·내보내기는 `400`이고(스스로 나가기는 `/api/me/teams/{teamId}/leave`), 마지막이 아니면 자기 강등은 된다 | 필수 |
-| TEN-TMEM-06 | 팀원을 바꾸는 요청은 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 요청자가 아직 그 팀의 `ACTIVE` 팀 관리자이거나 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `403`(조직 멤버십이 활동 중이 아니면 `404`)이다 | 필수 |
+| TEN-TMEM-06 | 팀원을 바꾸는 요청은 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 조직과 팀이 아직 `ACTIVE`인지(아니면 `409 READ_ONLY`), 요청자가 아직 그 팀의 `ACTIVE` 팀 관리자이거나 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `403`(조직 멤버십이 활동 중이 아니면 `404`)이다. 권한 판정과 잠금 사이에 보관되어도 바뀌지 않는다 | 필수 |
 | TEN-TMEM-07 | 활동 기록: `TEAM_MEMBER_ADDED`(전 값은 예전 상태, 후 값은 역할), `TEAM_ROLE_CHANGED`, `TEAM_MEMBER_SUSPENDED`, `TEAM_MEMBER_UNSUSPENDED`, `TEAM_MEMBER_REMOVED`. 팀 활동 기록 조회는 그 팀 기록만, (시각, ID) 최신순 커서이고 거르기 규칙은 TEN-LOG-06과 같다 | 필수 |
 
 ## 15. 활동 기록

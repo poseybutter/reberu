@@ -27,11 +27,13 @@ import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
 import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.OrgMembership;
+import reberu.core.tenancy.entity.Organization;
 import reberu.core.tenancy.entity.Team;
 import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.JoinedVia;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
@@ -281,8 +283,11 @@ public class TeamMemberService {
     }
 
     private Team lock(UUID orgId, UUID teamId, UUID actorId) {
-        organizations.findForUpdate(orgId).orElseThrow(TeamMemberService::notFound);
+        Organization organization = organizations.findForUpdate(orgId).orElseThrow(TeamMemberService::notFound);
         Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamMemberService::notFound);
+        if (organization.state() != OrgState.ACTIVE || team.state() != TeamState.ACTIVE) {
+            throw new ReberuException(ErrorCode.READ_ONLY);
+        }
         OrgMembership actor = orgMemberships.findByOrgIdAndAccountId(orgId, actorId)
                 .filter(membership -> membership.state() == MembershipState.ACTIVE)
                 .orElseThrow(TeamMemberService::notFound);
