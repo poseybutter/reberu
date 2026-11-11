@@ -55,11 +55,12 @@ class TenancyConfiguration {
     }
 
     @Bean
-    TeamService teamService(TeamRepository teams, TeamMembershipRepository teamMemberships,
-            OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
-            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(teams, teamMemberships, orgMemberships, jobTypes, nameRules, activityLogs,
-                cursors, jdbc, jsonMapper, Clock.systemUTC());
+    TeamService teamService(OrganizationRepository organizations, TeamRepository teams,
+            TeamMembershipRepository teamMemberships, OrgMembershipRepository orgMemberships,
+            JobTypeRepository jobTypes, NameRules nameRules, ActivityLogs activityLogs, CursorCodec cursors,
+            JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new TeamService(organizations, teams, teamMemberships, orgMemberships, jobTypes, nameRules,
+                activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean

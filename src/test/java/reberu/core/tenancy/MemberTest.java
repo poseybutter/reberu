@@ -309,6 +309,90 @@ class MemberTest {
     }
 
     @Test
+    @DisplayName("T-AUTHZ-LASTADMIN: 같은 팀의 팀 관리자 둘을 동시에 내보내면 하나만 성공하고 팀 관리자가 남음")
+    void keepsLastTeamAdminUnderConcurrency() throws Exception {
+        UUID other = newAccount("other");
+        insertOrgMembership(orgId, other, "MEMBER", "ACTIVE", false);
+        String team = createTeam("둘째 팀", member);
+        insertTeamMembership(team, other, "TEAM_ADMIN", "ACTIVE");
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            CountDownLatch start = new CountDownLatch(1);
+            CompletableFuture<Integer> first = CompletableFuture.supplyAsync(
+                    () -> race(start, admin, member, "remove"), executor);
+            CompletableFuture<Integer> second = CompletableFuture.supplyAsync(
+                    () -> race(start, admin, other, "remove"), executor);
+            start.countDown();
+            List<Integer> statuses = List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
+
+            assertThat(statuses).containsExactlyInAnyOrder(204, 409);
+            assertThat(jdbc.sql("""
+                            SELECT COUNT(*) FROM team_membership m
+                            JOIN org_membership o ON o.account_id = m.account_id AND o.org_id = :org
+                            WHERE m.team_id = :team AND m.role = 'TEAM_ADMIN' AND m.state = 'ACTIVE'
+                              AND o.state = 'ACTIVE'
+                            """)
+                    .param("org", orgId).param("team", team).query(Integer.class).single()).isOne();
+        }
+        finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("TEN-MEM-06: 팀 만들기·복원과 첫 팀 관리자 내보내기가 겹쳐도 조직을 떠난 사람이 팀 관리자로 남지 않음")
+    void keepsTeamAdminInOrgWhenRacingTeamCreation() throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            for (int round = 0; round < 5; round++) {
+                UUID candidate = newAccount("candidate" + round);
+                insertOrgMembership(orgId, candidate, "MEMBER", "ACTIVE", false);
+                String archived = createTeam("보관 팀 " + round, admin);
+                jdbc.sql("UPDATE team SET state = 'ARCHIVED' WHERE id = :id").param("id", archived).update();
+                jdbc.sql("DELETE FROM team_membership WHERE team_id = :id").param("id", archived).update();
+                CountDownLatch start = new CountDownLatch(1);
+                String name = "경합 팀 " + round;
+                CompletableFuture<Integer> created = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        start.await();
+                        return createTeamResponse(name, candidate).getStatus();
+                    }
+                    catch (Exception failed) {
+                        throw new IllegalStateException(failed);
+                    }
+                }, executor);
+                CompletableFuture<Integer> restored = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        start.await();
+                        return perform(post(path("/teams/" + archived + "/restore"))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"newAdminAccountId\":\"" + candidate + "\"}"), admin).getStatus();
+                    }
+                    catch (Exception failed) {
+                        throw new IllegalStateException(failed);
+                    }
+                }, executor);
+                start.countDown();
+                int removed = perform(post(path("/members/" + candidate + "/remove")), admin).getStatus();
+                created.get(30, TimeUnit.SECONDS);
+                restored.get(30, TimeUnit.SECONDS);
+
+                assertThat(removed).isIn(204, 409);
+                assertThat(jdbc.sql("""
+                                SELECT COUNT(*) FROM team_membership m
+                                JOIN org_membership o ON o.account_id = m.account_id AND o.org_id = :org
+                                WHERE m.account_id = :account AND m.state = 'ACTIVE' AND o.state <> 'ACTIVE'
+                                """)
+                        .param("org", orgId).param("account", candidate.toString()).query(Integer.class).single())
+                        .as("round " + round).isZero();
+            }
+        }
+        finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     @DisplayName("TEN-LOG-02: 조직 활동 기록은 조직·모든 팀 기록을 최신부터, 이름 붙임, 거르기·커서")
     void listsOrgActivity() throws Exception {
         String team = createTeam("둘째 팀", member);
@@ -399,15 +483,18 @@ class MemberTest {
     }
 
     private String createTeam(String name, UUID firstAdmin) throws Exception {
+        return json(createTeamResponse(name, firstAdmin), 201).get("teamId").asString();
+    }
+
+    private MockHttpServletResponse createTeamResponse(String name, UUID firstAdmin) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("name", name);
         body.put("visibility", "PRIVATE");
         body.put("jobTypeId", jdbc.sql("SELECT id FROM job_type WHERE org_id = :org AND name = '기본'")
                 .param("org", orgId).query(String.class).single());
         body.put("firstAdminAccountId", firstAdmin.toString());
-        return json(perform(post(path("/teams")).header("Idempotency-Key", UUID.randomUUID().toString())
-                .contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(body)), admin), 201)
-                .get("teamId").asString();
+        return perform(post(path("/teams")).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType(MediaType.APPLICATION_JSON).content(jsonMapper.writeValueAsString(body)), admin);
     }
 
     private MockHttpServletResponse createOrg(UUID actor, String name) throws Exception {

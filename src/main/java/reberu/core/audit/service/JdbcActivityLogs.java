@@ -116,18 +116,20 @@ class JdbcActivityLogs implements ActivityLogs {
         if (search.afterAt() != null) {
             filters.append(" AND (occurred_at < :afterAt OR (occurred_at = :afterAt AND id < :afterId))");
         }
+        String page = " ORDER BY occurred_at DESC, id DESC LIMIT :limit";
         String sql = """
-                SELECT id, CAST(NULL AS CHAR(36)) AS team_id, occurred_at, actor_id, action, target_type,
-                       target_id, before_value, after_value
-                FROM org_activity_log
-                WHERE org_id = :org""" + (search.orgTargetId() == null ? "" : " AND target_id = :orgTarget") + filters;
+                (SELECT id, CAST(NULL AS CHAR(36)) AS team_id, occurred_at, actor_id, action, target_type,
+                        target_id, before_value, after_value
+                 FROM org_activity_log
+                 WHERE org_id = :org""" + (search.orgTargetId() == null ? "" : " AND target_id = :orgTarget") + filters
+                + page + ")";
         if (!search.teamIds().isEmpty()) {
             sql += """
                      UNION ALL
-                    SELECT id, team_id, occurred_at, actor_id, action, target_type,
-                           target_id, before_value, after_value
-                    FROM team_activity_log
-                    WHERE team_id IN (:teams)""" + filters;
+                    (SELECT id, team_id, occurred_at, actor_id, action, target_type,
+                            target_id, before_value, after_value
+                     FROM team_activity_log
+                     WHERE team_id IN (:teams)""" + filters + page + ")";
         }
         JdbcClient.StatementSpec query = jdbc.sql("SELECT * FROM (" + sql
                         + ") l ORDER BY l.occurred_at DESC, l.id DESC LIMIT :limit")

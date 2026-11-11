@@ -889,7 +889,7 @@ flowchart LR
 | TEN-MEM-03 | 내보내기는 조직 멤버십을 `LEFT`(사유 `REMOVED`)로 바꾸고 조직 관리자 여부를 해제한다. 그 조직의 `ACTIVE`·`SUSPENDED`·`REQUESTED` 팀 멤버십도 모두 `LEFT`(사유 `REMOVED`)로 바꾼다. 대상이 `ACTIVE` 팀의 마지막 팀 관리자면 `409 LAST_ADMIN_REQUIRED`다. 팀 관리자 수에는 조직 멤버십도 `ACTIVE`인 사람만 센다 | 필수 |
 | TEN-MEM-04 | 조직 관리자 지정은 `ACTIVE` 구성원(`MEMBER`)만 받는다. 손님·정지된 사람은 `400`, 이미 관리자면 `409 ALREADY_PROCESSED`다. 지정이 커밋되면 대상의 세션을 모두 끊는다(SEC-SESS-03, 이벤트 `OrgAdminGranted`). 해제는 관리자가 아니면 `409 ALREADY_PROCESSED`이고, 마지막이 아니면 자기 자신도 해제할 수 있다. 해제할 때는 세션을 끊지 않는다(권한은 요청마다 다시 조회한다) | 필수 |
 | TEN-MEM-05 | 활동 중인 조직 관리자를 0명으로 만드는 정지·내보내기·해제는 `409 LAST_ADMIN_REQUIRED`다(TEN-INV-05·20). 조직 행을 잠근 뒤 요청자가 아직 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `404`(멤버십이 활동 중이 아님) 또는 `403`(관리자 아님)이다 | 필수 |
-| TEN-MEM-06 | 멤버십을 바꾸는 요청은 조직 행을 먼저 잠그고, 팀 행이 필요하면 팀 ID 순서로 잠근다. 팀 단위 멤버십 변경(팀 관리자 API)도 같은 순서를 따른다 | 필수 |
+| TEN-MEM-06 | 멤버십을 바꾸는 요청은 조직 행을 먼저 잠그고, 팀 행이 필요하면 팀 ID 순서로 잠근다. 팀 만들기의 첫 팀 관리자, 팀 복원의 새 팀 관리자처럼 다른 사람의 조직 멤버십을 확인하고 팀 멤버십을 만드는 요청과 팀 단위 멤버십 변경(팀 관리자 API)도 같은 순서를 따른다. 확인한 뒤 그 사람이 내보내져 조직을 떠난 사람이 팀 관리자로 남는 일이 없다 | 필수 |
 | TEN-MEM-07 | 구성원 목록은 기본으로 `ACTIVE`·`SUSPENDED`·`EXPIRED`를 보이고, 쿼리 `state`는 `ACTIVE`·`SUSPENDED`·`EXPIRED`·`LEFT`만 받는다(요청 중·거절은 가입 요청 API). `teamId`는 그 팀의 `ACTIVE`·`SUSPENDED` 팀 멤버십이 있는 사람이고, 그 조직의 팀이 아니면 빈 목록이다. 들어온 순서, 커서 페이지 | 필수 |
 | TEN-MEM-08 | 활동 기록: 조직에 `ORG_MEMBER_SUSPENDED`·`ORG_MEMBER_UNSUSPENDED`·`ORG_MEMBER_REMOVED`·`ORG_ADMIN_GRANTED`·`ORG_ADMIN_REVOKED`, 내보낼 때 팀마다 `TEAM_MEMBER_REMOVED`. 대상은 계정 ID, 바뀌기 전·후 값은 멤버십 상태뿐이다 | 필수 |
 
