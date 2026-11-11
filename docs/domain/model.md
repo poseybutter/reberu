@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.11.0\
-> 수정일: 2026-11-10
+> 버전: v0.12.0\
+> 수정일: 2026-11-11
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -398,8 +398,8 @@ erDiagram
 
 | 엔티티 | 필드 |
 | --- | --- |
-| `team_task_label` | `team_id`, `name` `TEXT(30)`, `sort_order` `INT`, `hidden` `BOOL`. 유일: (`team_id`, `name`) |
-| `team_custom_field` | `team_id`, `target` `CODE`(`TASK`·`PROJECT`), `label` `TEXT(40)`, `kind` `CODE`(`TEXT`·`MEMO`), `required` `BOOL`, `sort_order` `INT`, `hidden` `BOOL` |
+| `team_task_label` | `team_id`, `name` `TEXT(30)`, `name_key` `TEXT(30)`, `sort_order` `INT`, `hidden` `BOOL`, `version` `INT`. 유일: (`team_id`, `name_key`)(TEN-TSET-04) |
+| `team_custom_field` | `team_id`, `target` `CODE`(`TASK`·`PROJECT`), `label` `TEXT(40)`, `label_key` `TEXT(40)`, `kind` `CODE`(`TEXT`·`MEMO`), `required` `BOOL`, `sort_order` `INT`, `hidden` `BOOL`, `version` `INT`. 유일: (`team_id`, `target`, `label_key`) |
 
 - 추가 항목 종류에 비밀 정보는 없다(OQ-12).
 

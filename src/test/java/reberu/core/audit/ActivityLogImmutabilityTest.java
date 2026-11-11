@@ -85,7 +85,7 @@ class ActivityLogImmutabilityTest {
                 .toList();
 
         assertThat(methods).containsExactlyInAnyOrder("recordOrg", "recordTeam", "orgRecordedSince", "recentOrg",
-                "searchOrg");
+                "recentTeam", "searchOrg");
     }
 
     @Test

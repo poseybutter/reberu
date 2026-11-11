@@ -71,17 +71,23 @@ class JdbcActivityLogs implements ActivityLogs {
     @Override
     @Transactional(readOnly = true)
     public List<ActivityRecord> recentOrg(UUID orgId, int limit) {
+        return recent("org_activity_log", "org_id", Objects.requireNonNull(orgId, "조직 ID 없음"), limit);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActivityRecord> recentTeam(UUID teamId, int limit) {
+        return recent("team_activity_log", "team_id", Objects.requireNonNull(teamId, "팀 ID 없음"), limit);
+    }
+
+    private List<ActivityRecord> recent(String table, String ownerColumn, UUID owner, int limit) {
         if (limit < 1 || limit > MAX_RECENT) {
             throw new IllegalArgumentException("최근 활동 개수 범위 오류(1~" + MAX_RECENT + ")");
         }
-        return jdbc.sql("""
-                        SELECT id, occurred_at, actor_id, action, target_type, target_id, before_value, after_value
-                        FROM org_activity_log
-                        WHERE org_id = :org
-                        ORDER BY occurred_at DESC, id DESC
-                        LIMIT :limit
-                        """)
-                .param("org", Objects.requireNonNull(orgId, "조직 ID 없음").toString())
+        return jdbc.sql("SELECT id, occurred_at, actor_id, action, target_type, target_id, before_value, after_value"
+                        + " FROM " + table + " WHERE " + ownerColumn + " = :owner"
+                        + " ORDER BY occurred_at DESC, id DESC LIMIT :limit")
+                .param("owner", owner.toString())
                 .param("limit", limit)
                 .query((rs, rowNum) -> {
                     String actor = rs.getString("actor_id");

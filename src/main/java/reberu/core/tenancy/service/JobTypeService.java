@@ -5,14 +5,11 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import org.hibernate.exception.ConstraintViolationException;
-import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -202,14 +199,7 @@ public class JobTypeService {
     }
 
     static boolean isNameKeyConflict(DataIntegrityViolationException violation) {
-        for (Throwable cause = violation; cause != null; cause = cause.getCause()) {
-            if (cause instanceof ConstraintViolationException constraint) {
-                String name = constraint.getConstraintName();
-                return constraint.getKind() == ConstraintKind.UNIQUE && name != null
-                        && name.toLowerCase(Locale.ROOT).endsWith(NAME_KEY_CONSTRAINT);
-            }
-        }
-        return false;
+        return UniqueViolations.of(violation, NAME_KEY_CONSTRAINT);
     }
 
     private JobTypeView view(JobType jobType) {
@@ -245,7 +235,7 @@ public class JobTypeService {
         return violation == null ? null : violation.reason();
     }
 
-    private static void checkList(List<FieldViolation> violations, String field, List<String> values, int max,
+    static void checkList(List<FieldViolation> violations, String field, List<String> values, int max,
             Function<String, FieldReason> check) {
         if (values == null) {
             violations.add(new FieldViolation(field, FieldReason.REQUIRED));

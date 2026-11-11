@@ -41,19 +41,22 @@ public class OrgCreationService {
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
     private final DefaultJobTypes defaultJobTypes;
+    private final TeamFieldService teamFields;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
     private final Clock clock;
 
     OrgCreationService(Accounts accounts, OrganizationRepository organizations,
             OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
-            DefaultJobTypes defaultJobTypes, NameRules nameRules, ActivityLogs activityLogs, Clock clock) {
+            DefaultJobTypes defaultJobTypes, TeamFieldService teamFields, NameRules nameRules,
+            ActivityLogs activityLogs, Clock clock) {
         this.accounts = accounts;
         this.organizations = organizations;
         this.orgMemberships = orgMemberships;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
         this.defaultJobTypes = defaultJobTypes;
+        this.teamFields = teamFields;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
         this.clock = clock;
@@ -82,6 +85,7 @@ public class OrgCreationService {
         Team team = teams.save(Team.create(Uuids.v7(), organization.id(), teamName, NameRules.nameKey(teamName),
                 jobTypes.get(selected.key()).id(), selected.defaults().reportWeekStart(),
                 defaultJobTypes.noticeTitles(selected), now));
+        teamFields.copyLabels(team.id(), selected.defaults().taskLabels(), now);
         teamMemberships.save(TeamMembership.active(Uuids.v7(), team.id(), accountId, TeamRole.TEAM_ADMIN,
                 JoinedVia.CREATOR, now));
 

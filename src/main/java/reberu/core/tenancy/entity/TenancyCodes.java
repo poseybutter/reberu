@@ -58,6 +58,16 @@ public final class TenancyCodes {
         INSTANT
     }
 
+    public enum CustomFieldTarget {
+        TASK,
+        PROJECT
+    }
+
+    public enum CustomFieldKind {
+        TEXT,
+        MEMO
+    }
+
     public enum TeamRole {
         TEAM_ADMIN,
         TEAM_MEMBER,

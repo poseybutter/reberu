@@ -18,7 +18,9 @@ import reberu.core.tenancy.repository.JobTypeRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
 import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
+import reberu.core.tenancy.repository.TeamCustomFieldRepository;
 import reberu.core.tenancy.repository.TeamRepository;
+import reberu.core.tenancy.repository.TeamTaskLabelRepository;
 import tools.jackson.databind.json.JsonMapper;
 
 @Configuration(proxyBeanMethods = false)
@@ -44,9 +46,22 @@ class TenancyConfiguration {
     @Bean
     OrgCreationService orgCreationService(Accounts accounts, OrganizationRepository organizations,
             OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
-            DefaultJobTypes defaultJobTypes, NameRules nameRules, ActivityLogs activityLogs) {
+            DefaultJobTypes defaultJobTypes, TeamFieldService teamFields, NameRules nameRules,
+            ActivityLogs activityLogs) {
         return new OrgCreationService(accounts, organizations, orgMemberships, teams, teamMemberships,
-                defaultJobTypes, nameRules, activityLogs, Clock.systemUTC());
+                defaultJobTypes, teamFields, nameRules, activityLogs, Clock.systemUTC());
+    }
+
+    @Bean
+    TeamFieldService teamFieldService(TeamRepository teams, TeamTaskLabelRepository labels,
+            TeamCustomFieldRepository fields, NameRules nameRules, ActivityLogs activityLogs) {
+        return new TeamFieldService(teams, labels, fields, nameRules, activityLogs, Clock.systemUTC());
+    }
+
+    @Bean
+    TeamSettingsService teamSettingsService(TeamRepository teams, NameRules nameRules, ActivityLogs activityLogs,
+            JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new TeamSettingsService(teams, nameRules, activityLogs, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean
@@ -56,11 +71,11 @@ class TenancyConfiguration {
 
     @Bean
     TeamService teamService(OrganizationRepository organizations, TeamRepository teams,
-            TeamMembershipRepository teamMemberships, OrgMembershipRepository orgMemberships,
-            JobTypeRepository jobTypes, NameRules nameRules, ActivityLogs activityLogs, CursorCodec cursors,
-            JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(organizations, teams, teamMemberships, orgMemberships, jobTypes, nameRules,
-                activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
+            TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
+            OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
+            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new TeamService(organizations, teams, teamMemberships, teamFields, orgMemberships, jobTypes,
+                nameRules, activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean

@@ -99,6 +99,17 @@ public class Team {
         updatedAt = at;
     }
 
+    public void applySettings(String name, String nameKey, Visibility visibility, TeamJoinMode joinMode,
+            int reportWeekStart, String reportNoticeTitles, Instant at) {
+        this.name = name;
+        this.nameKey = nameKey;
+        this.visibility = visibility;
+        this.joinMode = joinMode;
+        this.reportWeekStart = reportWeekStart;
+        this.reportNoticeTitles = reportNoticeTitles;
+        this.updatedAt = at;
+    }
+
     public void archive(Instant at) {
         if (state != TeamState.ACTIVE) {
             throw new IllegalStateException("보관할 수 없는 팀 상태: " + state);
@@ -153,6 +164,14 @@ public class Team {
 
     public String reportNoticeTitles() {
         return reportNoticeTitles;
+    }
+
+    public TeamJoinMode joinMode() {
+        return joinMode;
+    }
+
+    public int version() {
+        return version;
     }
 
 }
