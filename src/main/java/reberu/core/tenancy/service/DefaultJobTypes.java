@@ -1,6 +1,7 @@
 package reberu.core.tenancy.service;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,9 +42,11 @@ public class DefaultJobTypes {
 
     Map<String, JobType> copyTo(UUID orgId, Instant at) {
         Map<String, JobType> copied = new LinkedHashMap<>();
-        for (DefaultJobType type : ALL) {
-            copied.put(type.key(), jobTypes.save(JobType.create(Uuids.v7(), orgId, type.name(), type.description(),
-                    jsonMapper.writeValueAsString(type.defaults()), at)));
+        for (int i = 0; i < ALL.size(); i++) {
+            DefaultJobType type = ALL.get(i);
+            copied.put(type.key(), jobTypes.save(JobType.create(Uuids.v7(), orgId, type.name(),
+                    NameRules.nameKey(type.name()), type.description(), jsonMapper.writeValueAsString(type.defaults()),
+                    at.plus(i, ChronoUnit.MICROS))));
         }
         return copied;
     }
