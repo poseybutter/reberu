@@ -48,6 +48,7 @@ public class TeamService {
     private final OrganizationRepository organizations;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
+    private final TeamFieldService teamFields;
     private final OrgMembershipRepository orgMemberships;
     private final JobTypeRepository jobTypes;
     private final NameRules nameRules;
@@ -58,12 +59,13 @@ public class TeamService {
     private final Clock clock;
 
     TeamService(OrganizationRepository organizations, TeamRepository teams,
-            TeamMembershipRepository teamMemberships, OrgMembershipRepository orgMemberships,
-            JobTypeRepository jobTypes, NameRules nameRules, ActivityLogs activityLogs, CursorCodec cursors,
-            JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
+            TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
+            OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
+            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
         this.organizations = organizations;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
+        this.teamFields = teamFields;
         this.orgMemberships = orgMemberships;
         this.jobTypes = jobTypes;
         this.nameRules = nameRules;
@@ -157,6 +159,7 @@ public class TeamService {
             throw new ReberuException(ErrorCode.INVALID_REQUEST,
                     List.of(new FieldViolation("name", FieldReason.DUPLICATE)));
         }
+        teamFields.copyLabels(team.id(), defaults.taskLabels(), now);
         teamMemberships.save(TeamMembership.active(Uuids.v7(), team.id(), input.firstAdminAccountId(),
                 TeamRole.TEAM_ADMIN, JoinedVia.DIRECT, now));
         activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "TEAM_CREATED", "TEAM", team.id(), null, null));

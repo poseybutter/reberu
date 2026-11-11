@@ -14,6 +14,8 @@ public interface ActivityLogs {
 
     List<ActivityRecord> recentOrg(UUID orgId, int limit);
 
+    List<ActivityRecord> recentTeam(UUID teamId, int limit);
+
     List<OrgActivityRecord> searchOrg(OrgActivitySearch search);
 
 }

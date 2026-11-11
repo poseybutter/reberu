@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.12.0\
+> 버전: v0.13.0\
 > 수정일: 2026-11-11
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -245,13 +245,15 @@
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 모듈 key 목록 `modules`와 메뉴(#22 전까지 빈 목록) | 팀 멤버, 조직 관리자 | 화면 공통 |
-| `GET` | `/api/teams/{teamId}/overview` | 팀 가입 요청 대기 수, 손님 만료 임박 수, 최근 팀 활동 5개 | 팀 관리자 | E1. 출석 수는 v0.2 |
-| `GET` | `/api/teams/{teamId}/settings` | 팀 설정과 `version` | 팀 관리자 | E4 |
-| `PATCH` | `/api/teams/{teamId}/settings` | 이름(조직 안 유일), 공개 범위, 공개 팀 가입 방식, 리포트 주기 값 | 팀 관리자 | `version` 필수 |
-| `GET`, `POST` | `/api/teams/{teamId}/labels` | 업무 구분 라벨 목록, 추가 | 팀 관리자(목록은 팀 멤버) | E4 |
-| `PATCH` | `/api/teams/{teamId}/labels/{labelId}` | 이름·순서·숨김 | 팀 관리자 | |
-| `GET`, `POST` | `/api/teams/{teamId}/custom-fields` | 업무·프로젝트 추가 항목 목록, 추가 | 팀 관리자(목록은 팀 멤버) | E4 |
-| `PATCH` | `/api/teams/{teamId}/custom-fields/{fieldId}` | 이름·필수·순서·숨김 | 팀 관리자 | |
+| `GET` | `/api/teams/{teamId}/overview` | 팀 가입 요청 대기 수 `pendingJoinRequests`, 손님 만료 임박 수 `expiringGuests`(TEN-TSET-07), 최근 팀 활동 5개(최신부터, 바뀌기 전·후 값 제외) | 팀 관리자 | E1. 출석 수는 v0.2 |
+| `GET` | `/api/teams/{teamId}/settings` | `name`, `jobTypeName`, `visibility`, `joinMode`, `reportWeekStart`, `noticeTitles`, `state`, `version` | 팀 관리자 | E4 |
+| `PATCH` | `/api/teams/{teamId}/settings` | 이름(조직 안 유일), 공개 범위, 공개 팀 가입 방식, 리포트 주 시작 요일, 공지 칸 제목. 보낸 필드만 바꾸고 새 설정을 돌려준다(TEN-TSET-01~03) | 팀 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
+| `GET` | `/api/teams/{teamId}/labels` | 업무 구분 라벨 목록. 쿼리 `includeHidden`은 관리자만(TEN-TSET-06). 항목마다 `id`, `name`, `sortOrder`, `hidden`, `version` | 팀 멤버 | E4 |
+| `POST` | `/api/teams/{teamId}/labels` | 업무 구분 라벨 추가. 본문 `name`, 응답 `{ labelId }`(TEN-TSET-04) | 팀 관리자 | `201`, 이름 중복 `400`, 50개 넘으면 `409 LIMIT_EXCEEDED` |
+| `PATCH` | `/api/teams/{teamId}/labels/{labelId}` | 이름·순서·숨김. 고친 라벨을 돌려준다(TEN-TSET-05) | 팀 관리자 | `version` 필수 |
+| `GET` | `/api/teams/{teamId}/custom-fields` | 업무·프로젝트 추가 항목 목록. 쿼리 `includeHidden`은 관리자만. 항목마다 `id`, `target`, `label`, `kind`, `required`, `sortOrder`, `hidden`, `version` | 팀 멤버 | E4 |
+| `POST` | `/api/teams/{teamId}/custom-fields` | 추가 항목 추가. 본문 `target`, `label`, `kind`, `required`, 응답 `{ fieldId }`(TEN-TSET-04) | 팀 관리자 | `201`, 이름 중복 `400`, 대상마다 20개 넘으면 `409 LIMIT_EXCEEDED` |
+| `PATCH` | `/api/teams/{teamId}/custom-fields/{fieldId}` | 이름·필수·순서·숨김. 대상·종류는 바꾸지 않는다(TEN-TSET-05) | 팀 관리자 | `version` 필수 |
 | `GET` | `/api/teams/{teamId}/members` | 팀원 목록: 표시 이름, 이메일(팀 관리자에게만), 멤버 종류, 역할, 상태, 들어온 날, 손님 만료 시각 | 팀 멤버 | E3. 팀원·읽기 전용에게는 이메일 없음 |
 | `POST` | `/api/teams/{teamId}/members` | 바로 추가. 본문 `accountId`(그 조직 `ACTIVE` 구성원), `role` | 팀 관리자 | E2 |
 | `PUT` | `/api/teams/{teamId}/members/{accountId}/role` | 팀 역할 바꾸기. 본문 `role`, `version`. 손님은 `TEAM_ADMIN` 불가 | 팀 관리자 🔒 | 마지막 관리자 `409` |
