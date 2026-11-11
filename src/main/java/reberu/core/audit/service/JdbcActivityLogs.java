@@ -14,11 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
 import reberu.core.audit.ActivityRecord;
+import reberu.core.audit.OrgActivityRecord;
+import reberu.core.audit.OrgActivitySearch;
 import reberu.core.support.Uuids;
 
 class JdbcActivityLogs implements ActivityLogs {
 
     static final int MAX_RECENT = 50;
+    static final int MAX_SEARCH = 101;
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -89,6 +92,82 @@ class JdbcActivityLogs implements ActivityLogs {
                             rs.getString("before_value"), rs.getString("after_value"));
                 })
                 .list();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrgActivityRecord> searchOrg(OrgActivitySearch search) {
+        if (search.limit() < 1 || search.limit() > MAX_SEARCH) {
+            throw new IllegalArgumentException("활동 기록 개수 범위 오류(1~" + MAX_SEARCH + ")");
+        }
+        StringBuilder filters = new StringBuilder();
+        if (search.from() != null) {
+            filters.append(" AND occurred_at >= :from");
+        }
+        if (search.to() != null) {
+            filters.append(" AND occurred_at < :to");
+        }
+        if (search.actorId() != null) {
+            filters.append(" AND actor_id = :actor");
+        }
+        if (search.action() != null) {
+            filters.append(" AND action = :action");
+        }
+        if (search.afterAt() != null) {
+            filters.append(" AND (occurred_at < :afterAt OR (occurred_at = :afterAt AND id < :afterId))");
+        }
+        String sql = """
+                SELECT id, CAST(NULL AS CHAR(36)) AS team_id, occurred_at, actor_id, action, target_type,
+                       target_id, before_value, after_value
+                FROM org_activity_log
+                WHERE org_id = :org""" + (search.orgTargetId() == null ? "" : " AND target_id = :orgTarget") + filters;
+        if (!search.teamIds().isEmpty()) {
+            sql += """
+                     UNION ALL
+                    SELECT id, team_id, occurred_at, actor_id, action, target_type,
+                           target_id, before_value, after_value
+                    FROM team_activity_log
+                    WHERE team_id IN (:teams)""" + filters;
+        }
+        JdbcClient.StatementSpec query = jdbc.sql("SELECT * FROM (" + sql
+                        + ") l ORDER BY l.occurred_at DESC, l.id DESC LIMIT :limit")
+                .param("org", search.orgId().toString())
+                .param("limit", search.limit());
+        if (search.orgTargetId() != null) {
+            query = query.param("orgTarget", search.orgTargetId().toString());
+        }
+        if (!search.teamIds().isEmpty()) {
+            query = query.param("teams", search.teamIds().stream().map(UUID::toString).toList());
+        }
+        if (search.from() != null) {
+            query = query.param("from", timestamp(search.from()));
+        }
+        if (search.to() != null) {
+            query = query.param("to", timestamp(search.to()));
+        }
+        if (search.actorId() != null) {
+            query = query.param("actor", search.actorId().toString());
+        }
+        if (search.action() != null) {
+            query = query.param("action", search.action());
+        }
+        if (search.afterAt() != null) {
+            query = query.param("afterAt", timestamp(search.afterAt())).param("afterId", search.afterId().toString());
+        }
+        return query.query((rs, rowNum) -> {
+            String team = rs.getString("team_id");
+            String actor = rs.getString("actor_id");
+            return new OrgActivityRecord(UUID.fromString(rs.getString("id")),
+                    team == null ? null : UUID.fromString(team.strip()),
+                    rs.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                    actor == null ? null : UUID.fromString(actor), rs.getString("action"),
+                    rs.getString("target_type"), UUID.fromString(rs.getString("target_id")),
+                    rs.getString("before_value"), rs.getString("after_value"));
+        }).list();
+    }
+
+    private static LocalDateTime timestamp(Instant at) {
+        return LocalDateTime.ofInstant(at.truncatedTo(ChronoUnit.MICROS), ZoneOffset.UTC);
     }
 
     private void insert(String sql, UUID owner, ActivityEntry entry) {

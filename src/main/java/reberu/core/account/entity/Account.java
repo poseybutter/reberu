@@ -114,4 +114,12 @@ public class Account {
         return displayName;
     }
 
+    public String email() {
+        return email;
+    }
+
+    public Instant lastLoginAt() {
+        return lastLoginAt;
+    }
+
 }

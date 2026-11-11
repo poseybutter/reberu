@@ -24,4 +24,15 @@ public interface TeamMembershipRepository extends Repository<TeamMembership, UUI
             """)
     List<TeamMembership> findByOrgIdAndState(UUID orgId, MembershipState state);
 
+    @Query("""
+            select m from TeamMembership m
+            where m.accountId = :accountId
+              and m.state in (reberu.core.tenancy.entity.TenancyCodes.MembershipState.ACTIVE,
+                              reberu.core.tenancy.entity.TenancyCodes.MembershipState.SUSPENDED,
+                              reberu.core.tenancy.entity.TenancyCodes.MembershipState.REQUESTED)
+              and m.teamId in (select t.id from Team t where t.orgId = :orgId)
+            order by m.teamId
+            """)
+    List<TeamMembership> findOpenByOrgIdAndAccountId(UUID orgId, UUID accountId);
+
 }

@@ -26,6 +26,11 @@ class SessionConfiguration {
     }
 
     @Bean
+    OrgAdminSessionRevoker orgAdminSessionRevoker(JdbcAuthSessionRepository sessions) {
+        return new OrgAdminSessionRevoker(sessions);
+    }
+
+    @Bean
     CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
         serializer.setCookieName(COOKIE_NAME);

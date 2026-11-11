@@ -2,6 +2,7 @@ package reberu.core.tenancy.service;
 
 import java.time.Clock;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -74,6 +75,20 @@ class TenancyConfiguration {
             NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
         return new JobTypeService(jobTypes, organizations, nameRules, activityLogs, jdbc, jsonMapper,
                 Clock.systemUTC());
+    }
+
+    @Bean
+    MemberService memberService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+            TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
+            ActivityLogs activityLogs, ApplicationEventPublisher events, CursorCodec cursors, JdbcClient jdbc) {
+        return new MemberService(organizations, orgMemberships, teams, teamMemberships, accounts, activityLogs,
+                events, cursors, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
+    OrgActivityService orgActivityService(ActivityLogs activityLogs, Accounts accounts, CursorCodec cursors,
+            JdbcClient jdbc) {
+        return new OrgActivityService(activityLogs, accounts, cursors, jdbc);
     }
 
     @Bean
