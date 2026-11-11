@@ -82,6 +82,45 @@ public class TeamMembership {
         updatedAt = at;
     }
 
+    public boolean current() {
+        return state == MembershipState.ACTIVE || state == MembershipState.SUSPENDED;
+    }
+
+    public void changeRole(TeamRole role, Instant at) {
+        if (!current() || this.role == role) {
+            throw new IllegalStateException("역할을 바꿀 수 없는 팀 멤버십");
+        }
+        this.role = role;
+        updatedAt = at;
+    }
+
+    public void suspend(Instant at) {
+        if (state != MembershipState.ACTIVE) {
+            throw new IllegalStateException("정지할 수 없는 팀 멤버십 상태: " + state);
+        }
+        state = MembershipState.SUSPENDED;
+        updatedAt = at;
+    }
+
+    public void unsuspend(Instant at) {
+        if (state != MembershipState.SUSPENDED) {
+            throw new IllegalStateException("정지 해제할 수 없는 팀 멤버십 상태: " + state);
+        }
+        state = MembershipState.ACTIVE;
+        updatedAt = at;
+    }
+
+    public void rejoin(TeamRole role, Instant at) {
+        if (state != MembershipState.LEFT && state != MembershipState.REJECTED) {
+            throw new IllegalStateException("다시 넣을 수 없는 팀 멤버십 상태: " + state);
+        }
+        this.role = role;
+        state = MembershipState.ACTIVE;
+        leftReason = null;
+        expiresAt = null;
+        updatedAt = at;
+    }
+
     public void remove(Instant at) {
         if (state != MembershipState.ACTIVE && state != MembershipState.SUSPENDED
                 && state != MembershipState.REQUESTED) {
@@ -118,6 +157,10 @@ public class TeamMembership {
 
     public MembershipState state() {
         return state;
+    }
+
+    public int version() {
+        return version;
     }
 
 }

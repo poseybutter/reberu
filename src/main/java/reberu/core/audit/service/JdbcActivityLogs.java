@@ -16,6 +16,7 @@ import reberu.core.audit.ActivityLogs;
 import reberu.core.audit.ActivityRecord;
 import reberu.core.audit.OrgActivityRecord;
 import reberu.core.audit.OrgActivitySearch;
+import reberu.core.audit.TeamActivitySearch;
 import reberu.core.support.Uuids;
 
 class JdbcActivityLogs implements ActivityLogs {
@@ -167,6 +168,61 @@ class JdbcActivityLogs implements ActivityLogs {
             String actor = rs.getString("actor_id");
             return new OrgActivityRecord(UUID.fromString(rs.getString("id")),
                     team == null ? null : UUID.fromString(team.strip()),
+                    rs.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                    actor == null ? null : UUID.fromString(actor), rs.getString("action"),
+                    rs.getString("target_type"), UUID.fromString(rs.getString("target_id")),
+                    rs.getString("before_value"), rs.getString("after_value"));
+        }).list();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ActivityRecord> searchTeam(TeamActivitySearch search) {
+        if (search.limit() < 1 || search.limit() > MAX_SEARCH) {
+            throw new IllegalArgumentException("활동 기록 개수 범위 오류(1~" + MAX_SEARCH + ")");
+        }
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, occurred_at, actor_id, action, target_type, target_id, before_value, after_value
+                FROM team_activity_log
+                WHERE team_id = :team
+                """);
+        if (search.from() != null) {
+            sql.append(" AND occurred_at >= :from");
+        }
+        if (search.to() != null) {
+            sql.append(" AND occurred_at < :to");
+        }
+        if (search.actorId() != null) {
+            sql.append(" AND actor_id = :actor");
+        }
+        if (search.action() != null) {
+            sql.append(" AND action = :action");
+        }
+        if (search.afterAt() != null) {
+            sql.append(" AND (occurred_at < :afterAt OR (occurred_at = :afterAt AND id < :afterId))");
+        }
+        sql.append(" ORDER BY occurred_at DESC, id DESC LIMIT :limit");
+        JdbcClient.StatementSpec query = jdbc.sql(sql.toString())
+                .param("team", search.teamId().toString())
+                .param("limit", search.limit());
+        if (search.from() != null) {
+            query = query.param("from", timestamp(search.from()));
+        }
+        if (search.to() != null) {
+            query = query.param("to", timestamp(search.to()));
+        }
+        if (search.actorId() != null) {
+            query = query.param("actor", search.actorId().toString());
+        }
+        if (search.action() != null) {
+            query = query.param("action", search.action());
+        }
+        if (search.afterAt() != null) {
+            query = query.param("afterAt", timestamp(search.afterAt())).param("afterId", search.afterId().toString());
+        }
+        return query.query((rs, rowNum) -> {
+            String actor = rs.getString("actor_id");
+            return new ActivityRecord(UUID.fromString(rs.getString("id")),
                     rs.getObject("occurred_at", LocalDateTime.class).toInstant(ZoneOffset.UTC),
                     actor == null ? null : UUID.fromString(actor), rs.getString("action"),
                     rs.getString("target_type"), UUID.fromString(rs.getString("target_id")),

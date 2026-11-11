@@ -102,6 +102,14 @@ class TenancyConfiguration {
     }
 
     @Bean
+    TeamMemberService teamMemberService(OrganizationRepository organizations,
+            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
+            Accounts accounts, ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc) {
+        return new TeamMemberService(organizations, orgMemberships, teams, teamMemberships, accounts, activityLogs,
+                cursors, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
     OrgActivityService orgActivityService(ActivityLogs activityLogs, Accounts accounts, CursorCodec cursors,
             JdbcClient jdbc) {
         return new OrgActivityService(activityLogs, accounts, cursors, jdbc);
