@@ -211,7 +211,7 @@
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관(TEN-TEAM-04·05) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/restore` | 팀 복원. 본문 `newAdminAccountId`는 팀 관리자가 없을 때만 필수이고, 있을 때 보내면 `400`(TEN-TEAM-02·03) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/join` | 공개 팀 가입 요청 또는 바로 들어가기([architecture/tenancy.md](tenancy.md) §7.5) | 조직 멤버 | 구성원만, 제한 SEC-RATE-04 |
-| `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록. 쿼리 `includeHidden`(기본 거짓). 항목마다 `id`, `name`, `description`, `hidden`, `defaults`(`modules`, `taskLabels`, `noticeTitles`, `reportWeekStart`), `teamCount`, `version` | 조직 관리자 | F3 |
+| `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록. 쿼리 `includeHidden`(기본 거짓). 항목마다 `id`, `name`, `description`, `hidden`, `defaults`(`modules`, `taskLabels`, `noticeTitles`, `reportWeekStart`), `teamCount`, `version`. 만든 순서이며 기본 직무 유형은 정해진 순서로 앞에 온다 | 조직 관리자 | F3 |
 | `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가. 본문 `name`, `description`, `defaults`. 응답 `{ jobTypeId }`(TEN-JOB-03~05) | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`, 50개 넘으면 `409 LIMIT_EXCEEDED` |
 | `PATCH` | `/api/orgs/{orgId}/job-types/{jobTypeId}` | 직무 유형 고치기. 보낸 필드만 바꾸고 고친 유형을 돌려준다. 이미 만든 팀은 바뀌지 않는다(TEN-JOB-06) | 조직 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
 | `POST` | `/api/orgs/{orgId}/job-types/{jobTypeId}/hide`, `/unhide` | 숨기기, 다시 보이기(TEN-JOB-07) | 조직 관리자 | `204`, 반복 `409 ALREADY_PROCESSED` |

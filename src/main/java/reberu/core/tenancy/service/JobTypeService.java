@@ -5,11 +5,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import org.hibernate.exception.ConstraintViolationException;
+import org.hibernate.exception.ConstraintViolationException.ConstraintKind;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,7 @@ public class JobTypeService {
     public static final int NOTICE_TITLE_MAX = 40;
 
     private static final Pattern MODULE_KEY = Pattern.compile("[a-z][a-z0-9-]{0,39}");
+    private static final String NAME_KEY_CONSTRAINT = "job_type_org_id_name_key_key";
 
     private final JobTypeRepository jobTypes;
     private final OrganizationRepository organizations;
@@ -186,10 +190,26 @@ public class JobTypeService {
         try {
             jobTypes.saveAndFlush(jobType);
         }
-        catch (DataIntegrityViolationException duplicated) {
-            throw new ReberuException(ErrorCode.INVALID_REQUEST,
+        catch (DataIntegrityViolationException violation) {
+            if (!isNameKeyConflict(violation)) {
+                throw violation;
+            }
+            ReberuException duplicated = new ReberuException(ErrorCode.INVALID_REQUEST,
                     List.of(new FieldViolation("name", FieldReason.DUPLICATE)));
+            duplicated.initCause(violation);
+            throw duplicated;
         }
+    }
+
+    static boolean isNameKeyConflict(DataIntegrityViolationException violation) {
+        for (Throwable cause = violation; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ConstraintViolationException constraint) {
+                String name = constraint.getConstraintName();
+                return constraint.getKind() == ConstraintKind.UNIQUE && name != null
+                        && name.toLowerCase(Locale.ROOT).endsWith(NAME_KEY_CONSTRAINT);
+            }
+        }
+        return false;
     }
 
     private JobTypeView view(JobType jobType) {

@@ -15,6 +15,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
@@ -56,6 +61,9 @@ class JobTypeTest {
     @Autowired
     JsonMapper jsonMapper;
 
+    @Autowired
+    PlatformTransactionManager transactionManager;
+
     private UUID admin;
     private UUID member;
     private UUID guest;
@@ -82,6 +90,8 @@ class JobTypeTest {
         JsonNode list = json(perform(get(path()), admin), 200);
 
         assertThat(names(list)).containsExactly("기본", "개발", "디자인", "운영");
+        assertThat(jdbc.sql("SELECT COUNT(DISTINCT created_at) FROM job_type WHERE org_id = :org")
+                .param("org", orgId).query(Integer.class).single()).isEqualTo(4);
         assertThat(list.get(0).get("teamCount").asLong()).isOne();
         assertThat(list.get(0).get("version").asInt()).isZero();
         assertThat(list.get(1).get("defaults").get("taskLabels").get(0).asString()).isEqualTo("기능");
@@ -208,6 +218,52 @@ class JobTypeTest {
                 .containsExactly("name:DUPLICATE");
         assertThat(json(update(UUID.fromString(id), Map.of("version", 0, "name", "OPS desk")), 200)
                 .get("name").asString()).isEqualTo("OPS desk");
+    }
+
+    @Test
+    @DisplayName("고치기 이름 경합: 커밋 전인 같은 이름과 겹치면 유일 제약으로 막고 DUPLICATE")
+    void renameRaceHitsUniqueConstraint() throws Exception {
+        UUID ops = jobType("운영");
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+            jdbc.sql("""
+                            INSERT INTO job_type (id, org_id, name, name_key, description, hidden, defaults,
+                                created_at, updated_at, version)
+                            VALUES (:id, :org, '경합', '경합', NULL, :hidden, '{}', :now, :now, 0)
+                            """)
+                    .param("id", UUID.randomUUID().toString())
+                    .param("org", orgId)
+                    .param("hidden", false)
+                    .param("now", now)
+                    .update();
+            inserted.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        holder.start();
+        assertThat(inserted.await(10, TimeUnit.SECONDS)).isTrue();
+
+        CompletableFuture<MockHttpServletResponse> rename = CompletableFuture.supplyAsync(() -> {
+            try {
+                return update(ops, Map.of("version", 0, "name", "경합"));
+            }
+            catch (Exception failed) {
+                throw new IllegalStateException(failed);
+            }
+        });
+        Thread.sleep(500);
+        release.countDown();
+        holder.join();
+
+        assertThat(fields(rename.get(30, TimeUnit.SECONDS))).containsExactly("name:DUPLICATE");
+        assertThat(jdbc.sql("SELECT name FROM job_type WHERE id = :id").param("id", ops.toString())
+                .query(String.class).single()).isEqualTo("운영");
     }
 
     @Test
