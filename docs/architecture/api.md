@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.13.0\
+> 버전: v0.14.0\
 > 수정일: 2026-11-11
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -254,11 +254,11 @@
 | `GET` | `/api/teams/{teamId}/custom-fields` | 업무·프로젝트 추가 항목 목록. 쿼리 `includeHidden`은 관리자만. 항목마다 `id`, `target`, `label`, `kind`, `required`, `sortOrder`, `hidden`, `version` | 팀 멤버 | E4 |
 | `POST` | `/api/teams/{teamId}/custom-fields` | 추가 항목 추가. 본문 `target`, `label`, `kind`, `required`, 응답 `{ fieldId }`(TEN-TSET-04) | 팀 관리자 | `201`, 이름 중복 `400`, 대상마다 20개 넘으면 `409 LIMIT_EXCEEDED` |
 | `PATCH` | `/api/teams/{teamId}/custom-fields/{fieldId}` | 이름·필수·순서·숨김. 대상·종류는 바꾸지 않는다(TEN-TSET-05) | 팀 관리자 | `version` 필수 |
-| `GET` | `/api/teams/{teamId}/members` | 팀원 목록: 표시 이름, 이메일(팀 관리자에게만), 멤버 종류, 역할, 상태, 들어온 날, 손님 만료 시각 | 팀 멤버 | E3. 팀원·읽기 전용에게는 이메일 없음 |
-| `POST` | `/api/teams/{teamId}/members` | 바로 추가. 본문 `accountId`(그 조직 `ACTIVE` 구성원), `role` | 팀 관리자 | E2 |
-| `PUT` | `/api/teams/{teamId}/members/{accountId}/role` | 팀 역할 바꾸기. 본문 `role`, `version`. 손님은 `TEAM_ADMIN` 불가 | 팀 관리자 🔒 | 마지막 관리자 `409` |
-| `POST` | `/api/teams/{teamId}/members/{accountId}/suspend`, `/unsuspend` | 팀 멤버십 정지·해제 | 팀 관리자 🔒 | 마지막 관리자 `409` |
-| `POST` | `/api/teams/{teamId}/members/{accountId}/remove` | 팀에서 내보내기 | 팀 관리자 🔒 | 마지막 관리자 `409` |
+| `GET` | `/api/teams/{teamId}/members` | 팀원 목록: `accountId`, `displayName`, `email`(관리자에게만), `kind`, `role`, `state`, `joinedAt`, `expiresAt`. 쿼리 `state`(관리자만, TEN-TMEM-01). 들어온 순서, 커서 페이지(§3.3) | 팀 멤버 | E3. 팀원·읽기 전용에게는 이메일 없이 `ACTIVE`만 |
+| `POST` | `/api/teams/{teamId}/members` | 바로 추가. 본문 `accountId`(그 조직 `ACTIVE` 구성원), `role`(`TEAM_MEMBER`·`VIEWER`, TEN-TMEM-02). 응답 `{ accountId }` | 팀 관리자 | E2. `201`, 이미 있으면 `409 ALREADY_PROCESSED` |
+| `PUT` | `/api/teams/{teamId}/members/{accountId}/role` | 팀 역할 바꾸기. 본문 `role`, `version`. 손님은 `TEAM_ADMIN` 불가(TEN-TMEM-03) | 팀 관리자 🔒 | `204`, 같은 역할 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED` |
+| `POST` | `/api/teams/{teamId}/members/{accountId}/suspend`, `/unsuspend` | 팀 멤버십 정지·해제(TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
+| `POST` | `/api/teams/{teamId}/members/{accountId}/remove` | 팀에서 내보내기 → `LEFT`(사유 `REMOVED`, TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
 | `GET` | `/api/teams/{teamId}/join-requests` | 팀 가입 요청(공개 팀 요청, 승인 필요 링크) | 팀 관리자 | E2 |
 | `POST` | `/api/teams/{teamId}/join-requests/{accountId}/approve`, `/reject` | 승인·거절. 조직 멤버십이 확인 대기면 승인할 수 없다(TEN-ADM-01) | 팀 관리자 | `409 ALREADY_PROCESSED` |
 | `GET` | `/api/teams/{teamId}/invitations` | 이 팀의 이메일 초대 | 팀 관리자 | E2 |
@@ -270,7 +270,7 @@
 | `GET` | `/api/teams/{teamId}/modules` | 조직이 허용한 `TEAM` 모듈과 켜짐 | 팀 관리자 | E6 |
 | `GET` | `/api/teams/{teamId}/modules/{moduleKey}/impact` | 끌 때 함께 꺼질 모듈, 켤 때 먼저 켜야 할 모듈 | 팀 관리자 | |
 | `PUT` | `/api/teams/{teamId}/modules/{moduleKey}/enabled` | 켜기·끄기. 본문 `enabled`, `confirmCascade`(함께 꺼지는 모듈이 있으면 참이어야 함) | 팀 관리자 | TEN-MOD-04·05 |
-| `GET` | `/api/teams/{teamId}/activity` | 팀 활동 기록. 쿼리 `from`, `to`, `actorId`, `action` | 팀 관리자 | E5 |
+| `GET` | `/api/teams/{teamId}/activity` | 팀 활동 기록(TEN-TMEM-07). 쿼리 `from`, `to`, `actorId`, `action`. 항목마다 `id`, `occurredAt`, `actorId`, `actorName`, `action`, `targetType`, `targetId`, `targetName`, `beforeValue`, `afterValue`. 최신부터, 커서 페이지 | 팀 관리자 | E5 |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |

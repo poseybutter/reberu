@@ -18,4 +18,6 @@ public interface ActivityLogs {
 
     List<OrgActivityRecord> searchOrg(OrgActivitySearch search);
 
+    List<ActivityRecord> searchTeam(TeamActivitySearch search);
+
 }
