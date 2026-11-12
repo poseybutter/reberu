@@ -1,7 +1,7 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.14.0\
-> 수정일: 2026-11-11
+> 버전: v0.15.0\
+> 수정일: 2026-11-12
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
 
@@ -703,6 +703,7 @@ flowchart TD
 | TEN-CTX-06 | 모든 `/api` 컨트롤러 메서드는 권한 수준 하나를 선언한다: `PUBLIC`, `SIGNUP_PENDING`, `ACCOUNT`(경로에 조직·팀 없음), `ORG_MEMBER`·`ORG_ADMIN`(`{orgId}` 경로, 1~4단계), `TEAM_VIEWER`·`TEAM_MEMBER`·`TEAM_ADMIN`(`{teamId}` 경로, 1~6단계). 쓰기 API는 쓰기 표시를 함께 단다(9단계). 판정은 요청 본문을 읽기 전에 한다 | 필수 |
 | TEN-CTX-07 | 조직 수준에서 손님은 4단계에서 `404`다(TEN-GUEST-05). 예외는 [architecture/api.md](api.md) 표에 "손님 가능"으로 적은 `ORG_MEMBER` API뿐이며, 권한 선언에 손님 허용(`guestAllowed`)을 함께 단다. 손님 허용은 `ORG_MEMBER`의 읽기 API에만 달 수 있고(쓰기 표시와 함께 쓸 수 없다), 어기면 서버가 시작하지 않는다. 조직 구성원이 `ORG_ADMIN` API를, 팀 멤버가 자기 역할보다 높은 팀 API를 부르면 볼 수 있는 대상이므로 10단계 `403 FORBIDDEN_ACTION`이다 | 필수 |
 | TEN-CTX-08 | 조직 경로 아래 팀 자원(`/api/orgs/{orgId}/teams/{teamId}/...`)은 조직 컨텍스트를 확정한 뒤 "조직 식별자 + 팀 식별자"로 찾는다. 다른 조직의 팀이면 `404`다 | 필수 |
+| TEN-CTX-09 | 9단계는 잠그기 전의 판정이라 판정과 잠금 사이에 보관될 수 있다. 조직이나 팀의 데이터를 바꾸는 서비스는 조직 행 → 팀 행 → 바꿀 행 순서로 잠근 뒤(TEN-MEM-06) 조직(팀 데이터면 팀도)이 아직 `ACTIVE`인지 다시 보고, 아니면 `409 READ_ONLY`다. 다시 보기는 버전 확인보다 먼저 한다. 조직 상태를 바꾸는 보관·복원도 조직 행을 잠그므로 이 확인과 직렬화된다 | 필수 |
 
 ## 11. 데이터 소속과 격리
 
@@ -914,7 +915,7 @@ flowchart LR
 | TEN-TMEM-03 | 역할 바꾸기는 `version`이 필수이고, 같은 역할이면 `409 ALREADY_PROCESSED`다. `TEAM_ADMIN`으로 올리는 것은 팀 멤버십과 조직 멤버십이 모두 `ACTIVE`인 구성원만 된다(손님은 `400`, TEN-INV-07) | 필수 |
 | TEN-TMEM-04 | 활동 중인 팀(`ACTIVE`)의 활동 중인 팀 관리자를 0명으로 만드는 강등·정지·내보내기는 `409 LAST_ADMIN_REQUIRED`다(TEN-INV-06). 팀 관리자 수에는 조직 멤버십도 `ACTIVE`인 사람만 센다. 조직 단위 정지(TEN-MEM-02)와 달리 팀 단위 정지도 막는다 | 필수 |
 | TEN-TMEM-05 | 대상은 그 팀의 `ACTIVE`·`SUSPENDED` 팀 멤버십뿐이다(아니면 `404`, API-TADM-03). 자기 자신의 정지·내보내기는 `400`이고(스스로 나가기는 `/api/me/teams/{teamId}/leave`), 마지막이 아니면 자기 강등은 된다 | 필수 |
-| TEN-TMEM-06 | 팀원을 바꾸는 요청은 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 조직과 팀이 아직 `ACTIVE`인지(아니면 `409 READ_ONLY`), 요청자가 아직 그 팀의 `ACTIVE` 팀 관리자이거나 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `403`(조직 멤버십이 활동 중이 아니면 `404`)이다. 권한 판정과 잠금 사이에 보관되어도 바뀌지 않는다 | 필수 |
+| TEN-TMEM-06 | 팀원을 바꾸는 요청은 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 조직과 팀이 아직 `ACTIVE`인지(아니면 `409 READ_ONLY`, TEN-CTX-09), 요청자가 아직 그 팀의 `ACTIVE` 팀 관리자이거나 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `403`(조직 멤버십이 활동 중이 아니면 `404`)이다. 권한 판정과 잠금 사이에 보관되어도 바뀌지 않는다 | 필수 |
 | TEN-TMEM-07 | 활동 기록: `TEAM_MEMBER_ADDED`(전 값은 예전 상태, 후 값은 역할), `TEAM_ROLE_CHANGED`, `TEAM_MEMBER_SUSPENDED`, `TEAM_MEMBER_UNSUSPENDED`, `TEAM_MEMBER_REMOVED`. 팀 활동 기록 조회는 그 팀 기록만, (시각, ID) 최신순 커서이고 거르기 규칙은 TEN-LOG-06과 같다 | 필수 |
 
 ## 15. 활동 기록

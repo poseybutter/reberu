@@ -27,17 +27,14 @@ import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
 import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.OrgMembership;
-import reberu.core.tenancy.entity.Organization;
 import reberu.core.tenancy.entity.Team;
 import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.JoinedVia;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
-import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
-import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
 import reberu.core.tenancy.repository.TeamRepository;
 
@@ -53,7 +50,7 @@ public class TeamMemberService {
     private static final Set<TeamRole> ADDABLE_ROLES = Set.of(TeamRole.TEAM_MEMBER, TeamRole.VIEWER);
     private static final Pattern ACTION = Pattern.compile("[A-Z][A-Z0-9_]{0,39}");
 
-    private final OrganizationRepository organizations;
+    private final StateLocks locks;
     private final OrgMembershipRepository orgMemberships;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
@@ -63,10 +60,10 @@ public class TeamMemberService {
     private final JdbcClient jdbc;
     private final Clock clock;
 
-    TeamMemberService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+    TeamMemberService(StateLocks locks, OrgMembershipRepository orgMemberships,
             TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, Clock clock) {
-        this.organizations = organizations;
+        this.locks = locks;
         this.orgMemberships = orgMemberships;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
@@ -283,11 +280,7 @@ public class TeamMemberService {
     }
 
     private Team lock(UUID orgId, UUID teamId, UUID actorId) {
-        Organization organization = organizations.findForUpdate(orgId).orElseThrow(TeamMemberService::notFound);
-        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamMemberService::notFound);
-        if (organization.state() != OrgState.ACTIVE || team.state() != TeamState.ACTIVE) {
-            throw new ReberuException(ErrorCode.READ_ONLY);
-        }
+        Team team = locks.activeTeam(orgId, teamId);
         OrgMembership actor = orgMemberships.findByOrgIdAndAccountId(orgId, actorId)
                 .filter(membership -> membership.state() == MembershipState.ACTIVE)
                 .orElseThrow(TeamMemberService::notFound);
