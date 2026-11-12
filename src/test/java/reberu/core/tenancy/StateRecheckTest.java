@@ -12,6 +12,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -178,32 +179,73 @@ class StateRecheckTest {
             setState("organization", orgId, "ACTIVE");
             List<Map<String, Object>> jobTypesBefore = rows("job_type");
             List<Map<String, Object>> teamsBefore = rows("team");
-            CountDownLatch archived = new CountDownLatch(1);
-            CountDownLatch release = new CountDownLatch(1);
-            Thread holder = new Thread(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
-                    status -> {
-                        orgSettings.archive(orgId, admin);
-                        archived.countDown();
-                        try {
-                            release.await(10, TimeUnit.SECONDS);
-                        }
-                        catch (InterruptedException interrupted) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }));
-            holder.start();
-            assertThat(archived.await(10, TimeUnit.SECONDS)).isTrue();
+            Held archive = hold(() -> orgSettings.archive(orgId, admin));
 
-            CompletableFuture<Boolean> write = CompletableFuture.supplyAsync(() -> readOnly(call.getValue()));
-            Thread.sleep(500);
-            assertThat(write.isDone()).as(call.getKey() + " 조직 행 대기").isFalse();
-            release.countDown();
-            holder.join();
+            CompletableFuture<Boolean> write = startBlocked(() -> readOnly(call.getValue()),
+                    call.getKey() + " 조직 행 대기");
+            archive.finish();
 
             assertThat(write.get(30, TimeUnit.SECONDS)).as(call.getKey()).isTrue();
             assertThat(rows("job_type")).as(call.getKey()).isEqualTo(jobTypesBefore);
             assertThat(rows("team")).as(call.getKey()).isEqualTo(teamsBefore);
         }
+    }
+
+    @Test
+    @DisplayName("TEN-CTX-09: 쓰기가 조직 행을 잡고 있으면 팀·조직 보관은 쓰기가 끝날 때까지 대기, 쓰기와 보관 모두 반영")
+    void archiveWaitsForWrite() throws Exception {
+        Held teamWrite = hold(() -> teamSettings.update(orgId, teamId, admin,
+                new SettingsChange(version("team", teamId), "먼저 바꾼 팀", null, null, null, null)));
+        CompletableFuture<Boolean> teamArchive = startBlocked(() -> {
+            teams.archive(orgId, teamId, admin);
+            return true;
+        }, "team.archive 조직 행 대기");
+        teamWrite.finish();
+        assertThat(teamArchive.get(30, TimeUnit.SECONDS)).isTrue();
+        assertThat(value("team", teamId, "name")).isEqualTo("먼저 바꾼 팀");
+        assertThat(value("team", teamId, "state")).isEqualTo("ARCHIVED");
+
+        Held jobTypeWrite = hold(() -> jobTypes.update(orgId, jobTypeId, admin,
+                new JobTypeChange(version("job_type", jobTypeId), "먼저 바꾼 유형", null, null)));
+        CompletableFuture<Boolean> orgArchive = startBlocked(() -> {
+            orgSettings.archive(orgId, admin);
+            return true;
+        }, "orgSettings.archive 조직 행 대기");
+        jobTypeWrite.finish();
+        assertThat(orgArchive.get(30, TimeUnit.SECONDS)).isTrue();
+        assertThat(value("job_type", jobTypeId, "name")).isEqualTo("먼저 바꾼 유형");
+        assertThat(value("organization", orgId, "state")).isEqualTo("ARCHIVED");
+    }
+
+    private Held hold(Runnable action) throws InterruptedException {
+        CountDownLatch done = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                status -> {
+                    action.run();
+                    done.countDown();
+                    try {
+                        release.await(10, TimeUnit.SECONDS);
+                    }
+                    catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                }));
+        holder.start();
+        assertThat(done.await(10, TimeUnit.SECONDS)).isTrue();
+        return new Held(holder, release);
+    }
+
+    private static <T> CompletableFuture<T> startBlocked(Supplier<T> task, String label) throws InterruptedException {
+        CountDownLatch started = new CountDownLatch(1);
+        CompletableFuture<T> future = CompletableFuture.supplyAsync(() -> {
+            started.countDown();
+            return task.get();
+        });
+        assertThat(started.await(10, TimeUnit.SECONDS)).as(label + " 시작").isTrue();
+        Thread.sleep(500);
+        assertThat(future.isDone()).as(label).isFalse();
+        return future;
     }
 
     private Map<String, Runnable> teamWrites() {
@@ -235,6 +277,11 @@ class StateRecheckTest {
     private void setState(String table, UUID id, String state) {
         jdbc.sql("UPDATE " + table + " SET state = :state WHERE id = :id")
                 .param("state", state).param("id", id.toString()).update();
+    }
+
+    private String value(String table, UUID id, String column) {
+        return jdbc.sql("SELECT " + column + " FROM " + table + " WHERE id = :id").param("id", id.toString())
+                .query(String.class).single();
     }
 
     private int version(String table, UUID id) {
@@ -271,6 +318,15 @@ class StateRecheckTest {
         catch (ReberuException rejected) {
             return rejected.code() == ErrorCode.READ_ONLY;
         }
+    }
+
+    private record Held(Thread holder, CountDownLatch release) {
+
+        void finish() throws InterruptedException {
+            release.countDown();
+            holder.join();
+        }
+
     }
 
 }
