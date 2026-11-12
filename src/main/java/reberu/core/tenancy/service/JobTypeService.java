@@ -23,7 +23,6 @@ import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.JobType;
 import reberu.core.tenancy.entity.Team;
 import reberu.core.tenancy.repository.JobTypeRepository;
-import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.service.DefaultJobTypes.JobTypeDefaults;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -42,17 +41,17 @@ public class JobTypeService {
     private static final String NAME_KEY_CONSTRAINT = "job_type_org_id_name_key_key";
 
     private final JobTypeRepository jobTypes;
-    private final OrganizationRepository organizations;
+    private final StateLocks locks;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
     private final JdbcClient jdbc;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    JobTypeService(JobTypeRepository jobTypes, OrganizationRepository organizations, NameRules nameRules,
+    JobTypeService(JobTypeRepository jobTypes, StateLocks locks, NameRules nameRules,
             ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
         this.jobTypes = jobTypes;
-        this.organizations = organizations;
+        this.locks = locks;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
         this.jdbc = jdbc;
@@ -80,7 +79,7 @@ public class JobTypeService {
 
     @Transactional
     public UUID create(UUID orgId, UUID actorId, NewJobType input) {
-        organizations.findForUpdate(orgId).orElseThrow(JobTypeService::notFound);
+        locks.activeOrg(orgId);
         List<FieldViolation> violations = new ArrayList<>();
         FieldViolation name = nameRules.checkName("name", input.name(), 1, NAME_MAX);
         String nameKey = name == null ? NameRules.nameKey(input.name()) : null;
@@ -111,6 +110,7 @@ public class JobTypeService {
 
     @Transactional
     public JobTypeView update(UUID orgId, UUID jobTypeId, UUID actorId, JobTypeChange change) {
+        locks.activeOrg(orgId);
         JobType jobType = jobTypes.findForUpdate(orgId, jobTypeId).orElseThrow(JobTypeService::notFound);
         if (change.version() == null || change.version() != jobType.version()) {
             throw new ReberuException(ErrorCode.VERSION_CONFLICT);
@@ -163,6 +163,7 @@ public class JobTypeService {
 
     @Transactional
     public void hide(UUID orgId, UUID jobTypeId, UUID actorId) {
+        locks.activeOrg(orgId);
         JobType jobType = jobTypes.findForUpdate(orgId, jobTypeId).orElseThrow(JobTypeService::notFound);
         if (jobType.hidden()) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
@@ -174,6 +175,7 @@ public class JobTypeService {
 
     @Transactional
     public void unhide(UUID orgId, UUID jobTypeId, UUID actorId) {
+        locks.activeOrg(orgId);
         JobType jobType = jobTypes.findForUpdate(orgId, jobTypeId).orElseThrow(JobTypeService::notFound);
         if (!jobType.hidden()) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);

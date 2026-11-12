@@ -39,6 +39,11 @@ class TenancyConfiguration {
     }
 
     @Bean
+    StateLocks stateLocks(OrganizationRepository organizations, TeamRepository teams) {
+        return new StateLocks(organizations, teams);
+    }
+
+    @Bean
     DefaultJobTypes defaultJobTypes(JobTypeRepository jobTypes, JsonMapper jsonMapper) {
         return new DefaultJobTypes(jobTypes, jsonMapper);
     }
@@ -53,15 +58,15 @@ class TenancyConfiguration {
     }
 
     @Bean
-    TeamFieldService teamFieldService(TeamRepository teams, TeamTaskLabelRepository labels,
+    TeamFieldService teamFieldService(StateLocks locks, TeamTaskLabelRepository labels,
             TeamCustomFieldRepository fields, NameRules nameRules, ActivityLogs activityLogs) {
-        return new TeamFieldService(teams, labels, fields, nameRules, activityLogs, Clock.systemUTC());
+        return new TeamFieldService(locks, labels, fields, nameRules, activityLogs, Clock.systemUTC());
     }
 
     @Bean
-    TeamSettingsService teamSettingsService(TeamRepository teams, NameRules nameRules, ActivityLogs activityLogs,
-            JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamSettingsService(teams, nameRules, activityLogs, jdbc, jsonMapper, Clock.systemUTC());
+    TeamSettingsService teamSettingsService(TeamRepository teams, StateLocks locks, NameRules nameRules,
+            ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new TeamSettingsService(teams, locks, nameRules, activityLogs, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean
@@ -70,11 +75,11 @@ class TenancyConfiguration {
     }
 
     @Bean
-    TeamService teamService(OrganizationRepository organizations, TeamRepository teams,
+    TeamService teamService(StateLocks locks, TeamRepository teams,
             TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(organizations, teams, teamMemberships, teamFields, orgMemberships, jobTypes,
+        return new TeamService(locks, teams, teamMemberships, teamFields, orgMemberships, jobTypes,
                 nameRules, activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
@@ -87,25 +92,24 @@ class TenancyConfiguration {
     }
 
     @Bean
-    JobTypeService jobTypeService(JobTypeRepository jobTypes, OrganizationRepository organizations,
-            NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new JobTypeService(jobTypes, organizations, nameRules, activityLogs, jdbc, jsonMapper,
+    JobTypeService jobTypeService(JobTypeRepository jobTypes, StateLocks locks, NameRules nameRules,
+            ActivityLogs activityLogs, JdbcClient jdbc, JsonMapper jsonMapper) {
+        return new JobTypeService(jobTypes, locks, nameRules, activityLogs, jdbc, jsonMapper,
                 Clock.systemUTC());
     }
 
     @Bean
-    MemberService memberService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+    MemberService memberService(StateLocks locks, OrgMembershipRepository orgMemberships,
             TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
             ActivityLogs activityLogs, ApplicationEventPublisher events, CursorCodec cursors, JdbcClient jdbc) {
-        return new MemberService(organizations, orgMemberships, teams, teamMemberships, accounts, activityLogs,
+        return new MemberService(locks, orgMemberships, teams, teamMemberships, accounts, activityLogs,
                 events, cursors, jdbc, Clock.systemUTC());
     }
 
     @Bean
-    TeamMemberService teamMemberService(OrganizationRepository organizations,
-            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
+    TeamMemberService teamMemberService(StateLocks locks, OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
             Accounts accounts, ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc) {
-        return new TeamMemberService(organizations, orgMemberships, teams, teamMemberships, accounts, activityLogs,
+        return new TeamMemberService(locks, orgMemberships, teams, teamMemberships, accounts, activityLogs,
                 cursors, jdbc, Clock.systemUTC());
     }
 

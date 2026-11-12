@@ -35,7 +35,6 @@ import reberu.core.tenancy.entity.Team;
 import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.repository.JobTypeRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
-import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
 import reberu.core.tenancy.repository.TeamRepository;
 import tools.jackson.databind.json.JsonMapper;
@@ -45,7 +44,7 @@ public class TeamService {
     public static final int DEFAULT_LIMIT = 20;
     public static final int MAX_LIMIT = 100;
 
-    private final OrganizationRepository organizations;
+    private final StateLocks locks;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
     private final TeamFieldService teamFields;
@@ -58,11 +57,11 @@ public class TeamService {
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    TeamService(OrganizationRepository organizations, TeamRepository teams,
+    TeamService(StateLocks locks, TeamRepository teams,
             TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
-        this.organizations = organizations;
+        this.locks = locks;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
         this.teamFields = teamFields;
@@ -114,7 +113,7 @@ public class TeamService {
 
     @Transactional
     public UUID create(UUID orgId, UUID accountId, NewTeam input) {
-        organizations.findForUpdate(orgId).orElseThrow(TeamService::notFound);
+        locks.activeOrg(orgId);
         List<FieldViolation> violations = new ArrayList<>();
         FieldViolation name = nameRules.checkName("name", input.name(), 1, Team.NAME_MAX);
         String nameKey = name == null ? NameRules.nameKey(input.name()) : null;
@@ -170,6 +169,7 @@ public class TeamService {
 
     @Transactional
     public void archive(UUID orgId, UUID teamId, UUID accountId) {
+        locks.activeOrg(orgId);
         Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamService::notFound);
         if (team.state() != TeamState.ACTIVE) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
@@ -181,7 +181,7 @@ public class TeamService {
 
     @Transactional
     public void restore(UUID orgId, UUID teamId, UUID accountId, UUID newAdminAccountId) {
-        organizations.findForUpdate(orgId).orElseThrow(TeamService::notFound);
+        locks.activeOrg(orgId);
         Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamService::notFound);
         if (team.state() != TeamState.ARCHIVED) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);

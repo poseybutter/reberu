@@ -73,7 +73,7 @@ class TeamSettingsController {
     @Access(value = AccessLevel.TEAM_ADMIN, write = true)
     LabelView updateLabel(TeamContext team, @PathVariable UUID labelId,
             @Valid @RequestBody TeamSettingsRequests.UpdateLabel body) {
-        return fields.updateLabel(team.teamId(), labelId, team.accountId(), body.toChange());
+        return fields.updateLabel(team.orgId(), team.teamId(), labelId, team.accountId(), body.toChange());
     }
 
     @GetMapping("/custom-fields")
@@ -94,7 +94,7 @@ class TeamSettingsController {
     @Access(value = AccessLevel.TEAM_ADMIN, write = true)
     FieldView updateField(TeamContext team, @PathVariable UUID fieldId,
             @Valid @RequestBody TeamSettingsRequests.UpdateField body) {
-        return fields.updateField(team.teamId(), fieldId, team.accountId(), body.toChange());
+        return fields.updateField(team.orgId(), team.teamId(), fieldId, team.accountId(), body.toChange());
     }
 
     private static boolean admin(TeamContext team) {

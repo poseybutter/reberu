@@ -19,7 +19,6 @@ import reberu.core.tenancy.entity.TeamTaskLabel;
 import reberu.core.tenancy.entity.TenancyCodes.CustomFieldKind;
 import reberu.core.tenancy.entity.TenancyCodes.CustomFieldTarget;
 import reberu.core.tenancy.repository.TeamCustomFieldRepository;
-import reberu.core.tenancy.repository.TeamRepository;
 import reberu.core.tenancy.repository.TeamTaskLabelRepository;
 
 public class TeamFieldService {
@@ -31,16 +30,16 @@ public class TeamFieldService {
     private static final String LABEL_CONSTRAINT = "team_task_label_team_id_name_key_key";
     private static final String FIELD_CONSTRAINT = "team_custom_field_team_id_target_label_key_key";
 
-    private final TeamRepository teams;
+    private final StateLocks locks;
     private final TeamTaskLabelRepository labels;
     private final TeamCustomFieldRepository fields;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
     private final Clock clock;
 
-    TeamFieldService(TeamRepository teams, TeamTaskLabelRepository labels, TeamCustomFieldRepository fields,
+    TeamFieldService(StateLocks locks, TeamTaskLabelRepository labels, TeamCustomFieldRepository fields,
             NameRules nameRules, ActivityLogs activityLogs, Clock clock) {
-        this.teams = teams;
+        this.locks = locks;
         this.labels = labels;
         this.fields = fields;
         this.nameRules = nameRules;
@@ -58,7 +57,7 @@ public class TeamFieldService {
 
     @Transactional
     public UUID createLabel(UUID orgId, UUID teamId, UUID actorId, String name) {
-        lockTeam(orgId, teamId);
+        locks.activeTeam(orgId, teamId);
         FieldViolation invalid = nameRules.checkName("name", name, 1, TeamTaskLabel.NAME_MAX);
         String nameKey = invalid == null ? NameRules.nameKey(name) : null;
         if (invalid == null && labels.existsByTeamIdAndNameKey(teamId, nameKey)) {
@@ -79,7 +78,8 @@ public class TeamFieldService {
     }
 
     @Transactional
-    public LabelView updateLabel(UUID teamId, UUID labelId, UUID actorId, LabelChange change) {
+    public LabelView updateLabel(UUID orgId, UUID teamId, UUID labelId, UUID actorId, LabelChange change) {
+        locks.activeTeam(orgId, teamId);
         TeamTaskLabel label = labels.findForUpdate(teamId, labelId).orElseThrow(TeamFieldService::notFound);
         if (change.version() == null || change.version() != label.version()) {
             throw new ReberuException(ErrorCode.VERSION_CONFLICT);
@@ -132,7 +132,7 @@ public class TeamFieldService {
 
     @Transactional
     public UUID createField(UUID orgId, UUID teamId, UUID actorId, NewField input) {
-        lockTeam(orgId, teamId);
+        locks.activeTeam(orgId, teamId);
         List<FieldViolation> violations = new ArrayList<>();
         if (input.target() == null) {
             violations.add(new FieldViolation("target", FieldReason.REQUIRED));
@@ -163,7 +163,8 @@ public class TeamFieldService {
     }
 
     @Transactional
-    public FieldView updateField(UUID teamId, UUID fieldId, UUID actorId, FieldChange change) {
+    public FieldView updateField(UUID orgId, UUID teamId, UUID fieldId, UUID actorId, FieldChange change) {
+        locks.activeTeam(orgId, teamId);
         TeamCustomField field = fields.findForUpdate(teamId, fieldId).orElseThrow(TeamFieldService::notFound);
         if (change.version() == null || change.version() != field.version()) {
             throw new ReberuException(ErrorCode.VERSION_CONFLICT);
@@ -216,10 +217,6 @@ public class TeamFieldService {
             String name = names.get(i).strip();
             labels.save(TeamTaskLabel.create(Uuids.v7(), teamId, name, NameRules.nameKey(name), i, at));
         }
-    }
-
-    private void lockTeam(UUID orgId, UUID teamId) {
-        teams.findForUpdate(orgId, teamId).orElseThrow(TeamFieldService::notFound);
     }
 
     private void saveLabel(TeamTaskLabel label) {

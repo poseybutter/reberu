@@ -38,15 +38,17 @@ public class TeamSettingsService {
     };
 
     private final TeamRepository teams;
+    private final StateLocks locks;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
     private final JdbcClient jdbc;
     private final JsonMapper jsonMapper;
     private final Clock clock;
 
-    TeamSettingsService(TeamRepository teams, NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc,
+    TeamSettingsService(TeamRepository teams, StateLocks locks, NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc,
             JsonMapper jsonMapper, Clock clock) {
         this.teams = teams;
+        this.locks = locks;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
         this.jdbc = jdbc;
@@ -85,12 +87,9 @@ public class TeamSettingsService {
 
     @Transactional
     public TeamSettings update(UUID orgId, UUID teamId, UUID actorId, SettingsChange change) {
-        Team team = teams.findForUpdate(orgId, teamId).orElseThrow(TeamSettingsService::notFound);
+        Team team = locks.activeTeam(orgId, teamId);
         if (change.version() == null || change.version() != team.version()) {
             throw new ReberuException(ErrorCode.VERSION_CONFLICT);
-        }
-        if (team.state() != TeamState.ACTIVE) {
-            throw new ReberuException(ErrorCode.READ_ONLY);
         }
         Values before = Values.of(team, titles(team));
         Values after = merge(orgId, team, before, change);

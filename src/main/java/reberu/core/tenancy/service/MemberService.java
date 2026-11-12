@@ -30,7 +30,6 @@ import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
-import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
 import reberu.core.tenancy.repository.TeamRepository;
 
@@ -44,7 +43,7 @@ public class MemberService {
     private static final Set<MembershipState> LISTABLE_STATES = Set.of(MembershipState.ACTIVE,
             MembershipState.SUSPENDED, MembershipState.EXPIRED, MembershipState.LEFT);
 
-    private final OrganizationRepository organizations;
+    private final StateLocks locks;
     private final OrgMembershipRepository orgMemberships;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
@@ -55,10 +54,10 @@ public class MemberService {
     private final JdbcClient jdbc;
     private final Clock clock;
 
-    MemberService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships, TeamRepository teams,
+    MemberService(StateLocks locks, OrgMembershipRepository orgMemberships, TeamRepository teams,
             TeamMembershipRepository teamMemberships, Accounts accounts, ActivityLogs activityLogs,
             ApplicationEventPublisher events, CursorCodec cursors, JdbcClient jdbc, Clock clock) {
-        this.organizations = organizations;
+        this.locks = locks;
         this.orgMemberships = orgMemberships;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
@@ -216,7 +215,7 @@ public class MemberService {
     }
 
     private OrgMembership lockTarget(UUID orgId, UUID actorId, UUID accountId) {
-        organizations.findForUpdate(orgId).orElseThrow(MemberService::notFound);
+        locks.activeOrg(orgId);
         OrgMembership actor = orgMemberships.findByOrgIdAndAccountId(orgId, actorId)
                 .filter(membership -> membership.state() == MembershipState.ACTIVE)
                 .orElseThrow(MemberService::notFound);
