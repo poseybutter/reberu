@@ -9,6 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
@@ -31,6 +36,7 @@ import reberu.core.tenancy.service.JobTypeService.NewJobType;
 import reberu.core.tenancy.service.MemberService;
 import reberu.core.tenancy.service.OrgCreationService;
 import reberu.core.tenancy.service.OrgCreationService.NewOrg;
+import reberu.core.tenancy.service.OrgSettingsService;
 import reberu.core.tenancy.service.TeamFieldService;
 import reberu.core.tenancy.service.TeamFieldService.FieldChange;
 import reberu.core.tenancy.service.TeamFieldService.LabelChange;
@@ -73,6 +79,12 @@ class StateRecheckTest {
 
     @Autowired
     TeamFieldService teamFields;
+
+    @Autowired
+    OrgSettingsService orgSettings;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private UUID admin;
     private UUID member;
@@ -149,6 +161,49 @@ class StateRecheckTest {
 
         teamWrites().forEach((name, call) -> assertThat(readOnly(call)).as(name).isTrue());
         assertThat(snapshot()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("TEN-CTX-09: 조직 보관이 조직 행을 잡고 있으면 쓰기는 기다렸다가 보관이 끝난 뒤 READ_ONLY, 데이터는 그대로")
+    void waitsForArchiveAndRejects() throws Exception {
+        Map<String, Runnable> calls = new LinkedHashMap<>();
+        int jobTypeVersion = version("job_type", jobTypeId);
+        int teamVersion = version("team", teamId);
+        calls.put("jobType.update", () -> jobTypes.update(orgId, jobTypeId, admin,
+                new JobTypeChange(jobTypeVersion, "경합 유형", null, null)));
+        calls.put("teamSettings.update", () -> teamSettings.update(orgId, teamId, admin,
+                new SettingsChange(teamVersion, "경합 팀", null, null, null, null)));
+
+        for (Map.Entry<String, Runnable> call : calls.entrySet()) {
+            setState("organization", orgId, "ACTIVE");
+            List<Map<String, Object>> jobTypesBefore = rows("job_type");
+            List<Map<String, Object>> teamsBefore = rows("team");
+            CountDownLatch archived = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            Thread holder = new Thread(() -> new TransactionTemplate(transactionManager).executeWithoutResult(
+                    status -> {
+                        orgSettings.archive(orgId, admin);
+                        archived.countDown();
+                        try {
+                            release.await(10, TimeUnit.SECONDS);
+                        }
+                        catch (InterruptedException interrupted) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }));
+            holder.start();
+            assertThat(archived.await(10, TimeUnit.SECONDS)).isTrue();
+
+            CompletableFuture<Boolean> write = CompletableFuture.supplyAsync(() -> readOnly(call.getValue()));
+            Thread.sleep(500);
+            assertThat(write.isDone()).as(call.getKey() + " 조직 행 대기").isFalse();
+            release.countDown();
+            holder.join();
+
+            assertThat(write.get(30, TimeUnit.SECONDS)).as(call.getKey()).isTrue();
+            assertThat(rows("job_type")).as(call.getKey()).isEqualTo(jobTypesBefore);
+            assertThat(rows("team")).as(call.getKey()).isEqualTo(teamsBefore);
+        }
     }
 
     private Map<String, Runnable> teamWrites() {
