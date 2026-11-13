@@ -15,6 +15,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
@@ -54,6 +59,9 @@ class TeamTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     private UUID admin;
     private UUID member;
@@ -112,6 +120,53 @@ class TeamTest {
         assertThat(fields(createTeam(admin, orgId, team("첫  팀", "PRIVATE", jobType("기본"), admin))))
                 .containsExactly("name:DUPLICATE");
         assertThat(count("team")).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("TEN-TEAM-06: 커밋 전인 같은 이름과 겹치는 팀 만들기는 유일 제약으로 막고 DUPLICATE")
+    void createRaceHitsUniqueConstraint() throws Exception {
+        UUID basic = jobType("기본");
+        CountDownLatch inserted = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+            jdbc.sql("""
+                            INSERT INTO team (id, org_id, name, name_key, visibility, join_mode, state, job_type_id,
+                                report_week_start, report_notice_titles, created_at, updated_at, version)
+                            VALUES (:id, :org, '경합', '경합', 'PRIVATE', 'APPROVAL', 'ACTIVE', NULL, 1, '[]',
+                                :now, :now, 0)
+                            """)
+                    .param("id", UUID.randomUUID().toString())
+                    .param("org", orgId)
+                    .param("now", now)
+                    .update();
+            inserted.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        holder.start();
+        assertThat(inserted.await(10, TimeUnit.SECONDS)).isTrue();
+
+        CompletableFuture<MockHttpServletResponse> create = CompletableFuture.supplyAsync(() -> {
+            try {
+                return createTeam(admin, orgId, team("경합", "PRIVATE", basic, admin));
+            }
+            catch (Exception failed) {
+                throw new IllegalStateException(failed);
+            }
+        });
+        Thread.sleep(500);
+        release.countDown();
+        holder.join();
+
+        assertThat(fields(create.get(30, TimeUnit.SECONDS))).containsExactly("name:DUPLICATE");
+        assertThat(count("team")).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM org_activity_log WHERE action = 'TEAM_CREATED'")
+                .query(Integer.class).single()).isOne();
     }
 
     @Test

@@ -44,6 +44,8 @@ public class TeamService {
     public static final int DEFAULT_LIMIT = 20;
     public static final int MAX_LIMIT = 100;
 
+    private static final String NAME_KEY_CONSTRAINT = "team_org_id_name_key_key";
+
     private final StateLocks locks;
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
@@ -154,9 +156,8 @@ public class TeamService {
         try {
             teams.saveAndFlush(team);
         }
-        catch (DataIntegrityViolationException duplicated) {
-            throw new ReberuException(ErrorCode.INVALID_REQUEST,
-                    List.of(new FieldViolation("name", FieldReason.DUPLICATE)));
+        catch (DataIntegrityViolationException violation) {
+            throw duplicateName(violation);
         }
         teamFields.copyLabels(team.id(), defaults.taskLabels(), now);
         teamMemberships.save(TeamMembership.active(Uuids.v7(), team.id(), input.firstAdminAccountId(),
@@ -268,6 +269,20 @@ public class TeamService {
                 rs.getLong("member_count"),
                 role == null ? null : TeamRole.valueOf(role),
                 createdAt.toInstant(ZoneOffset.UTC));
+    }
+
+    static boolean isNameKeyConflict(DataIntegrityViolationException violation) {
+        return UniqueViolations.of(violation, NAME_KEY_CONSTRAINT);
+    }
+
+    static RuntimeException duplicateName(DataIntegrityViolationException violation) {
+        if (!isNameKeyConflict(violation)) {
+            return violation;
+        }
+        ReberuException duplicated = new ReberuException(ErrorCode.INVALID_REQUEST,
+                List.of(new FieldViolation("name", FieldReason.DUPLICATE)));
+        duplicated.initCause(violation);
+        return duplicated;
     }
 
     private record Position(LocalDateTime createdAt, String id) {

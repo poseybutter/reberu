@@ -33,7 +33,6 @@ public class TeamSettingsService {
     public static final Duration GUEST_EXPIRY_SOON = Duration.ofDays(7);
     public static final int RECENT_ACTIVITY_LIMIT = 5;
 
-    private static final String NAME_KEY_CONSTRAINT = "team_org_id_name_key_key";
     private static final TypeReference<List<String>> STRINGS = new TypeReference<>() {
     };
 
@@ -102,13 +101,7 @@ public class TeamSettingsService {
             teams.saveAndFlush(team);
         }
         catch (DataIntegrityViolationException violation) {
-            if (!UniqueViolations.of(violation, NAME_KEY_CONSTRAINT)) {
-                throw violation;
-            }
-            ReberuException duplicated = new ReberuException(ErrorCode.INVALID_REQUEST,
-                    List.of(new FieldViolation("name", FieldReason.DUPLICATE)));
-            duplicated.initCause(violation);
-            throw duplicated;
+            throw TeamService.duplicateName(violation);
         }
         List<Field> changed = Field.ALL.stream()
                 .filter(field -> !Objects.equals(field.value().apply(before), field.value().apply(after)))
