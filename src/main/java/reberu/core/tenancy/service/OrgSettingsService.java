@@ -95,7 +95,13 @@ public class OrgSettingsService {
                         record.targetType(), record.targetId()))
                 .toList();
         long joinRequests = orgMemberships.countByOrgIdAndState(orgId, MembershipState.REQUESTED);
-        return new OrgOverview(teams.size(), teams, joinRequests, 0, recent);
+        long invitationReviews = jdbc.sql("""
+                        SELECT COUNT(*) FROM invitation WHERE org_id = :org AND state = 'PENDING_APPROVAL'
+                        """)
+                .param("org", orgId.toString())
+                .query(Long.class)
+                .single();
+        return new OrgOverview(teams.size(), teams, joinRequests, invitationReviews, recent);
     }
 
     @Transactional(readOnly = true)

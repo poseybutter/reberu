@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.12.0\
-> 수정일: 2026-11-11
+> 버전: v0.13.0\
+> 수정일: 2026-11-13
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -356,14 +356,14 @@ erDiagram
 | `team_id` | `UUID` | 손님 ○ | 구성원 초대는 선택 |
 | `email` | `TEXT(254)` | ○ | 소문자(TEN-INVT-01) |
 | `kind` | `CODE` | ○ | `MEMBER`·`GUEST` |
-| `role` | `CODE` | ○ | `TEAM_MEMBER`·`VIEWER`(TEN-INV-11) |
+| `role` | `CODE` | 팀 ○ | `TEAM_MEMBER`·`VIEWER`(TEN-INV-11). 팀 없는 구성원 초대는 비운다(TEN-INVT-08) |
 | `guest_days` | `INT` | 손님 ○ | 이용 일수 |
 | `state` | `CODE` | ○ | `PENDING_APPROVAL`·`PENDING`·`ACCEPTED`·`DECLINED`·`EXPIRED`·`REVOKED`([architecture/tenancy.md](../architecture/tenancy.md) §5.6) |
 | `accept_by` | `UTC_TIMESTAMP` | ○ | 수락 기한 |
 | `created_by`, `approved_by`, `accepted_by` | `UUID` | | 계정 |
 
 - 유일 성격: (`org_id`, `email`, `team_id`)에 `PENDING_APPROVAL`·`PENDING`은 하나(TEN-INVT-02). 부분 인덱스를 쓰지 않으므로(TEN-DB-02) 앱이 같은 트랜잭션에서 기존 행을 `REVOKED`로 바꾸고, 동시성은 조직 단위 직렬화로 막는다.
-- 인덱스 후보: (`email`, `state`) 로그인 때 받은 초대 찾기.
+- 인덱스: (`email`, `state`) 받은 초대 찾기, (`org_id`, `email`) TEN-INVT-02 기존 초대 찾기, (`org_id`, `state`) 조직 목록·승인 대기 수, (`team_id`, `state`) 팀 목록.
 
 ### invite_link
 

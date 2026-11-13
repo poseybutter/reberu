@@ -68,6 +68,15 @@ public final class TenancyCodes {
         MEMO
     }
 
+    public enum InvitationState {
+        PENDING_APPROVAL,
+        PENDING,
+        ACCEPTED,
+        DECLINED,
+        EXPIRED,
+        REVOKED
+    }
+
     public enum TeamRole {
         TEAM_ADMIN,
         TEAM_MEMBER,

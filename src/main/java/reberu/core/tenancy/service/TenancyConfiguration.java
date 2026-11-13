@@ -11,9 +11,11 @@ import reberu.core.access.MembershipDirectory;
 import reberu.core.account.Accounts;
 import reberu.core.audit.ActivityLogs;
 import reberu.core.support.CursorCodec;
+import reberu.core.support.RateLimits;
 import reberu.core.tenancy.Deployment;
 import reberu.core.tenancy.DeploymentMode;
 import reberu.core.tenancy.OrgBootstrap;
+import reberu.core.tenancy.repository.InvitationRepository;
 import reberu.core.tenancy.repository.JobTypeRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
 import reberu.core.tenancy.repository.OrganizationRepository;
@@ -111,6 +113,15 @@ class TenancyConfiguration {
             Accounts accounts, ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc) {
         return new TeamMemberService(locks, orgMemberships, teams, teamMemberships, accounts, activityLogs,
                 cursors, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
+    InvitationService invitationService(StateLocks locks, InvitationRepository invitations,
+            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
+            Accounts accounts, ActivityLogs activityLogs, RateLimits rateLimits, CursorCodec cursors,
+            JdbcClient jdbc) {
+        return new InvitationService(locks, invitations, orgMemberships, teams, teamMemberships, accounts,
+                activityLogs, rateLimits, cursors, jdbc, Clock.systemUTC());
     }
 
     @Bean
