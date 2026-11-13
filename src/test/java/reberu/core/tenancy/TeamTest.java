@@ -18,9 +18,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.aopalliance.intercept.MethodInterceptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.Advised;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -36,6 +38,7 @@ import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.security.AccountAuthentication;
+import reberu.core.tenancy.repository.TeamRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -62,6 +65,9 @@ class TeamTest {
 
     @Autowired
     PlatformTransactionManager transactionManager;
+
+    @Autowired
+    TeamRepository teams;
 
     private UUID admin;
     private UUID member;
@@ -150,20 +156,36 @@ class TeamTest {
         }));
         holder.start();
         assertThat(inserted.await(10, TimeUnit.SECONDS)).isTrue();
-
-        CompletableFuture<MockHttpServletResponse> create = CompletableFuture.supplyAsync(() -> {
-            try {
-                return createTeam(admin, orgId, team("경합", "PRIVATE", basic, admin));
+        CountDownLatch saving = new CountDownLatch(1);
+        MethodInterceptor signal = invocation -> {
+            if (invocation.getMethod().getName().equals("saveAndFlush")) {
+                saving.countDown();
             }
-            catch (Exception failed) {
-                throw new IllegalStateException(failed);
-            }
-        });
-        Thread.sleep(500);
-        release.countDown();
-        holder.join();
+            return invocation.proceed();
+        };
+        Advised repository = (Advised) teams;
+        repository.addAdvice(0, signal);
+        MockHttpServletResponse response;
+        try {
+            CompletableFuture<MockHttpServletResponse> create = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return createTeam(admin, orgId, team("경합", "PRIVATE", basic, admin));
+                }
+                catch (Exception failed) {
+                    throw new IllegalStateException(failed);
+                }
+            });
+            assertThat(saving.await(10, TimeUnit.SECONDS)).as("사전 조회 통과").isTrue();
+            release.countDown();
+            holder.join();
+            response = create.get(30, TimeUnit.SECONDS);
+        }
+        finally {
+            release.countDown();
+            repository.removeAdvice(signal);
+        }
 
-        assertThat(fields(create.get(30, TimeUnit.SECONDS))).containsExactly("name:DUPLICATE");
+        assertThat(fields(response)).containsExactly("name:DUPLICATE");
         assertThat(count("team")).isEqualTo(2);
         assertThat(jdbc.sql("SELECT COUNT(*) FROM org_activity_log WHERE action = 'TEAM_CREATED'")
                 .query(Integer.class).single()).isOne();
