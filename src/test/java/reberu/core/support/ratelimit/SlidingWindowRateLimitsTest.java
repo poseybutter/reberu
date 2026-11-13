@@ -181,17 +181,43 @@ class SlidingWindowRateLimitsTest {
     @Test
     @DisplayName("SEC-RATE-13: 서로 다른 새 키가 동시에 몰려도 키 수 상한을 넘지 않음")
     void concurrentNewKeysRespectCap() throws Exception {
-        SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 10);
-        List<Callable<Boolean>> attempts = new ArrayList<>();
-        for (int i = 0; i < 100; i++) {
-            String key = RateLimits.ipKey("203.0.113." + i);
-            attempts.add(() -> allowed(limits, key));
+        for (int round = 0; round < 200; round++) {
+            SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 10);
+            List<Callable<Boolean>> attempts = new ArrayList<>();
+            for (int i = 0; i < 100; i++) {
+                String key = RateLimits.ipKey("203.0.113." + i);
+                attempts.add(() -> allowed(limits, key));
+            }
+
+            long allowed = runTogether(attempts).stream().filter(Boolean::booleanValue).count();
+
+            assertThat(allowed).as("%d번째", round).isEqualTo(10);
+            assertThat(limits.size(RateLimit.DEFAULT)).as("%d번째", round).isEqualTo(10);
         }
+    }
 
-        long allowed = runTogether(attempts).stream().filter(Boolean::booleanValue).count();
+    @Test
+    @DisplayName("SEC-RATE-13: 정리되는 옛 키와 새 키가 동시에 몰려도 키 수 상한을 넘지 않음")
+    void staleKeysPurgedConcurrentlyRespectCap() throws Exception {
+        for (int round = 0; round < 200; round++) {
+            SlidingWindowRateLimits limits = limits(5, Duration.ofMinutes(1), 10);
+            for (int i = 0; i < 10; i++) {
+                limits.acquire(RateLimit.DEFAULT, RateLimits.ipKey("198.51.100." + i));
+            }
+            clock.advance(Duration.ofMinutes(2));
+            List<Callable<Boolean>> attempts = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                String old = RateLimits.ipKey("198.51.100." + i);
+                String fresh = RateLimits.ipKey("203.0.113." + i);
+                attempts.add(() -> allowed(limits, old));
+                attempts.add(() -> allowed(limits, fresh));
+            }
 
-        assertThat(allowed).isEqualTo(10);
-        assertThat(limits.size(RateLimit.DEFAULT)).isEqualTo(10);
+            long allowed = runTogether(attempts).stream().filter(Boolean::booleanValue).count();
+
+            assertThat(allowed).as("%d번째", round).isEqualTo(10);
+            assertThat(limits.size(RateLimit.DEFAULT)).as("%d번째", round).isEqualTo(10);
+        }
     }
 
     @Test

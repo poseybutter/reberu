@@ -47,36 +47,37 @@ class SlidingWindowRateLimits implements RateLimits {
         ConcurrentHashMap<String, Bucket> keys = pool.buckets;
         long size = config.window().toMillis();
         long now = clock.millis();
-        if (!keys.containsKey(key)) {
+        long[] wait = {-1};
+        boolean[] report = {false};
+        while (wait[0] < 0) {
+            keys.computeIfPresent(key, (ignored, bucket) -> {
+                wait[0] = bucket.tryAcquire(config.limit(), size, now);
+                report[0] = bucket.mark(wait[0]);
+                return bucket;
+            });
+            if (wait[0] >= 0) {
+                break;
+            }
             synchronized (pool) {
-                if (!keys.containsKey(key)) {
-                    if (keys.size() >= properties.maxKeysPerRule()) {
-                        purge(keys, now, size);
-                    }
-                    if (keys.size() >= properties.maxKeysPerRule()) {
-                        long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
-                        if (pool.lastCapLog.getAndAccumulate(logIndex, Math::max) < logIndex) {
-                            securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
-                        }
-                        throw new RateLimitExceededException(rule, config.window());
-                    }
-                    keys.put(key, newBucket(config.limit()));
+                if (keys.containsKey(key)) {
+                    continue;
                 }
+                if (keys.size() >= properties.maxKeysPerRule()) {
+                    purge(keys, now, size);
+                }
+                if (keys.size() >= properties.maxKeysPerRule()) {
+                    long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
+                    if (pool.lastCapLog.getAndAccumulate(logIndex, Math::max) < logIndex) {
+                        securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
+                    }
+                    throw new RateLimitExceededException(rule, config.window());
+                }
+                Bucket created = newBucket(config.limit());
+                wait[0] = created.tryAcquire(config.limit(), size, now);
+                report[0] = created.mark(wait[0]);
+                keys.put(key, created);
             }
         }
-        long[] wait = {0};
-        boolean[] report = {false};
-        keys.compute(key, (ignored, bucket) -> {
-            Bucket current = bucket == null ? newBucket(config.limit()) : bucket;
-            wait[0] = current.tryAcquire(config.limit(), size, now);
-            if (wait[0] == 0) {
-                current.reported = false;
-            } else if (!current.reported) {
-                current.reported = true;
-                report[0] = true;
-            }
-            return current;
-        });
         if (wait[0] > 0) {
             if (report[0]) {
                 securityLog.warn("요청 제한 초과: rule={}, key={}", rule.id(), maskKey(key));
@@ -140,6 +141,18 @@ class SlidingWindowRateLimits implements RateLimits {
     private abstract static class Bucket {
 
         private boolean reported;
+
+        boolean mark(long wait) {
+            if (wait == 0) {
+                reported = false;
+                return false;
+            }
+            if (reported) {
+                return false;
+            }
+            reported = true;
+            return true;
+        }
 
         abstract long tryAcquire(int limit, long size, long now);
 
