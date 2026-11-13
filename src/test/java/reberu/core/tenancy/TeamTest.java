@@ -165,27 +165,25 @@ class TeamTest {
         };
         Advised repository = (Advised) teams;
         repository.addAdvice(0, signal);
-        MockHttpServletResponse response;
+        CompletableFuture<MockHttpServletResponse> create = CompletableFuture.supplyAsync(() -> {
+            try {
+                return createTeam(admin, orgId, team("경합", "PRIVATE", basic, admin));
+            }
+            catch (Exception failed) {
+                throw new IllegalStateException(failed);
+            }
+        });
         try {
-            CompletableFuture<MockHttpServletResponse> create = CompletableFuture.supplyAsync(() -> {
-                try {
-                    return createTeam(admin, orgId, team("경합", "PRIVATE", basic, admin));
-                }
-                catch (Exception failed) {
-                    throw new IllegalStateException(failed);
-                }
-            });
             assertThat(saving.await(10, TimeUnit.SECONDS)).as("사전 조회 통과").isTrue();
-            release.countDown();
-            holder.join();
-            response = create.get(30, TimeUnit.SECONDS);
         }
         finally {
             release.countDown();
+            holder.join(TimeUnit.SECONDS.toMillis(30));
+            create.exceptionally(failed -> null).get(30, TimeUnit.SECONDS);
             repository.removeAdvice(signal);
         }
 
-        assertThat(fields(response)).containsExactly("name:DUPLICATE");
+        assertThat(fields(create.get())).containsExactly("name:DUPLICATE");
         assertThat(count("team")).isEqualTo(2);
         assertThat(jdbc.sql("SELECT COUNT(*) FROM org_activity_log WHERE action = 'TEAM_CREATED'")
                 .query(Integer.class).single()).isOne();
