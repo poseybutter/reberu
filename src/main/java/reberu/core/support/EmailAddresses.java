@@ -9,7 +9,7 @@ public final class EmailAddresses {
     public static final int LOCAL_MAX_LENGTH = 64;
 
     private static final Pattern LOCAL = Pattern.compile("[a-z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*");
-    private static final Pattern DOMAIN = Pattern.compile("([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?");
+    private static final Pattern DOMAIN = Pattern.compile("([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?");
 
     private EmailAddresses() {
     }
