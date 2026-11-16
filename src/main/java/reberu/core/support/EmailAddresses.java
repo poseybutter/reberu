@@ -1,11 +1,15 @@
 package reberu.core.support;
 
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public final class EmailAddresses {
 
     public static final int MAX_LENGTH = 254;
     public static final int LOCAL_MAX_LENGTH = 64;
+
+    private static final Pattern LOCAL = Pattern.compile("[a-z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*");
+    private static final Pattern DOMAIN = Pattern.compile("([a-z0-9]([a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9]([a-z0-9-]*[a-z0-9])?");
 
     private EmailAddresses() {
     }
@@ -18,19 +22,12 @@ public final class EmailAddresses {
         if (normalized.isEmpty() || normalized.length() > MAX_LENGTH) {
             return false;
         }
-        for (int i = 0; i < normalized.length(); i++) {
-            char c = normalized.charAt(i);
-            if (c <= 0x20 || c >= 0x7F) {
-                return false;
-            }
-        }
         int at = normalized.indexOf('@');
         if (at <= 0 || at > LOCAL_MAX_LENGTH || at != normalized.lastIndexOf('@')) {
             return false;
         }
-        String domain = normalized.substring(at + 1);
-        int dot = domain.indexOf('.');
-        return dot > 0 && !domain.endsWith(".") && !domain.contains("..");
+        return LOCAL.matcher(normalized.substring(0, at)).matches()
+                && DOMAIN.matcher(normalized.substring(at + 1)).matches();
     }
 
 }

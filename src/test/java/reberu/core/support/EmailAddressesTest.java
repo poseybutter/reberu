@@ -20,10 +20,13 @@ class EmailAddressesTest {
     void rejectsMalformed() {
         assertThat(EmailAddresses.valid("dana@example.com")).isTrue();
         assertThat(EmailAddresses.valid("a@b.co")).isTrue();
+        assertThat(EmailAddresses.valid("dana.kim+work@mail-1.example.co.kr")).isTrue();
+        assertThat(EmailAddresses.valid("o'brien_99@example.com")).isTrue();
         for (String email : new String[] {"", "다나@example.com", "dana@exämple.com", "da na@example.com",
                 "dana\u0000@example.com", "@example.com", "dana@", "dana@example", "dana@.example.com",
                 "dana@example.com.", "dana@example..com", "a@b@example.com", "x".repeat(65) + "@example.com",
-                "a@" + "b".repeat(250) + ".com"}) {
+                "a@" + "b".repeat(250) + ".com", "a..b@example.com", ".dana@example.com", "dana.@example.com",
+                "a@exam/ple.com", "a@exam_ple.com", "a@-example.com", "a@example-.com", "da(na)@example.com"}) {
             assertThat(EmailAddresses.valid(email)).as(email).isFalse();
         }
     }

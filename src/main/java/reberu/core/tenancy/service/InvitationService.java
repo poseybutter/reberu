@@ -185,9 +185,16 @@ public class InvitationService {
                         OPEN_STATES);
         for (Invitation replaced : existing) {
             String before = replaced.state().name();
-            replaced.revoke(now);
-            record(replaced, new ActivityEntry(actorId, "INVITATION_REVOKED", "INVITATION", replaced.id(), before,
-                    InvitationState.REVOKED.name()));
+            if (replaced.open(now)) {
+                replaced.revoke(now);
+                record(replaced, new ActivityEntry(actorId, "INVITATION_REVOKED", "INVITATION", replaced.id(),
+                        before, InvitationState.REVOKED.name()));
+            }
+            else {
+                replaced.expire(now);
+                record(replaced, new ActivityEntry(actorId, "INVITATION_EXPIRED", "INVITATION", replaced.id(),
+                        before, InvitationState.EXPIRED.name()));
+            }
         }
         TeamRole role = teamId == null ? null : input.role();
         List<Created> created = new ArrayList<>();

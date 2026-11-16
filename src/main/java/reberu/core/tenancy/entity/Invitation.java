@@ -114,6 +114,14 @@ public class Invitation {
         updatedAt = at;
     }
 
+    public void expire(Instant at) {
+        if (state != InvitationState.PENDING || at.isBefore(acceptBy)) {
+            throw new IllegalStateException("만료할 수 없는 초대: " + state);
+        }
+        state = InvitationState.EXPIRED;
+        updatedAt = at;
+    }
+
     private void require(InvitationState expected) {
         if (state != expected) {
             throw new IllegalStateException("초대 상태 오류: " + state);

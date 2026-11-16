@@ -161,6 +161,48 @@ class InvitationTest {
     }
 
     @Test
+    @DisplayName("TEN-INVT-02·10: 다시 초대할 때 기한이 지난 PENDING 초대는 REVOKED가 아니라 EXPIRED, 기록도 만료")
+    void replacingExpiredInvitationExpiresIt() throws Exception {
+        String expired = invitationId(createForOrg(orgAdmin, invite(List.of("mina@example.com"), "MEMBER", teamId,
+                "VIEWER", null)));
+        jdbc.sql("UPDATE invitation SET accept_by = :old WHERE id = :id")
+                .param("old", LocalDateTime.now(ZoneOffset.UTC).minusMinutes(1)).param("id", expired).update();
+
+        String fresh = invitationId(createForOrg(orgAdmin, invite(List.of("mina@example.com"), "MEMBER", teamId,
+                "VIEWER", null)));
+
+        assertThat(state(expired)).isEqualTo("EXPIRED");
+        assertThat(state(fresh)).isEqualTo("PENDING");
+        assertThat(teamLog(teamId, "INVITATION_EXPIRED")).containsExactly(orgAdmin + " " + expired + " PENDING EXPIRED");
+        assertThat(teamLog(teamId, "INVITATION_REVOKED")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("TEN-INVT-11: 같은 이메일 계정이 여럿이면 모두 ACTIVE 구성원일 때만 승인 없이 PENDING")
+    void everyAccountWithEmailMustBeMember() throws Exception {
+        UUID twin = newAccount("haneul@example.com");
+        String noMembership = createdState(createForTeam(teamAdmin, teamId, invite(List.of("haneul@example.com"),
+                "MEMBER", null, "VIEWER", null)));
+        insertOrgMembership(twin, "GUEST");
+        String guestTwin = createdState(createForTeam(teamAdmin, teamId, invite(List.of("haneul@example.com"),
+                "MEMBER", null, "VIEWER", null)));
+        jdbc.sql("UPDATE org_membership SET kind = 'MEMBER' WHERE account_id = :account")
+                .param("account", twin.toString()).update();
+        String bothMembers = createdState(createForTeam(teamAdmin, teamId, invite(List.of("haneul@example.com"),
+                "MEMBER", null, "VIEWER", null)));
+
+        assertThat(noMembership).isEqualTo("PENDING_APPROVAL");
+        assertThat(guestTwin).isEqualTo("PENDING_APPROVAL");
+        assertThat(bothMembers).isEqualTo("PENDING");
+    }
+
+    private String createdState(MockHttpServletResponse response) throws Exception {
+        JsonNode invitations = json(response, 201).get("invitations");
+        assertThat(invitations).hasSize(1);
+        return invitations.get(0).get("state").asString();
+    }
+
+    @Test
     @DisplayName("TEN-ADM-01·TEN-TST-15: 팀 관리자의 구성원 초대는 ACTIVE 구성원이 아닌 사람만 승인 대기, 조직 관리자 초대와 설정 끔은 바로 PENDING")
     void teamAdminMemberInvitationNeedsReview() throws Exception {
         JsonNode byTeamAdmin = json(createForTeam(teamAdmin, teamId, invite(List.of("haneul@example.com",
