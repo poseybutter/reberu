@@ -15,6 +15,9 @@ public final class EmailAddresses {
     }
 
     public static String normalize(String email) {
+        if (email.chars().anyMatch(c -> c > 0x7F)) {
+            return email;
+        }
         return email.strip().toLowerCase(Locale.ROOT);
     }
 

@@ -16,6 +16,15 @@ class EmailAddressesTest {
     }
 
     @Test
+    @DisplayName("SEC-TOKEN-09: 소문자 변환·공백 제거로 ASCII가 되는 ASCII 밖 문자도 받지 않음")
+    void rejectsNonAsciiBeforeNormalizing() {
+        for (String raw : new String[] {"K@example.com", "dana@example.Kom", "dana@example.com　",
+                " dana@example.com"}) {
+            assertThat(EmailAddresses.valid(EmailAddresses.normalize(raw))).as(raw).isFalse();
+        }
+    }
+
+    @Test
     @DisplayName("SEC-TOKEN-09: ASCII 밖 문자·공백·제어 문자·@ 개수·도메인 형식·길이·라벨 길이가 맞지 않으면 받지 않음")
     void rejectsMalformed() {
         assertThat(EmailAddresses.valid("dana@example.com")).isTrue();

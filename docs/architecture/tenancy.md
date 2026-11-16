@@ -255,7 +255,7 @@ stateDiagram-v2
     [*] --> PENDING_APPROVAL: 구성원 초대 + TEN-ADM-01 켜짐 + 만든 사람이 조직 관리자가 아님 + 받는 사람이 그 조직의 ACTIVE 구성원 아님
     [*] --> PENDING: 그 밖의 초대
     PENDING_APPROVAL --> PENDING: 조직 관리자 승인
-    PENDING_APPROVAL --> REVOKED: 조직 관리자 거절 / 만든 사람 취소
+    PENDING_APPROVAL --> REVOKED: 조직 관리자 거절 / 관리자 취소(TEN-INVT-12)
     PENDING --> ACCEPTED: 이메일이 일치하는 계정이 수락
     PENDING --> DECLINED: 받은 사람 거절
     PENDING --> EXPIRED: 수락 기한 경과
