@@ -9,7 +9,11 @@ public interface RateLimits {
     String IP_PREFIX = "ip:";
     String ACCOUNT_PREFIX = "account:";
 
-    void acquire(RateLimit rule, String key);
+    default void acquire(RateLimit rule, String key) {
+        acquire(rule, key, 1);
+    }
+
+    void acquire(RateLimit rule, String key, int permits);
 
     static String ipKey(String address) {
         return IP_PREFIX + network(address);

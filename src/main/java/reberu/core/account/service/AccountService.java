@@ -3,6 +3,7 @@ package reberu.core.account.service;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -50,6 +51,19 @@ class AccountService implements Accounts {
                     account.email(), account.lastLoginAt()));
         }
         return profiles;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Set<UUID>> idsByEmail(Collection<String> normalizedEmails) {
+        if (normalizedEmails.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Set<UUID>> ids = new HashMap<>();
+        for (Account account : accounts.findByEmailIn(Set.copyOf(normalizedEmails))) {
+            ids.computeIfAbsent(account.email(), ignored -> new HashSet<>()).add(account.id());
+        }
+        return ids;
     }
 
     @Override

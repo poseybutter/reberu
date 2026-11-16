@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.14.0\
-> 수정일: 2026-11-11
+> 버전: v0.15.0\
+> 수정일: 2026-11-13
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -201,7 +201,7 @@
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/orgs/{orgId}` | `id`, `name`, `timeZone`, `state`, 내 멤버 종류 `myKind`, 조직 관리자 여부 `orgAdmin` | 조직 멤버(손님 가능) | |
-| `GET` | `/api/orgs/{orgId}/overview` | 팀 수와 팀별 `ACTIVE` 인원, 조직 가입 요청 대기 수, 초대 승인 대기 수, 최근 조직 활동 5개(최신부터, 바뀌기 전·후 값 제외) | 조직 관리자 | F1. 초대 수는 #18 전까지 0. 출석 수는 v0.2 |
+| `GET` | `/api/orgs/{orgId}/overview` | 팀 수와 팀별 `ACTIVE` 인원, 조직 가입 요청 대기 수, 초대 승인 대기 수, 최근 조직 활동 5개(최신부터, 바뀌기 전·후 값 제외) | 조직 관리자 | F1. 초대 승인 대기 수는 `PENDING_APPROVAL` 초대 수. 출석 수는 v0.2 |
 | `GET` | `/api/orgs/{orgId}/settings` | 조직 설정 전체, `state`, `version` | 조직 관리자 | F7 |
 | `PATCH` | `/api/orgs/{orgId}/settings` | 이름, 한 줄 소개, 시간대(OQ-32), 공개 범위, 가입 방법, 새 구성원 조직 관리자 확인(TEN-ADM-01·02), 손님 규칙, 초대 수락 기한. 보낸 필드만 바꾸고 새 설정을 돌려준다(TEN-SET-01~04) | 조직 관리자 🔒 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
 | `POST` | `/api/orgs/{orgId}/archive` | 조직 보관([architecture/tenancy.md](tenancy.md) §14.1, TEN-SET-05) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED` |
@@ -224,10 +224,10 @@
 | `GET` | `/api/orgs/{orgId}/join-requests` | 조직 가입 요청과 팀 관리자 링크로 온 새 구성원 확인 대기(TEN-ADM-01) | 조직 관리자 | F5 |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/approve` | 승인. 선택 `teamId`, `role`(`TEAM_MEMBER`·`VIEWER`) | 조직 관리자 | `409 ALREADY_PROCESSED` |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/reject` | 거절 | 조직 관리자 | |
-| `GET` | `/api/orgs/{orgId}/invitations` | 모든 팀의 이메일 초대. 쿼리 `state`, `kind`, `teamId` | 조직 관리자 | F5 |
-| `POST` | `/api/orgs/{orgId}/invitations` | 이메일 초대 만들기. 본문 `emails`(최대 50), `kind`, `teamId`(손님은 필수), `role`, `guestDays` | 조직 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
-| `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/approve`, `/reject` | `PENDING_APPROVAL` 초대 승인·거절(손님 초대, 팀 관리자의 새 구성원 초대) | 조직 관리자 🔒 | |
-| `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/revoke` | 초대 취소 → `REVOKED` | 조직 관리자 | |
+| `GET` | `/api/orgs/{orgId}/invitations` | 모든 팀의 이메일 초대. 쿼리 `state`, `kind`, `teamId`. 항목마다 `invitationId`, `email`, `kind`, `teamId`, `teamName`, `role`, `guestDays`, `state`(TEN-INVT-10), `acceptBy`, `createdBy`, `createdByName`, `createdAt`. 최신부터, 커서 페이지(§3.3) | 조직 관리자 | F5 |
+| `POST` | `/api/orgs/{orgId}/invitations` | 이메일 초대 만들기. 본문 `emails`(최대 50), `kind`, `teamId`(손님은 필수), `role`(팀이 있을 때만), `guestDays`(손님만). 응답 `invitations`: 이메일마다 `invitationId`, `email`, `state`, `acceptBy`(TEN-INVT-07~09) | 조직 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
+| `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/approve`, `/reject` | `PENDING_APPROVAL` 초대 승인·거절(손님 초대, 팀 관리자의 새 구성원 초대, TEN-INVT-12) | 조직 관리자 🔒 | `204`, 처리된 초대 `409 ALREADY_PROCESSED`, 보관된 팀 승인 `409 READ_ONLY` |
+| `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/revoke` | 초대 취소 → `REVOKED` | 조직 관리자 | `204`, 대기 중이 아니면 `409 ALREADY_PROCESSED`(TEN-INVT-10) |
 | `GET` | `/api/orgs/{orgId}/modules` | 설치된 모듈: key, 이름, 설명, 범위, 출처, 허용·켜짐, 켠 팀 수, 필요한 모듈 | 조직 관리자 | F4 |
 | `GET` | `/api/orgs/{orgId}/modules/{moduleKey}/impact` | 허용을 거두거나 끌 때 영향: 꺼질 팀 수, 함께 꺼질 모듈 | 조직 관리자 | TEN-MOD-04 확인 화면 |
 | `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/allowed` | `TEAM` 모듈 허용·거두기. 본문 `allowed` | 조직 관리자 🔒 | TEN-MOD-03 |
@@ -261,9 +261,9 @@
 | `POST` | `/api/teams/{teamId}/members/{accountId}/remove` | 팀에서 내보내기 → `LEFT`(사유 `REMOVED`, TEN-TMEM-04·05) | 팀 관리자 🔒 | `204`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
 | `GET` | `/api/teams/{teamId}/join-requests` | 팀 가입 요청(공개 팀 요청, 승인 필요 링크) | 팀 관리자 | E2 |
 | `POST` | `/api/teams/{teamId}/join-requests/{accountId}/approve`, `/reject` | 승인·거절. 조직 멤버십이 확인 대기면 승인할 수 없다(TEN-ADM-01) | 팀 관리자 | `409 ALREADY_PROCESSED` |
-| `GET` | `/api/teams/{teamId}/invitations` | 이 팀의 이메일 초대 | 팀 관리자 | E2 |
-| `POST` | `/api/teams/{teamId}/invitations` | 이 팀 초대 만들기. 본문 `emails`, `kind`, `role`, `guestDays`. 상태는 [architecture/tenancy.md](tenancy.md) §5.6 | 팀 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
-| `POST` | `/api/teams/{teamId}/invitations/{invitationId}/revoke` | 초대 취소 | 팀 관리자 | |
+| `GET` | `/api/teams/{teamId}/invitations` | 이 팀의 이메일 초대. 쿼리 `state`, `kind`. 항목은 조직 초대 목록과 같다 | 팀 관리자 | E2 |
+| `POST` | `/api/teams/{teamId}/invitations` | 이 팀 초대 만들기. 본문 `emails`, `kind`, `role`, `guestDays`. 상태는 [architecture/tenancy.md](tenancy.md) §5.6, 응답은 조직 초대 만들기와 같다 | 팀 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
+| `POST` | `/api/teams/{teamId}/invitations/{invitationId}/revoke` | 초대 취소. 이 팀 초대만(TEN-INVT-12) | 팀 관리자 | `204`, 대기 중이 아니면 `409 ALREADY_PROCESSED` |
 | `GET` | `/api/teams/{teamId}/invite-links` | 링크 목록: 승인 필요, 역할, 만료 시각, 사용 횟수/상한, 켜짐, 만든 사람. 토큰 없음 | 팀 관리자 | E2 |
 | `POST` | `/api/teams/{teamId}/invite-links` | 링크 만들기. 본문 `approvalRequired`, `role`, `expiresInDays`(기본 7, 최대 30), `maxUses`(필수). 응답에만 링크 주소가 한 번 들어 있다(TEN-LINK-04) | 팀 관리자 | `201`, 조직이 링크를 껐으면 `404`, `Idempotency-Key` |
 | `POST` | `/api/teams/{teamId}/invite-links/{linkId}/disable` | 링크 끄기. 다시 켜는 API는 없다. 새로 만든다 | 팀 관리자 | |

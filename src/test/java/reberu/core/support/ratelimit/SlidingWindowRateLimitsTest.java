@@ -3,6 +3,7 @@ package reberu.core.support.ratelimit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -284,6 +285,36 @@ class SlidingWindowRateLimitsTest {
     @DisplayName("거부 예외는 스택 트레이스를 모으지 않음")
     void rejectionHasNoStackTrace() {
         assertThat(new RateLimitExceededException(RateLimit.DEFAULT, Duration.ofSeconds(1)).getStackTrace()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-03·09: 개수로 세면 한도 안에서만 한꺼번에 허용, 넘치면 하나도 세지 않고 자리가 날 때까지 대기")
+    void acquiresPermitsTogether() {
+        SlidingWindowRateLimits exact = limits(5, Duration.ofMinutes(1), 100);
+        exact.acquire(RateLimit.DEFAULT, "account:exact", 3);
+        clock.advance(Duration.ofSeconds(10));
+        exact.acquire(RateLimit.DEFAULT, "account:exact", 1);
+
+        RateLimitExceededException waiting = catchThrowableOfType(RateLimitExceededException.class,
+                () -> exact.acquire(RateLimit.DEFAULT, "account:exact", 3));
+        assertThat(waiting.retryAfter()).isEqualTo(Duration.ofSeconds(50));
+        exact.acquire(RateLimit.DEFAULT, "account:exact", 1);
+        assertThatThrownBy(() -> exact.acquire(RateLimit.DEFAULT, "account:exact", 1))
+                .isInstanceOf(RateLimitExceededException.class);
+        assertThatThrownBy(() -> exact.acquire(RateLimit.DEFAULT, "account:other", 6))
+                .isInstanceOf(RateLimitExceededException.class);
+        assertThatThrownBy(() -> exact.acquire(RateLimit.DEFAULT, "account:other", 0))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(exact.size(RateLimit.DEFAULT)).isEqualTo(1);
+
+        int limit = SlidingWindowRateLimits.EXACT_MAX_LIMIT + 100;
+        SlidingWindowRateLimits counting = limits(limit, Duration.ofMinutes(1), 100);
+        counting.acquire(RateLimit.DEFAULT, "account:counting", limit - 10);
+        assertThatThrownBy(() -> counting.acquire(RateLimit.DEFAULT, "account:counting", 11))
+                .isInstanceOf(RateLimitExceededException.class);
+        assertThatCode(() -> counting.acquire(RateLimit.DEFAULT, "account:counting", 10)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> counting.acquire(RateLimit.DEFAULT, "account:counting", 1))
+                .isInstanceOf(RateLimitExceededException.class);
     }
 
     @Test

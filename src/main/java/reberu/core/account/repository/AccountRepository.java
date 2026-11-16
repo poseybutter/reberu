@@ -1,6 +1,8 @@
 package reberu.core.account.repository;
 
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,6 +14,8 @@ import reberu.core.account.entity.Account;
 public interface AccountRepository extends JpaRepository<Account, UUID> {
 
     Optional<Account> findByGoogleSub(String googleSub);
+
+    List<Account> findByEmailIn(Collection<String> emails);
 
     @Query("select a.state from Account a where a.id = :id")
     Optional<AccountState> findStateById(UUID id);

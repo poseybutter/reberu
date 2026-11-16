@@ -40,8 +40,14 @@ class SlidingWindowRateLimits implements RateLimits {
     }
 
     @Override
-    public void acquire(RateLimit rule, String key) {
+    public void acquire(RateLimit rule, String key, int permits) {
+        if (permits < 1) {
+            throw new IllegalArgumentException("요청 제한 개수는 1 이상: " + permits);
+        }
         RateLimitProperties.Rule config = properties.rules().get(rule);
+        if (permits > config.limit()) {
+            throw new RateLimitExceededException(rule, config.window());
+        }
         RateLimit.Key kind = key.startsWith(RateLimits.IP_PREFIX) ? RateLimit.Key.IP : RateLimit.Key.ACCOUNT;
         Pool pool = pools.get(rule).get(kind);
         ConcurrentHashMap<String, Bucket> keys = pool.buckets;
@@ -51,7 +57,7 @@ class SlidingWindowRateLimits implements RateLimits {
         boolean[] report = {false};
         while (wait[0] < 0) {
             keys.computeIfPresent(key, (ignored, bucket) -> {
-                wait[0] = bucket.tryAcquire(config.limit(), size, now);
+                wait[0] = bucket.tryAcquire(config.limit(), permits, size, now);
                 report[0] = bucket.mark(wait[0]);
                 return bucket;
             });
@@ -73,7 +79,7 @@ class SlidingWindowRateLimits implements RateLimits {
                     throw new RateLimitExceededException(rule, config.window());
                 }
                 Bucket created = newBucket(config.limit());
-                wait[0] = created.tryAcquire(config.limit(), size, now);
+                wait[0] = created.tryAcquire(config.limit(), permits, size, now);
                 report[0] = created.mark(wait[0]);
                 keys.put(key, created);
             }
@@ -154,7 +160,7 @@ class SlidingWindowRateLimits implements RateLimits {
             return true;
         }
 
-        abstract long tryAcquire(int limit, long size, long now);
+        abstract long tryAcquire(int limit, int permits, long size, long now);
 
         abstract boolean stale(long size, long now);
 
@@ -165,15 +171,19 @@ class SlidingWindowRateLimits implements RateLimits {
         private final ArrayDeque<Long> times = new ArrayDeque<>();
 
         @Override
-        long tryAcquire(int limit, long size, long now) {
+        long tryAcquire(int limit, int permits, long size, long now) {
             while (!times.isEmpty() && times.peekFirst() <= now - size) {
                 times.pollFirst();
             }
-            if (times.size() < limit) {
-                times.addLast(now);
+            if (times.size() + permits <= limit) {
+                for (int i = 0; i < permits; i++) {
+                    times.addLast(now);
+                }
                 return 0;
             }
-            return Math.max(1, times.peekFirst() + size - now);
+            int expiring = times.size() + permits - limit;
+            long freedAt = times.stream().skip(expiring - 1L).findFirst().orElseThrow();
+            return Math.max(1, freedAt + size - now);
         }
 
         @Override
@@ -191,7 +201,7 @@ class SlidingWindowRateLimits implements RateLimits {
         private int current;
 
         @Override
-        long tryAcquire(int limit, long size, long now) {
+        long tryAcquire(int limit, int permits, long size, long now) {
             long next = Math.floorDiv(now, size);
             if (next != index) {
                 previous = next == index + 1 ? current : 0;
@@ -199,15 +209,15 @@ class SlidingWindowRateLimits implements RateLimits {
                 index = next;
             }
             long elapsed = now - index * size;
-            if (previous * (size - elapsed) + (current + 1L) * size <= limit * size) {
-                current++;
+            if (previous * (size - elapsed) + ((long) current + permits) * size <= limit * size) {
+                current += permits;
                 return 0;
             }
             long wait;
-            if (current + 1 <= limit) {
-                wait = size - (limit - current - 1L) * size / previous - elapsed;
+            if ((long) current + permits <= limit) {
+                wait = size - ((long) limit - current - permits) * size / previous - elapsed;
             } else {
-                wait = size - elapsed + size - (limit - 1L) * size / current;
+                wait = size - elapsed + size - ((long) limit - permits) * size / current;
             }
             return Math.max(1, wait);
         }
