@@ -1,7 +1,7 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.17.0\
-> 수정일: 2026-11-16
+> 버전: v0.18.0\
+> 수정일: 2026-11-17
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
 
@@ -187,7 +187,7 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> REQUESTED: 가입 요청 / 승인 필요 링크 / 승인 대기 자동 가입
     [*] --> ACTIVE: 초대 수락 / 바로 가입 / 바로 자동 가입 / 조직 만들기
-    REQUESTED --> ACTIVE: 조직 관리자 승인
+    REQUESTED --> ACTIVE: 조직 관리자 승인 / 초대 수락(TEN-INVT-16)
     REQUESTED --> REJECTED: 조직 관리자 거절
     REQUESTED --> LEFT: 본인 요청 취소
     ACTIVE --> SUSPENDED: 조직 관리자 정지
@@ -199,7 +199,7 @@ stateDiagram-v2
     LEFT --> REQUESTED: 다시 요청
     LEFT --> ACTIVE: 새 초대 수락
     REJECTED --> ACTIVE: 새 초대 수락
-    EXPIRED --> ACTIVE: 새 손님 초대 수락 / 연장 승인
+    EXPIRED --> ACTIVE: 새 초대 수락(TEN-INVT-16) / 연장 승인
 ```
 
 | 전이 | 주체 | 조건 | 부수 효과 |
@@ -222,7 +222,7 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> REQUESTED: 공개 팀 요청 / 승인 필요 링크
     [*] --> ACTIVE: 초대 수락 / 바로 가입 / 관리자가 바로 추가
-    REQUESTED --> ACTIVE: 팀 관리자 승인
+    REQUESTED --> ACTIVE: 팀 관리자 승인 / 초대 수락(TEN-INVT-16)
     REQUESTED --> REJECTED: 팀 관리자 거절
     REQUESTED --> LEFT: 본인 취소
     ACTIVE --> SUSPENDED: 팀 관리자 정지
@@ -233,7 +233,8 @@ stateDiagram-v2
     REJECTED --> REQUESTED: 다시 요청
     LEFT --> REQUESTED: 다시 요청
     LEFT --> ACTIVE: 새 초대 수락 / 바로 추가
-    EXPIRED --> ACTIVE: 새 손님 초대 수락 / 연장 승인
+    REJECTED --> ACTIVE: 새 초대 수락
+    EXPIRED --> ACTIVE: 새 초대 수락(TEN-INVT-16) / 연장 승인
 ```
 
 | 전이 | 주체 | 조건 | 부수 효과 |
@@ -278,6 +279,11 @@ stateDiagram-v2
 | TEN-INVT-11 | "받는 사람이 그 조직의 `ACTIVE` 구성원인가"(§5.6, TEN-ADM-01)는 초대 이메일과 같은 확인된 이메일을 가진 계정이 모두 그 조직의 `ACTIVE` 구성원(`MEMBER`)일 때만 참이다. 그런 계정이 없거나 하나라도 아니면 거짓이다 | 필수 |
 | TEN-INVT-12 | 승인·거절은 조직 관리자만 하고 최근 인증이 필요하다. 보관된 팀의 초대는 승인하지 않는다(`409 READ_ONLY`). 거절은 된다. 취소는 조직 관리자(조직의 모든 초대)와 팀 관리자(자기 팀 초대, 만든 사람과 상관없이)가 한다 | 필수 |
 | TEN-INVT-13 | 초대 만들기·승인·거절·취소, TEN-INVT-02로 바뀐 기존 초대는 초대 하나마다 활동 기록에 남긴다. 팀이 있는 초대는 그 팀 기록, 팀 없는 초대는 조직 기록이다. 값 열에는 상태만 넣고 이메일을 넣지 않는다(TEN-LOG-03) | 필수 |
+| TEN-INVT-14 | 받은 사람에게 보이는 초대는 계정의 확인된 이메일과 정확히 같고(SEC-TOKEN-08), `PENDING`이며 수락 기한 전이고, 조직이 `ACTIVE`이며 팀이 있으면 팀도 `ACTIVE`인 것이다. 목록과 첫 화면의 초대 수는 이 기준을 함께 쓴다 | 필수 |
+| TEN-INVT-15 | 수락은 조직, 팀, 초대 순으로 행을 잠근 뒤 확인한다(TEN-CTX-09). 같은 계정의 같은 조직 초대 수락은 조직 행 잠금으로 차례대로 처리된다. 기한이 지났거나 조직·팀이 `ACTIVE`가 아니면 초대를 `EXPIRED`로 바꾸고 기록을 남긴 채 `409 ALREADY_PROCESSED`로 답한다. 이 상태 변경은 오류 응답과 함께 되돌리지 않는다 | 필수 |
+| TEN-INVT-16 | 끝난 멤버십(`REQUESTED`·`LEFT`·`REJECTED`·`EXPIRED`, 만료 시각이 지난 손님 포함)은 초대를 수락하면 초대의 멤버 종류로 `ACTIVE`가 된다. 만료된 손님이 구성원 초대를 수락하면 구성원이 된다. 팀 멤버십만 `SUSPENDED`이면 TEN-AUTH-12처럼 수락하지 않고 `403 FORBIDDEN_ACTION`이며 초대는 `PENDING`으로 남는다 | 필수 |
+| TEN-INVT-17 | 손님의 팀 멤버십 만료 시각은 수락 시각에 이용 일수를 더한 값이고, 조직 멤버십 만료 시각은 TEN-INV-09를 따른다. 이미 `ACTIVE`인(만료 전) 팀 멤버십에 손님 초대가 오면 만료 시각을 바꾸지 않는다. 연장은 TEN-GUEST-03으로만 한다. 수락으로 멤버십이 생기거나 다시 `ACTIVE`가 되면 조직 기록에 `ORG_MEMBER_JOINED`, 팀 기록에 `TEAM_MEMBER_JOINED`를 남긴다 | 필수 |
+| TEN-INVT-18 | 받은 사람은 수락 기한 전이면 조직·팀 상태와 상관없이 거절할 수 있다. 기한이 지났으면 초대를 `EXPIRED`로 바꾸고 `409 ALREADY_PROCESSED`다. 수락·거절은 초대 기록(`INVITATION_ACCEPTED`·`INVITATION_DECLINED`)을 남긴다 | 필수 |
 
 ## 6. 로그인과 계정
 

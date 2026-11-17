@@ -16,6 +16,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
 import reberu.core.account.AccountProfile;
+import reberu.core.account.AccountState;
 import reberu.core.account.Accounts;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
@@ -30,15 +31,19 @@ import reberu.core.support.RateLimits;
 import reberu.core.support.ReberuException;
 import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.Invitation;
+import reberu.core.tenancy.entity.OrgMembership;
 import reberu.core.tenancy.entity.Organization;
 import reberu.core.tenancy.entity.Team;
+import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.InvitationState;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 import reberu.core.tenancy.repository.InvitationRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
+import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
 import reberu.core.tenancy.repository.TeamRepository;
 
@@ -47,12 +52,21 @@ public class InvitationService {
     public static final int EMAILS_MAX = 50;
     public static final int DEFAULT_LIMIT = 20;
     public static final int MAX_LIMIT = 100;
+    public static final int MINE_LIMIT = 50;
 
+    private static final String MINE_FROM = """
+            FROM invitation i
+            JOIN organization o ON o.id = i.org_id
+            LEFT JOIN team t ON t.id = i.team_id AND t.org_id = i.org_id
+            WHERE i.email = :email AND i.state = 'PENDING' AND i.accept_by > :now AND o.state = 'ACTIVE'
+              AND (i.team_id IS NULL OR t.state = 'ACTIVE')
+            """;
     private static final Set<TeamRole> INVITABLE_ROLES = Set.of(TeamRole.TEAM_MEMBER, TeamRole.VIEWER);
     private static final List<InvitationState> OPEN_STATES = List.of(InvitationState.PENDING_APPROVAL,
             InvitationState.PENDING);
 
     private final StateLocks locks;
+    private final OrganizationRepository organizations;
     private final InvitationRepository invitations;
     private final OrgMembershipRepository orgMemberships;
     private final TeamRepository teams;
@@ -64,10 +78,11 @@ public class InvitationService {
     private final JdbcClient jdbc;
     private final Clock clock;
 
-    InvitationService(StateLocks locks, InvitationRepository invitations, OrgMembershipRepository orgMemberships,
-            TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
+    InvitationService(StateLocks locks, OrganizationRepository organizations, InvitationRepository invitations,
+            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
             ActivityLogs activityLogs, RateLimits rateLimits, CursorCodec cursors, JdbcClient jdbc, Clock clock) {
         this.locks = locks;
+        this.organizations = organizations;
         this.invitations = invitations;
         this.orgMemberships = orgMemberships;
         this.teams = teams;
@@ -164,6 +179,195 @@ public class InvitationService {
         invitation.revoke(clock.instant());
         record(invitation, new ActivityEntry(actorId, "INVITATION_REJECTED", "INVITATION", invitation.id(),
                 InvitationState.PENDING_APPROVAL.name(), InvitationState.REVOKED.name()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyInvitation> listMine(UUID accountId) {
+        String email = emailOf(accountId);
+        if (email == null) {
+            return List.of();
+        }
+        List<MyRow> rows = jdbc.sql("""
+                        SELECT i.id, o.name AS org_name, t.name AS team_name, i.kind, i.role, i.accept_by,
+                               i.created_by
+                        """ + MINE_FROM + " ORDER BY i.created_at DESC, i.id DESC LIMIT :limit")
+                .param("email", email)
+                .param("now", LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
+                .param("limit", MINE_LIMIT)
+                .query((rs, rowNum) -> {
+                    String role = rs.getString("role");
+                    String createdBy = rs.getString("created_by");
+                    return new MyRow(UUID.fromString(rs.getString("id")), rs.getString("org_name"),
+                            rs.getString("team_name"), MembershipKind.valueOf(rs.getString("kind")),
+                            role == null ? null : TeamRole.valueOf(role),
+                            rs.getObject("accept_by", LocalDateTime.class).toInstant(ZoneOffset.UTC),
+                            createdBy == null ? null : UUID.fromString(createdBy));
+                })
+                .list();
+        Set<UUID> creators = new HashSet<>();
+        rows.forEach(row -> {
+            if (row.createdBy() != null) {
+                creators.add(row.createdBy());
+            }
+        });
+        Map<UUID, AccountProfile> profiles = accounts.profiles(creators);
+        return rows.stream().map(row -> {
+            AccountProfile creator = row.createdBy() == null ? null : profiles.get(row.createdBy());
+            return new MyInvitation(row.id(), row.orgName(), row.teamName(),
+                    creator == null ? null : creator.displayName(), row.kind(), row.role(), row.acceptBy());
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public int countMine(UUID accountId) {
+        String email = emailOf(accountId);
+        if (email == null) {
+            return 0;
+        }
+        return jdbc.sql("SELECT COUNT(*) " + MINE_FROM)
+                .param("email", email)
+                .param("now", LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC))
+                .query(Long.class)
+                .single()
+                .intValue();
+    }
+
+    @Transactional
+    public Acceptance accept(UUID accountId, UUID invitationId) {
+        Target target = target(accountId, invitationId);
+        Organization organization = organizations.findForUpdate(target.orgId())
+                .orElseThrow(InvitationService::notFound);
+        Team team = target.teamId() == null ? null
+                : teams.findForUpdate(target.orgId(), target.teamId()).orElseThrow(InvitationService::notFound);
+        Invitation invitation = mine(target, invitationId);
+        Instant now = clock.instant();
+        if (!invitation.open(now)) {
+            expire(invitation, accountId, now, false);
+            return new Acceptance(false, null);
+        }
+        if (organization.state() != OrgState.ACTIVE || team != null && team.state() != TeamState.ACTIVE) {
+            expire(invitation, accountId, now, true);
+            return new Acceptance(false, null);
+        }
+        OrgMembership orgMembership = orgMemberships.findByOrgIdAndAccountId(organization.id(), accountId)
+                .orElse(null);
+        boolean orgLive = orgMembership != null && !orgMembership.admittable(now);
+        if (orgLive && orgMembership.state() != MembershipState.ACTIVE) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+        if (orgLive && orgMembership.kind() == MembershipKind.GUEST && invitation.kind() == MembershipKind.MEMBER) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+        TeamMembership teamMembership = team == null ? null
+                : teamMemberships.findByTeamIdAndAccountId(team.id(), accountId).orElse(null);
+        boolean teamLive = teamMembership != null && !teamMembership.admittable(now);
+        if (teamLive && teamMembership.state() != MembershipState.ACTIVE) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+        boolean guest = orgLive ? orgMembership.kind() == MembershipKind.GUEST
+                : invitation.kind() == MembershipKind.GUEST;
+        Instant teamExpiresAt = guest ? now.plus(Duration.ofDays(invitation.guestDays())) : null;
+        if (orgMembership == null) {
+            orgMemberships.save(OrgMembership.invited(Uuids.v7(), organization.id(), accountId, invitation.kind(),
+                    teamExpiresAt, now));
+            recordOrgJoin(organization.id(), accountId, null, invitation.kind());
+        }
+        else if (!orgLive) {
+            String before = before(orgMembership.state(), orgMembership.expiredGuest(now));
+            orgMembership.admit(invitation.kind(), teamExpiresAt, now);
+            recordOrgJoin(organization.id(), accountId, before, invitation.kind());
+        }
+        if (team != null && !teamLive) {
+            String before = null;
+            if (teamMembership == null) {
+                teamMemberships.save(TeamMembership.invited(Uuids.v7(), team.id(), accountId, invitation.role(),
+                        teamExpiresAt, now));
+            }
+            else {
+                before = before(teamMembership.state(), teamMembership.expired(now));
+                teamMembership.admit(invitation.role(), teamExpiresAt, now);
+            }
+            activityLogs.recordTeam(team.id(), new ActivityEntry(accountId, "TEAM_MEMBER_JOINED", "ACCOUNT",
+                    accountId, before, invitation.role().name()));
+            if (orgLive && guest) {
+                orgMembership.extendGuest(teamExpiresAt, now);
+            }
+        }
+        invitation.accept(accountId, now);
+        record(invitation, new ActivityEntry(accountId, "INVITATION_ACCEPTED", "INVITATION", invitation.id(),
+                InvitationState.PENDING.name(), InvitationState.ACCEPTED.name()));
+        return new Acceptance(true, team == null ? null : team.id());
+    }
+
+    @Transactional
+    public boolean decline(UUID accountId, UUID invitationId) {
+        Invitation invitation = mine(target(accountId, invitationId), invitationId);
+        Instant now = clock.instant();
+        if (!invitation.open(now)) {
+            expire(invitation, accountId, now, false);
+            return false;
+        }
+        invitation.decline(now);
+        record(invitation, new ActivityEntry(accountId, "INVITATION_DECLINED", "INVITATION", invitation.id(),
+                InvitationState.PENDING.name(), InvitationState.DECLINED.name()));
+        return true;
+    }
+
+    private Target target(UUID accountId, UUID invitationId) {
+        String email = emailOf(accountId);
+        if (email == null) {
+            throw notFound();
+        }
+        return jdbc.sql("SELECT org_id, team_id FROM invitation WHERE id = :id AND email = :email")
+                .param("id", invitationId.toString())
+                .param("email", email)
+                .query((rs, rowNum) -> {
+                    String teamId = rs.getString("team_id");
+                    return new Target(UUID.fromString(rs.getString("org_id")),
+                            teamId == null ? null : UUID.fromString(teamId), email);
+                })
+                .optional()
+                .orElseThrow(InvitationService::notFound);
+    }
+
+    private Invitation mine(Target target, UUID invitationId) {
+        Invitation invitation = invitations.findForUpdate(target.orgId(), invitationId)
+                .orElseThrow(InvitationService::notFound);
+        if (!target.email().equals(invitation.email()) || invitation.state() == InvitationState.PENDING_APPROVAL) {
+            throw notFound();
+        }
+        if (invitation.state() != InvitationState.PENDING) {
+            throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
+        }
+        return invitation;
+    }
+
+    private String emailOf(UUID accountId) {
+        AccountProfile profile = accounts.profiles(Set.of(accountId)).get(accountId);
+        if (profile == null || profile.state() != AccountState.ACTIVE || profile.email() == null) {
+            return null;
+        }
+        return EmailAddresses.normalize(profile.email());
+    }
+
+    private void expire(Invitation invitation, UUID actorId, Instant now, boolean unavailable) {
+        if (unavailable) {
+            invitation.expireUnavailable(now);
+        }
+        else {
+            invitation.expire(now);
+        }
+        record(invitation, new ActivityEntry(actorId, "INVITATION_EXPIRED", "INVITATION", invitation.id(),
+                InvitationState.PENDING.name(), InvitationState.EXPIRED.name()));
+    }
+
+    private void recordOrgJoin(UUID orgId, UUID accountId, String before, MembershipKind kind) {
+        activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "ORG_MEMBER_JOINED", "ACCOUNT", accountId, before,
+                kind.name()));
+    }
+
+    private static String before(MembershipState state, boolean expired) {
+        return expired ? MembershipState.EXPIRED.name() : state.name();
     }
 
     private List<Created> create(Organization organization, UUID teamId, UUID actorId, boolean orgAdmin,
@@ -467,6 +671,20 @@ public class InvitationService {
     }
 
     public record Created(UUID invitationId, String email, InvitationState state, Instant acceptBy) {
+    }
+
+    public record MyInvitation(UUID invitationId, String orgName, String teamName, String invitedByName,
+            MembershipKind kind, TeamRole role, Instant acceptBy) {
+    }
+
+    public record Acceptance(boolean accepted, UUID teamId) {
+    }
+
+    private record MyRow(UUID id, String orgName, String teamName, MembershipKind kind, TeamRole role,
+            Instant acceptBy, UUID createdBy) {
+    }
+
+    private record Target(UUID orgId, UUID teamId, String email) {
     }
 
     public record InvitationView(UUID invitationId, String email, MembershipKind kind, UUID teamId,

@@ -82,6 +82,53 @@ public class OrgMembership {
         return membership;
     }
 
+    public static OrgMembership invited(UUID id, UUID orgId, UUID accountId, MembershipKind kind, Instant expiresAt,
+            Instant at) {
+        OrgMembership membership = new OrgMembership();
+        membership.id = id;
+        membership.orgId = orgId;
+        membership.accountId = accountId;
+        membership.kind = kind;
+        membership.state = MembershipState.ACTIVE;
+        membership.joinedVia = JoinedVia.INVITATION;
+        membership.expiresAt = kind == MembershipKind.GUEST ? expiresAt : null;
+        membership.createdAt = at;
+        membership.updatedAt = at;
+        return membership;
+    }
+
+    public boolean expiredGuest(Instant now) {
+        return state == MembershipState.ACTIVE && kind == MembershipKind.GUEST && expiresAt != null
+                && !now.isBefore(expiresAt);
+    }
+
+    public boolean admittable(Instant now) {
+        return state == MembershipState.REQUESTED || state == MembershipState.LEFT
+                || state == MembershipState.REJECTED || state == MembershipState.EXPIRED || expiredGuest(now);
+    }
+
+    public void admit(MembershipKind kind, Instant expiresAt, Instant at) {
+        if (!admittable(at)) {
+            throw new IllegalStateException("초대로 들일 수 없는 멤버십 상태: " + state);
+        }
+        this.kind = kind;
+        state = MembershipState.ACTIVE;
+        orgAdmin = false;
+        this.expiresAt = kind == MembershipKind.GUEST ? expiresAt : null;
+        leftReason = null;
+        updatedAt = at;
+    }
+
+    public void extendGuest(Instant expiresAt, Instant at) {
+        if (state != MembershipState.ACTIVE || kind != MembershipKind.GUEST || expiredGuest(at)) {
+            throw new IllegalStateException("만료 시각을 늘릴 수 없는 멤버십");
+        }
+        if (this.expiresAt == null || expiresAt.isAfter(this.expiresAt)) {
+            this.expiresAt = expiresAt;
+            updatedAt = at;
+        }
+    }
+
     public boolean canBecomeAdmin() {
         return state == MembershipState.ACTIVE && kind == MembershipKind.MEMBER && !orgAdmin;
     }
@@ -163,6 +210,10 @@ public class OrgMembership {
 
     public JoinedVia joinedVia() {
         return joinedVia;
+    }
+
+    public Instant expiresAt() {
+        return expiresAt;
     }
 
 }

@@ -18,9 +18,11 @@ import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 public class HomeService implements HomeScreens {
 
     private final JdbcClient jdbc;
+    private final InvitationService invitations;
 
-    HomeService(JdbcClient jdbc) {
+    HomeService(JdbcClient jdbc, InvitationService invitations) {
         this.jdbc = jdbc;
+        this.invitations = invitations;
     }
 
     @Override
@@ -104,7 +106,8 @@ public class HomeService implements HomeScreens {
                     }
                 });
         boolean requested = pendingRequest(account);
-        return new Home(decide(orgs.isEmpty(), activeTeams, requested), List.copyOf(orgs.values()), 0);
+        return new Home(decide(orgs.isEmpty(), activeTeams, requested), List.copyOf(orgs.values()),
+                invitations.countMine(accountId));
     }
 
     private boolean pendingRequest(String account) {

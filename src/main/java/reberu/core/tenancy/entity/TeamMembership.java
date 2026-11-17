@@ -74,6 +74,33 @@ public class TeamMembership {
         return membership;
     }
 
+    public static TeamMembership invited(UUID id, UUID teamId, UUID accountId, TeamRole role, Instant expiresAt,
+            Instant at) {
+        TeamMembership membership = active(id, teamId, accountId, role, JoinedVia.INVITATION, at);
+        membership.expiresAt = expiresAt;
+        return membership;
+    }
+
+    public boolean expired(Instant now) {
+        return state == MembershipState.ACTIVE && expiresAt != null && !now.isBefore(expiresAt);
+    }
+
+    public boolean admittable(Instant now) {
+        return state == MembershipState.REQUESTED || state == MembershipState.LEFT
+                || state == MembershipState.REJECTED || state == MembershipState.EXPIRED || expired(now);
+    }
+
+    public void admit(TeamRole role, Instant expiresAt, Instant at) {
+        if (!admittable(at)) {
+            throw new IllegalStateException("초대로 들일 수 없는 팀 멤버십 상태: " + state);
+        }
+        this.role = role;
+        state = MembershipState.ACTIVE;
+        this.expiresAt = expiresAt;
+        leftReason = null;
+        updatedAt = at;
+    }
+
     public void promoteToAdmin(Instant at) {
         if (state != MembershipState.ACTIVE || role == TeamRole.TEAM_ADMIN) {
             throw new IllegalStateException("팀 관리자로 올릴 수 없는 멤버십");

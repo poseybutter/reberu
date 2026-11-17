@@ -116,12 +116,12 @@ class TenancyConfiguration {
     }
 
     @Bean
-    InvitationService invitationService(StateLocks locks, InvitationRepository invitations,
-            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
-            Accounts accounts, ActivityLogs activityLogs, RateLimits rateLimits, CursorCodec cursors,
-            JdbcClient jdbc) {
-        return new InvitationService(locks, invitations, orgMemberships, teams, teamMemberships, accounts,
-                activityLogs, rateLimits, cursors, jdbc, Clock.systemUTC());
+    InvitationService invitationService(StateLocks locks, OrganizationRepository organizations,
+            InvitationRepository invitations, OrgMembershipRepository orgMemberships, TeamRepository teams,
+            TeamMembershipRepository teamMemberships, Accounts accounts, ActivityLogs activityLogs,
+            RateLimits rateLimits, CursorCodec cursors, JdbcClient jdbc) {
+        return new InvitationService(locks, organizations, invitations, orgMemberships, teams, teamMemberships,
+                accounts, activityLogs, rateLimits, cursors, jdbc, Clock.systemUTC());
     }
 
     @Bean
@@ -136,8 +136,8 @@ class TenancyConfiguration {
     }
 
     @Bean
-    HomeService homeService(JdbcClient jdbc) {
-        return new HomeService(jdbc);
+    HomeService homeService(JdbcClient jdbc, InvitationService invitations) {
+        return new HomeService(jdbc, invitations);
     }
 
     @Bean
