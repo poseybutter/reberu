@@ -453,7 +453,9 @@ class MyInvitationTest {
             futures.add(CompletableFuture.supplyAsync(() -> {
                 try {
                     ready.countDown();
-                    start.await(10, TimeUnit.SECONDS);
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        return new IllegalStateException("시작 신호 없음");
+                    }
                     return task.get();
                 }
                 catch (InterruptedException interrupted) {
@@ -465,12 +467,15 @@ class MyInvitationTest {
                 }
             }));
         }
-        assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
-        start.countDown();
+        boolean allReady = ready.await(10, TimeUnit.SECONDS);
+        if (allReady) {
+            start.countDown();
+        }
         List<Object> results = new ArrayList<>();
         for (CompletableFuture<Object> future : futures) {
             results.add(future.get(30, TimeUnit.SECONDS));
         }
+        assertThat(allReady).isTrue();
         return results;
     }
 
