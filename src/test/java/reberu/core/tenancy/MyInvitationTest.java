@@ -446,11 +446,13 @@ class MyInvitationTest {
 
     @SafeVarargs
     private List<Object> race(java.util.function.Supplier<Object>... tasks) throws Exception {
+        CountDownLatch ready = new CountDownLatch(tasks.length);
         CountDownLatch start = new CountDownLatch(1);
         List<CompletableFuture<Object>> futures = new ArrayList<>();
         for (java.util.function.Supplier<Object> task : tasks) {
             futures.add(CompletableFuture.supplyAsync(() -> {
                 try {
+                    ready.countDown();
                     start.await(10, TimeUnit.SECONDS);
                     return task.get();
                 }
@@ -463,6 +465,7 @@ class MyInvitationTest {
                 }
             }));
         }
+        assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
         start.countDown();
         List<Object> results = new ArrayList<>();
         for (CompletableFuture<Object> future : futures) {
