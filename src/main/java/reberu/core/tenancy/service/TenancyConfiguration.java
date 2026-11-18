@@ -1,6 +1,7 @@
 package reberu.core.tenancy.service;
 
 import java.time.Clock;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +17,7 @@ import reberu.core.tenancy.Deployment;
 import reberu.core.tenancy.DeploymentMode;
 import reberu.core.tenancy.OrgBootstrap;
 import reberu.core.tenancy.repository.InvitationRepository;
+import reberu.core.tenancy.repository.InviteLinkRepository;
 import reberu.core.tenancy.repository.JobTypeRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
 import reberu.core.tenancy.repository.OrganizationRepository;
@@ -78,19 +80,28 @@ class TenancyConfiguration {
 
     @Bean
     TeamService teamService(StateLocks locks, TeamRepository teams,
-            TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
+            TeamMembershipRepository teamMemberships, TeamFieldService teamFields, InviteLinkService inviteLinks,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
-        return new TeamService(locks, teams, teamMemberships, teamFields, orgMemberships, jobTypes,
+        return new TeamService(locks, teams, teamMemberships, teamFields, inviteLinks, orgMemberships, jobTypes,
                 nameRules, activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean
     OrgSettingsService orgSettingsService(OrganizationRepository organizations,
-            OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships, NameRules nameRules,
-            ActivityLogs activityLogs, JdbcClient jdbc) {
-        return new OrgSettingsService(organizations, orgMemberships, teamMemberships, nameRules, activityLogs, jdbc,
-                Clock.systemUTC());
+            OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships,
+            InviteLinkService inviteLinks, NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc) {
+        return new OrgSettingsService(organizations, orgMemberships, teamMemberships, inviteLinks, nameRules,
+                activityLogs, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
+    InviteLinkService inviteLinkService(StateLocks locks, OrganizationRepository organizations,
+            InviteLinkRepository links, OrgMembershipRepository orgMemberships,
+            TeamMembershipRepository teamMemberships, Accounts accounts, ActivityLogs activityLogs,
+            CursorCodec cursors, JdbcClient jdbc, @Value("${reberu.app.base-url}") String baseUrl) {
+        return new InviteLinkService(locks, organizations, links, orgMemberships, teamMemberships, accounts,
+                activityLogs, cursors, jdbc, baseUrl, Clock.systemUTC());
     }
 
     @Bean

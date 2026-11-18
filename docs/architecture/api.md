@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.16.0\
-> 수정일: 2026-11-17
+> 버전: v0.17.0\
+> 수정일: 2026-11-18
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -264,9 +264,9 @@
 | `GET` | `/api/teams/{teamId}/invitations` | 이 팀의 이메일 초대. 쿼리 `state`, `kind`. 항목은 조직 초대 목록과 같다 | 팀 관리자 | E2 |
 | `POST` | `/api/teams/{teamId}/invitations` | 이 팀 초대 만들기. 본문 `emails`, `kind`, `role`, `guestDays`. 상태는 [architecture/tenancy.md](tenancy.md) §5.6, 응답은 조직 초대 만들기와 같다 | 팀 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
 | `POST` | `/api/teams/{teamId}/invitations/{invitationId}/revoke` | 초대 취소. 이 팀 초대만(TEN-INVT-12) | 팀 관리자 | `204`, 대기 중이 아니면 `409 ALREADY_PROCESSED` |
-| `GET` | `/api/teams/{teamId}/invite-links` | 링크 목록: 승인 필요, 역할, 만료 시각, 사용 횟수/상한, 켜짐, 만든 사람. 토큰 없음 | 팀 관리자 | E2 |
-| `POST` | `/api/teams/{teamId}/invite-links` | 링크 만들기. 본문 `approvalRequired`, `role`, `expiresInDays`(기본 7, 최대 30), `maxUses`(필수). 응답에만 링크 주소가 한 번 들어 있다(TEN-LINK-04) | 팀 관리자 | `201`, 조직이 링크를 껐으면 `404`, `Idempotency-Key` |
-| `POST` | `/api/teams/{teamId}/invite-links/{linkId}/disable` | 링크 끄기. 다시 켜는 API는 없다. 새로 만든다 | 팀 관리자 | |
+| `GET` | `/api/teams/{teamId}/invite-links` | 링크 목록: `linkId`, `approvalRequired`, `role`, `expiresAt`, `useCount`, `maxUses`, `enabled`, `createdBy`, `createdByName`, `createdAt`. 토큰·해시 없음. 최신부터, 커서 페이지(§3.3) | 팀 관리자 | E2. 조직이 링크를 껐으면 `404` |
+| `POST` | `/api/teams/{teamId}/invite-links` | 링크 만들기. 본문 `approvalRequired`(필수), `role`(`TEAM_MEMBER`·`VIEWER`), `expiresInDays`(기본 7, 1~30), `maxUses`(필수, 1~1000, TEN-LINK-07). 응답 `{ linkId, url, expiresAt }`, `url`은 `APP_BASE_URL/join#<토큰>`이고 이 응답에만 한 번 들어 있다(TEN-LINK-04) | 팀 관리자 | `201`, 조직이 링크를 껐으면 `404`, `Idempotency-Key`(같은 키 두 번째는 `409`, API-CON-05) |
+| `POST` | `/api/teams/{teamId}/invite-links/{linkId}/disable` | 링크 끄기. 다시 켜는 API는 없다. 새로 만든다 | 팀 관리자 | `204`, 이미 꺼졌으면 `409 ALREADY_PROCESSED`, 조직이 링크를 껐으면 `404` |
 | `GET` | `/api/teams/{teamId}/modules` | 조직이 허용한 `TEAM` 모듈과 켜짐 | 팀 관리자 | E6 |
 | `GET` | `/api/teams/{teamId}/modules/{moduleKey}/impact` | 끌 때 함께 꺼질 모듈, 켤 때 먼저 켜야 할 모듈 | 팀 관리자 | |
 | `PUT` | `/api/teams/{teamId}/modules/{moduleKey}/enabled` | 켜기·끄기. 본문 `enabled`, `confirmCascade`(함께 꺼지는 모듈이 있으면 참이어야 함) | 팀 관리자 | TEN-MOD-04·05 |
