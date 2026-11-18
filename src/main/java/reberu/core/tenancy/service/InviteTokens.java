@@ -11,7 +11,8 @@ import java.util.regex.Pattern;
 final class InviteTokens {
 
     private static final int TOKEN_BYTES = 32;
-    private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]{43}");
+    private static final int TOKEN_LENGTH = 43;
+    private static final Pattern TOKEN = Pattern.compile("[A-Za-z0-9_-]+");
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private InviteTokens() {
@@ -24,7 +25,7 @@ final class InviteTokens {
     }
 
     static boolean isToken(String value) {
-        return value != null && TOKEN.matcher(value).matches();
+        return value != null && value.length() == TOKEN_LENGTH && TOKEN.matcher(value).matches();
     }
 
     static String hash(String token) {

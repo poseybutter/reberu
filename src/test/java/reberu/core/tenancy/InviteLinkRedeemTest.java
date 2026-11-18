@@ -205,6 +205,7 @@ class InviteLinkRedeemTest {
         String good = token(create(orgAdmin, false, "VIEWER", 5));
         cases.put("형식 오류", () -> { });
         cases.put("없는 토큰", () -> { });
+        cases.put("너무 긴 토큰", () -> { });
         String disabled = token(create(orgAdmin, false, "VIEWER", 5));
         cases.put("꺼짐", () -> disableLink(disabled));
         String expired = token(create(orgAdmin, false, "VIEWER", 5));
@@ -233,6 +234,7 @@ class InviteLinkRedeemTest {
             String token = switch (entry.getKey()) {
                 case "형식 오류" -> "짧은-토큰";
                 case "없는 토큰" -> "A".repeat(43);
+                case "너무 긴 토큰" -> good + "A".repeat(10_000);
                 case "꺼짐" -> disabled;
                 case "만료" -> expired;
                 case "상한" -> used;

@@ -7,8 +7,15 @@ import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -100,6 +107,42 @@ class MemoryFailureStreaksTest {
         streaks.failed(RateLimit.INVITE_LINK, third);
         assertThatThrownBy(() -> streaks.check(RateLimit.INVITE_LINK, third))
                 .isInstanceOf(RateLimitExceededException.class);
+    }
+
+    @Test
+    @DisplayName("SEC-RATE-16: 서로 다른 새 키의 실패가 동시에 몰려도 기억하는 키 수가 상한을 넘지 않음")
+    void concurrentNewKeysStayWithinCap() throws Exception {
+        int threads = 16;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try {
+            for (int round = 0; round < 50; round++) {
+                MemoryFailureStreaks streaks = streaks(20, 4);
+                streaks.failed(RateLimit.INVITE_LINK, RateLimits.ipKey("192.0.2.250"));
+                CountDownLatch ready = new CountDownLatch(threads);
+                CountDownLatch start = new CountDownLatch(1);
+                List<Future<?>> futures = new ArrayList<>();
+                for (int i = 0; i < threads; i++) {
+                    String key = RateLimits.ipKey("192.0.2." + i);
+                    futures.add(executor.submit(() -> {
+                        ready.countDown();
+                        if (start.await(10, TimeUnit.SECONDS)) {
+                            streaks.failed(RateLimit.INVITE_LINK, key);
+                        }
+                        return null;
+                    }));
+                }
+                boolean allReady = ready.await(10, TimeUnit.SECONDS);
+                start.countDown();
+                for (Future<?> future : futures) {
+                    future.get(10, TimeUnit.SECONDS);
+                }
+                assertThat(allReady).isTrue();
+                assertThat(streaks.size(RateLimit.INVITE_LINK)).as("round " + round).isLessThanOrEqualTo(4);
+            }
+        }
+        finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

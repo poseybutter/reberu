@@ -6,6 +6,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reberu.core.support.FailureStreaks;
@@ -45,18 +46,8 @@ class MemoryFailureStreaks implements FailureStreaks {
         ConcurrentHashMap<String, Streak> keys = keys(rule);
         long now = clock.millis();
         long block = config.block().toMillis();
-        if (!keys.containsKey(key) && keys.size() >= properties.maxKeysPerRule()) {
-            keys.entrySet().removeIf(entry -> entry.getValue().stale(now, block));
-            if (keys.size() >= properties.maxKeysPerRule()) {
-                long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
-                if (lastCapLog.getAndAccumulate(logIndex, Math::max) < logIndex) {
-                    securityLog.warn("실패 연속 기록 키 상한 도달: rule={}", rule.id());
-                }
-                return;
-            }
-        }
         boolean[] blocked = {false};
-        keys.compute(key, (ignored, streak) -> {
+        BiFunction<String, Streak, Streak> next = (ignored, streak) -> {
             if (streak != null && streak.blockedUntil() > now) {
                 return streak;
             }
@@ -66,7 +57,22 @@ class MemoryFailureStreaks implements FailureStreaks {
                 return new Streak(0, now, now + block);
             }
             return new Streak(count, now, 0);
-        });
+        };
+        if (keys.computeIfPresent(key, next) == null) {
+            synchronized (keys) {
+                if (!keys.containsKey(key) && keys.size() >= properties.maxKeysPerRule()) {
+                    keys.entrySet().removeIf(entry -> entry.getValue().stale(now, block));
+                    if (keys.size() >= properties.maxKeysPerRule()) {
+                        long logIndex = Math.floorDiv(now, CAP_LOG_INTERVAL);
+                        if (lastCapLog.getAndAccumulate(logIndex, Math::max) < logIndex) {
+                            securityLog.warn("실패 연속 기록 키 상한 도달: rule={}", rule.id());
+                        }
+                        return;
+                    }
+                }
+                keys.compute(key, next);
+            }
+        }
         if (blocked[0]) {
             securityLog.warn("실패 연속 차단 시작: rule={}, key={}, seconds={}", rule.id(),
                     SlidingWindowRateLimits.maskKey(key), config.block().toSeconds());
@@ -76,6 +82,10 @@ class MemoryFailureStreaks implements FailureStreaks {
     @Override
     public void succeeded(RateLimit rule, String key) {
         keys(rule).computeIfPresent(key, (ignored, streak) -> streak.blockedUntil() > clock.millis() ? streak : null);
+    }
+
+    int size(RateLimit rule) {
+        return keys(rule).size();
     }
 
     private ConcurrentHashMap<String, Streak> keys(RateLimit rule) {
