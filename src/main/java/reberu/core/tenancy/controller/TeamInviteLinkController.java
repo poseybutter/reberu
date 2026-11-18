@@ -52,6 +52,7 @@ class TeamInviteLinkController {
             @RequestHeader(name = IdempotentRequest.HEADER, required = false) String key,
             @RequestBody InviteLinkRequests.Create body, HttpServletRequest request) {
         IdempotentRequest idempotent = IdempotentRequest.of(team.accountId(), key, request, body);
+        links.requireLinksAllowed(team.orgId());
         return idempotentRequests.executeWithoutReplay(idempotent, () -> ResponseEntity.status(HttpStatus.CREATED)
                 .body(links.create(team.orgId(), team.teamId(), team.accountId(), body.toNewLink())));
     }

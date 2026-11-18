@@ -168,7 +168,7 @@ class InviteLinkTest {
     }
 
     @Test
-    @DisplayName("API-CON-05: 같은 중복 방지 키의 두 번째 만들기는 409, 링크를 다시 만들거나 토큰을 다시 보내지 않음")
+    @DisplayName("API-CON-05·TEN-LINK-08: 같은 중복 방지 키의 두 번째 만들기는 409, 토큰 재전송 없음, 조직이 링크를 끈 뒤에는 같은 키도 404")
     void sameKeyIsNotReplayed() throws Exception {
         String key = UUID.randomUUID().toString();
         MockHttpServletResponse first = create(teamAdmin, teamId, link(false, "VIEWER", null, 3), key);
@@ -178,6 +178,10 @@ class InviteLinkTest {
         assertThat(code(second, 409)).isEqualTo("ALREADY_PROCESSED");
         assertThat(second.getContentAsString()).doesNotContain("/join#");
         assertThat(count()).isOne();
+
+        allowLinks(false);
+        assertThat(code(create(teamAdmin, teamId, link(false, "VIEWER", null, 3), key), 404)).isEqualTo("NOT_FOUND");
+        assertThat(code(create(teamAdmin, teamId, link(false, "VIEWER", null, 9), key), 404)).isEqualTo("NOT_FOUND");
     }
 
     @Test

@@ -73,6 +73,11 @@ public class InviteLinkService {
     }
 
     @Transactional(readOnly = true)
+    public void requireLinksAllowed(UUID orgId) {
+        requireLinksAllowed(organizations.findById(orgId).orElseThrow(InviteLinkService::notFound));
+    }
+
+    @Transactional(readOnly = true)
     public CursorPage<LinkView> list(UUID orgId, UUID teamId, String cursor, int limit) {
         requireLinksAllowed(organizations.findById(orgId).orElseThrow(InviteLinkService::notFound));
         String scope = "invite-links:" + teamId;
