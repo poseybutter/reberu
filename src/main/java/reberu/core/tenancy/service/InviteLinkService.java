@@ -25,14 +25,20 @@ import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
 import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.InviteLink;
+import reberu.core.tenancy.entity.OrgMembership;
 import reberu.core.tenancy.entity.Organization;
+import reberu.core.tenancy.entity.Team;
+import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
+import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 import reberu.core.tenancy.repository.InviteLinkRepository;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
 import reberu.core.tenancy.repository.OrganizationRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
+import reberu.core.tenancy.repository.TeamRepository;
 
 public class InviteLinkService {
 
@@ -46,6 +52,7 @@ public class InviteLinkService {
 
     private final StateLocks locks;
     private final OrganizationRepository organizations;
+    private final TeamRepository teams;
     private final InviteLinkRepository links;
     private final OrgMembershipRepository orgMemberships;
     private final TeamMembershipRepository teamMemberships;
@@ -56,11 +63,13 @@ public class InviteLinkService {
     private final String joinUrl;
     private final Clock clock;
 
-    InviteLinkService(StateLocks locks, OrganizationRepository organizations, InviteLinkRepository links,
+    InviteLinkService(StateLocks locks, OrganizationRepository organizations, TeamRepository teams,
+            InviteLinkRepository links,
             OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships, Accounts accounts,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, String baseUrl, Clock clock) {
         this.locks = locks;
         this.organizations = organizations;
+        this.teams = teams;
         this.links = links;
         this.orgMemberships = orgMemberships;
         this.teamMemberships = teamMemberships;
@@ -160,18 +169,129 @@ public class InviteLinkService {
                 link.id(), "ENABLED", "DISABLED"));
     }
 
+    @Transactional
+    public Redemption redeem(UUID accountId, String token) {
+        if (!InviteTokens.isToken(token)) {
+            return Redemption.FAILED;
+        }
+        String hash = InviteTokens.hash(token);
+        Scope scope = jdbc.sql("SELECT id, org_id, team_id, token_hash FROM invite_link WHERE token_hash = :hash")
+                .param("hash", hash)
+                .query((rs, rowNum) -> new Scope(UUID.fromString(rs.getString("id")),
+                        UUID.fromString(rs.getString("org_id")), UUID.fromString(rs.getString("team_id")),
+                        rs.getString("token_hash")))
+                .optional()
+                .filter(found -> InviteTokens.sameHash(found.tokenHash(), hash))
+                .orElse(null);
+        if (scope == null) {
+            return Redemption.FAILED;
+        }
+        Organization organization = organizations.findForUpdate(scope.orgId()).orElse(null);
+        Team team = teams.findForUpdate(scope.orgId(), scope.teamId()).orElse(null);
+        InviteLink link = links.findForUpdate(scope.teamId(), scope.linkId()).orElse(null);
+        Instant now = clock.instant();
+        if (organization == null || team == null || link == null || !usable(organization, team, link, now)) {
+            return Redemption.FAILED;
+        }
+        boolean creatorOrgAdmin = orgAdmin(organization.id(), link.createdBy());
+        if (!creatorOrgAdmin && !teamAdmin(team.id(), link.createdBy())) {
+            return Redemption.FAILED;
+        }
+        OrgMembership orgMembership = orgMemberships.findByOrgIdAndAccountId(organization.id(), accountId)
+                .orElse(null);
+        if (orgMembership != null && (orgMembership.state() == MembershipState.SUSPENDED
+                || orgMembership.kind() == MembershipKind.GUEST && orgMembership.state() == MembershipState.ACTIVE)) {
+            return Redemption.FAILED;
+        }
+        boolean orgLive = orgMembership != null && orgMembership.state() == MembershipState.ACTIVE;
+        TeamMembership teamMembership = teamMemberships.findByTeamIdAndAccountId(team.id(), accountId).orElse(null);
+        if (teamMembership != null && teamMembership.state() == MembershipState.SUSPENDED) {
+            return Redemption.FAILED;
+        }
+        if (teamMembership != null && teamMembership.state() == MembershipState.ACTIVE && !teamMembership.expired(now)) {
+            return orgLive ? Redemption.of(Outcome.ALREADY_MEMBER, organization, team) : Redemption.FAILED;
+        }
+        boolean orgRequested = !orgLive
+                && (link.approvalRequired() || !creatorOrgAdmin && organization.memberAdmissionReview());
+        boolean teamRequested = link.approvalRequired() || orgRequested;
+        boolean orgWaiting = orgLive || orgMembership != null && orgMembership.state() == MembershipState.REQUESTED;
+        if (teamRequested && orgWaiting && teamMembership != null
+                && teamMembership.state() == MembershipState.REQUESTED) {
+            return Redemption.of(Outcome.REQUESTED, organization, team);
+        }
+        if (links.incrementUse(team.id(), link.id(), now) != 1) {
+            return Redemption.FAILED;
+        }
+        if (orgMembership == null) {
+            orgMemberships.save(OrgMembership.linked(Uuids.v7(), organization.id(), accountId, orgRequested, now));
+            recordOrg(organization.id(), accountId, null, orgRequested);
+        }
+        else if (!orgLive && !(orgRequested && orgMembership.state() == MembershipState.REQUESTED)) {
+            String before = orgMembership.state().name();
+            if (orgRequested) {
+                orgMembership.request(now);
+            }
+            else {
+                orgMembership.admit(MembershipKind.MEMBER, null, now);
+            }
+            recordOrg(organization.id(), accountId, before, orgRequested);
+        }
+        String teamBefore = teamMembership == null ? null : teamBefore(teamMembership, now);
+        if (teamMembership == null) {
+            teamMemberships.save(TeamMembership.linked(Uuids.v7(), team.id(), accountId, link.role(), teamRequested,
+                    link.id(), now));
+        }
+        else if (teamRequested) {
+            if (teamMembership.state() != MembershipState.REQUESTED) {
+                teamMembership.request(link.role(), link.id(), now);
+            }
+        }
+        else {
+            teamMembership.admitByLink(link.role(), link.id(), now);
+        }
+        activityLogs.recordTeam(team.id(), new ActivityEntry(accountId,
+                teamRequested ? "TEAM_MEMBER_REQUESTED" : "TEAM_MEMBER_JOINED", "ACCOUNT", accountId, teamBefore,
+                link.role().name()));
+        Outcome outcome = teamRequested ? Outcome.REQUESTED : Outcome.JOINED;
+        activityLogs.recordTeam(team.id(), new ActivityEntry(accountId, "INVITE_LINK_USED", "INVITE_LINK", link.id(),
+                null, outcome.name()));
+        return Redemption.of(outcome, organization, team);
+    }
+
+    private static boolean usable(Organization organization, Team team, InviteLink link, Instant now) {
+        return link.enabled() && now.isBefore(link.expiresAt()) && link.useCount() < link.maxUses()
+                && organization.state() == OrgState.ACTIVE && organization.joinLinkEnabled()
+                && team.state() == TeamState.ACTIVE;
+    }
+
+    private void recordOrg(UUID orgId, UUID accountId, String before, boolean requested) {
+        activityLogs.recordOrg(orgId, new ActivityEntry(accountId,
+                requested ? "ORG_MEMBER_REQUESTED" : "ORG_MEMBER_JOINED", "ACCOUNT", accountId, before,
+                requested ? MembershipState.REQUESTED.name() : MembershipKind.MEMBER.name()));
+    }
+
+    private static String teamBefore(TeamMembership membership, Instant now) {
+        return membership.expired(now) ? MembershipState.EXPIRED.name() : membership.state().name();
+    }
+
     private void requireAdmin(UUID orgId, UUID teamId, UUID actorId) {
-        boolean orgAdmin = orgMemberships.findByOrgIdAndAccountId(orgId, actorId)
+        if (!orgAdmin(orgId, actorId) && !teamAdmin(teamId, actorId)) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+    }
+
+    private boolean orgAdmin(UUID orgId, UUID accountId) {
+        return orgMemberships.findByOrgIdAndAccountId(orgId, accountId)
                 .filter(membership -> membership.state() == MembershipState.ACTIVE && membership.orgAdmin()
                         && membership.kind() == MembershipKind.MEMBER)
                 .isPresent();
-        boolean teamAdmin = teamMemberships.findByTeamIdAndAccountId(teamId, actorId)
+    }
+
+    private boolean teamAdmin(UUID teamId, UUID accountId) {
+        return teamMemberships.findByTeamIdAndAccountId(teamId, accountId)
                 .filter(membership -> membership.state() == MembershipState.ACTIVE
                         && membership.role() == TeamRole.TEAM_ADMIN)
                 .isPresent();
-        if (!orgAdmin && !teamAdmin) {
-            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
-        }
     }
 
     private static void requireLinksAllowed(Organization organization) {
@@ -230,6 +350,29 @@ public class InviteLinkService {
                 throw new ReberuException(ErrorCode.INVALID_REQUEST);
             }
             throw new ReberuException(ErrorCode.INVALID_REQUEST);
+        }
+
+    }
+
+    private record Scope(UUID linkId, UUID orgId, UUID teamId, String tokenHash) {
+    }
+
+    public enum Outcome {
+        JOINED,
+        REQUESTED,
+        ALREADY_MEMBER
+    }
+
+    public record Redemption(Outcome outcome, UUID teamId, String orgName, String teamName) {
+
+        static final Redemption FAILED = new Redemption(null, null, null, null);
+
+        static Redemption of(Outcome outcome, Organization organization, Team team) {
+            return new Redemption(outcome, team.id(), organization.name(), team.name());
+        }
+
+        public boolean failed() {
+            return outcome == null;
         }
 
     }

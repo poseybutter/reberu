@@ -1,6 +1,6 @@
 # 도메인 모델
 
-> 버전: v0.14.0\
+> 버전: v0.15.0\
 > 수정일: 2026-11-18
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
@@ -214,7 +214,7 @@ erDiagram
 | `session_id_hash` | `HASH` | ○ | |
 | `google_sub` | `TEXT(255)` | ○ | |
 | `email`, `name`, `picture_url`, `workspace_domain` | `TEXT(254)`, `TEXT(255)`, `TEXT(1024)`, `TEXT(253)` | | ID 토큰 값 |
-| `invite_link_id` | `UUID` | | 링크로 들어온 경우 동의 직후 처리한다([architecture/tenancy.md](../architecture/tenancy.md) §6.3) |
+| `invite_link_id` | `UUID` | | 쓰지 않는다. 초대 링크는 화면이 동의를 마친 뒤 사용 API로 보낸다([architecture/frontend.md](../architecture/frontend.md) FE-LINK-03). 열은 V4에 있어 남겨 둔다 |
 | `created_at` | `UTC_TIMESTAMP` | ○ | |
 | `expires_at` | `UTC_TIMESTAMP` | ○ | 인덱스. 서버 작업이 10분마다 지운다 |
 
@@ -343,6 +343,7 @@ erDiagram
 | `joined_via` | `CODE` | ○ | org_membership과 같은 값 + `DIRECT`(관리자 바로 추가) |
 | `expires_at` | `UTC_TIMESTAMP` | 손님 ○ | 90일 이내(TEN-INV-08) |
 | `left_reason` | `CODE` | | |
+| `invite_link_id` | `UUID` | | 초대 링크로 들어오거나 요청한 경우 그 링크(TEN-LINK-12). 링크 행이 없어져도 값은 남긴다 |
 | `version` | `INT` | ○ | 잠금 |
 
 - 인덱스 후보: (`team_id`, `state`, `role`), (`account_id`, `state`).

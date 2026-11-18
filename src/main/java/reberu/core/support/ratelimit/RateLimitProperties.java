@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import reberu.core.support.RateLimit;
 
 @ConfigurationProperties("reberu.rate-limit")
-record RateLimitProperties(int maxKeysPerRule, Map<RateLimit, Rule> rules) {
+record RateLimitProperties(int maxKeysPerRule, Map<RateLimit, Rule> rules, Map<RateLimit, Streak> failureStreaks) {
 
     RateLimitProperties {
         if (maxKeysPerRule < 1) {
@@ -24,9 +24,19 @@ record RateLimitProperties(int maxKeysPerRule, Map<RateLimit, Rule> rules) {
             }
         }
         rules = new EnumMap<>(rules);
+        failureStreaks = failureStreaks == null ? Map.of() : Map.copyOf(failureStreaks);
+        failureStreaks.forEach((rule, value) -> {
+            if (value == null || value.threshold() < 1 || value.block() == null
+                    || value.block().compareTo(Duration.ofSeconds(1)) < 0) {
+                throw new IllegalStateException("실패 연속 차단 값 오류(" + rule.id() + ", 횟수 1 이상·차단 1초 이상 필요)");
+            }
+        });
     }
 
     record Rule(int limit, Duration window) {
+    }
+
+    record Streak(int threshold, Duration block) {
     }
 
 }

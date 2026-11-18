@@ -1,7 +1,7 @@
 # 프론트엔드 설계
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-05
+> 버전: v0.3.0\
+> 수정일: 2026-11-18
 
 브라우저 화면의 구조, 상태 관리, 새로고침 없이 오래 열어 두는 페이지에서 생기는 결함을 막는 규칙, 화면 쪽 보안을 정한다. 기술 선택의 근거는 [ADR-0019](../adr/0019-spa-frontend.md)다. 화면 내용은 [product/screens.md](../product/screens.md), API는 [architecture/api.md](api.md), 실시간 채널은 [architecture/realtime.md](realtime.md), 보안 요구사항은 [architecture/security.md](security.md)를 따른다. 요구사항 ID 접두어는 `FE`다.
 
@@ -139,6 +139,9 @@ sequenceDiagram
         B->>S: 전체 이동 /oauth2/authorization/google?next=/join
         S-->>B: 로그인 뒤 /join으로 돌아옴
     end
+    opt 가입 대기(A6)
+        B->>S: POST /api/auth/signup/consent (토큰 없음)
+    end
     B->>S: POST /api/invite-links/redeem {token}
     B->>B: 결과와 관계없이 sessionStorage의 토큰을 지움
     B->>B: 응답의 next로 전체 새로고침
@@ -148,7 +151,7 @@ sequenceDiagram
 | --- | --- | --- |
 | FE-LINK-01 | 토큰을 읽자마자 주소에서 지운다. 토큰이 방문 기록, 북마크, 화면 공유에 남지 않게 한다 | 필수 |
 | FE-LINK-02 | `sessionStorage`의 토큰은 넣은 지 10분이 지나면 쓰지 않고 지운다. 쓴 뒤에는 결과와 관계없이 지운다 | 필수 |
-| FE-LINK-03 | 가입 대기(A6) 중이면 토큰을 동의 요청의 `inviteToken`으로 보낸다([architecture/api.md](api.md) §4) | 필수 |
+| FE-LINK-03 | 가입 대기(A6) 중이면 토큰을 그대로 두고 동의를 먼저 마친다. 동의 응답을 받은 뒤 같은 탭에서 `POST /api/invite-links/redeem`을 보낸다. 동의 요청에는 토큰을 넣지 않는다([architecture/api.md](api.md) §4·§6) | 필수 |
 
 ### 5.4 여러 탭
 

@@ -379,13 +379,13 @@ class SlidingWindowRateLimitsTest {
     void rejectsInvalidProperties() {
         Map<RateLimit, RateLimitProperties.Rule> rules = rules(5, Duration.ofMinutes(1));
         rules.remove(RateLimit.POSTING);
-        assertThatThrownBy(() -> new RateLimitProperties(100, rules))
+        assertThatThrownBy(() -> new RateLimitProperties(100, rules, null))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("SEC-RATE-07");
-        assertThatThrownBy(() -> new RateLimitProperties(100, rules(0, Duration.ofMinutes(1))))
+        assertThatThrownBy(() -> new RateLimitProperties(100, rules(0, Duration.ofMinutes(1)), null))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new RateLimitProperties(100, rules(5, Duration.ofMillis(500))))
+        assertThatThrownBy(() -> new RateLimitProperties(100, rules(5, Duration.ofMillis(500)), null))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new RateLimitProperties(0, rules(5, Duration.ofMinutes(1))))
+        assertThatThrownBy(() -> new RateLimitProperties(0, rules(5, Duration.ofMinutes(1)), null))
                 .isInstanceOf(IllegalStateException.class);
     }
 
@@ -434,7 +434,7 @@ class SlidingWindowRateLimitsTest {
     }
 
     private SlidingWindowRateLimits limits(int limit, Duration window, int maxKeys) {
-        return new SlidingWindowRateLimits(new RateLimitProperties(maxKeys, rules(limit, window)), clock);
+        return new SlidingWindowRateLimits(new RateLimitProperties(maxKeys, rules(limit, window), null), clock);
     }
 
     private static Map<RateLimit, RateLimitProperties.Rule> rules(int limit, Duration window) {

@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.17.0\
+> 버전: v0.18.0\
 > 수정일: 2026-11-18
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -123,7 +123,7 @@
 | `GET` | `/login/oauth2/code/google` | 콜백. 판정은 [architecture/tenancy.md](tenancy.md) §6.1. 결과에 따라 A6, A1, 첫 화면으로 `302` | 공개 | 제한 SEC-RATE-01 |
 | `GET` | `/api/auth/session` | 세션 상태 `ANONYMOUS`·`SIGNUP_PENDING`·`AUTHENTICATED`, 배포 모드 `deploymentMode`, 로그인 뒤 갈 첫 화면 `next`(§5.1, `AUTHENTICATED`일 때만, `GET /api/me/home`과 같은 판정, TEN-HOME-03). 로그인 상태면 계정 ID와 인증 시각도 담는다(탭 계정 확인 FE-TAB-03, 재인증 판단 FE-REAUTH-01). CSRF 쿠키를 내려 준다 | 공개 | |
 | `GET` | `/api/auth/signup` | A6에 보일 값: Google이 준 이메일·이름·사진, 지금 약관·처리방침 버전 | 가입 대기 | |
-| `POST` | `/api/auth/signup/consent` | 동의. 본문 `termsVersion`, `privacyVersion`(지금 버전과 같아야 함), 선택 `inviteToken`. 계정을 만들고 세션 ID를 새로 발급한다. 링크가 있으면 §6과 같이 처리한다 | 가입 대기 | `201`. 응답에 첫 화면 |
+| `POST` | `/api/auth/signup/consent` | 동의. 본문 `termsVersion`, `privacyVersion`(지금 버전과 같아야 함). 계정을 만들고 세션 ID를 새로 발급한다. 초대 링크로 들어온 사람은 화면이 동의를 마친 뒤 §6의 사용 API를 부른다 | 가입 대기 | `201`. 응답에 첫 화면 |
 | `DELETE` | `/api/auth/signup` | 동의 안 함. 가입 대기 세션을 지운다 | 가입 대기 | `204` |
 | `POST` | `/api/auth/logout` | 서버 세션 삭제, 실시간 연결 종료, 쿠키 만료(SEC-SESS-08) | 계정 | `204` |
 
@@ -175,7 +175,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/invite-links/redeem` | 본문 `token`. 판정은 [architecture/tenancy.md](tenancy.md) §7.4. 결과 `JOINED`(팀 `ACTIVE`), `REQUESTED`(승인 대기), `ALREADY_MEMBER` 가운데 하나와 `next` | 계정 | 제한 SEC-RATE-02 |
+| `POST` | `/api/invite-links/redeem` | 본문 `token`. 판정은 [architecture/tenancy.md](tenancy.md) §7.4. 응답 `{ result, next, orgName, teamName }`. `result`는 `JOINED`(팀 `ACTIVE`), `REQUESTED`(승인 대기), `ALREADY_MEMBER` 가운데 하나다. `next`는 `JOINED`·`ALREADY_MEMBER`면 그 팀의 `TEAM_HOME`, `REQUESTED`면 `JOIN_PENDING`이다 | 계정 | `200`, 실패 `404`(최소 300ms 뒤, SEC-RATE-17), 제한 SEC-RATE-02, 실패 연속이면 `429`(SEC-RATE-16) |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
