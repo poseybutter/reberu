@@ -52,17 +52,19 @@ public class OrgSettingsService {
     private final OrganizationRepository organizations;
     private final OrgMembershipRepository orgMemberships;
     private final TeamMembershipRepository teamMemberships;
+    private final InviteLinkService inviteLinks;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
     private final JdbcClient jdbc;
     private final Clock clock;
 
     OrgSettingsService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
-            TeamMembershipRepository teamMemberships, NameRules nameRules, ActivityLogs activityLogs, JdbcClient jdbc,
-            Clock clock) {
+            TeamMembershipRepository teamMemberships, InviteLinkService inviteLinks, NameRules nameRules,
+            ActivityLogs activityLogs, JdbcClient jdbc, Clock clock) {
         this.organizations = organizations;
         this.orgMemberships = orgMemberships;
         this.teamMemberships = teamMemberships;
+        this.inviteLinks = inviteLinks;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
         this.jdbc = jdbc;
@@ -153,6 +155,7 @@ public class OrgSettingsService {
             activityLogs.recordTeam(request.teamId(), new ActivityEntry(actorId, "TEAM_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }
+        inviteLinks.disableForOrg(orgId, actorId, now);
         activityLogs.recordOrg(orgId, new ActivityEntry(actorId, "ORG_ARCHIVED", "ORG", orgId, "ACTIVE", "ARCHIVED"));
     }
 

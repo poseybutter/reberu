@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.13.0\
-> 수정일: 2026-11-13
+> 버전: v0.14.0\
+> 수정일: 2026-11-18
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -374,13 +374,14 @@ erDiagram
 | `approval_required` | `BOOL` | ○ | |
 | `role` | `CODE` | ○ | `TEAM_MEMBER`·`VIEWER`(TEN-LINK-03) |
 | `expires_at` | `UTC_TIMESTAMP` | ○ | 기본 7일, 30일 이내(TEN-LINK-02) |
-| `max_uses` | `INT` | ○ | 필수(TEN-LINK-02). 무제한 링크는 없다 |
+| `max_uses` | `INT` | ○ | 필수, 1~1000(TEN-LINK-02·07). 무제한 링크는 없다 |
 | `use_count` | `INT` | ○ | 원자적 조건부 증가(TEN-LINK-01) |
 | `enabled` | `BOOL` | ○ | |
 | `created_by` | `UUID` | ○ | |
 
 - TEN-ADM-01의 "만든 사람이 조직 관리자인가"는 링크를 쓰는 시점에 `created_by`의 현재 조직 관리자 여부로 판정한다. 만든 뒤 조직 관리자에서 내려온 사람의 링크는 팀 관리자 링크로 다룬다.
 - 만든 사람이 그 팀의 팀 관리자도 조직 관리자도 아니게 되면 링크를 쓸 수 없다(TEN-LINK-05 공통 응답).
+- 인덱스: (`team_id`, `created_at`) 팀 링크 목록, (`org_id`, `enabled`) 조직 보관 때 켜진 링크 끄기.
 
 ### job_type
 

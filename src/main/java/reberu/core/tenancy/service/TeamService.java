@@ -50,6 +50,7 @@ public class TeamService {
     private final TeamRepository teams;
     private final TeamMembershipRepository teamMemberships;
     private final TeamFieldService teamFields;
+    private final InviteLinkService inviteLinks;
     private final OrgMembershipRepository orgMemberships;
     private final JobTypeRepository jobTypes;
     private final NameRules nameRules;
@@ -60,13 +61,14 @@ public class TeamService {
     private final Clock clock;
 
     TeamService(StateLocks locks, TeamRepository teams,
-            TeamMembershipRepository teamMemberships, TeamFieldService teamFields,
+            TeamMembershipRepository teamMemberships, TeamFieldService teamFields, InviteLinkService inviteLinks,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
             ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
         this.locks = locks;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
         this.teamFields = teamFields;
+        this.inviteLinks = inviteLinks;
         this.orgMemberships = orgMemberships;
         this.jobTypes = jobTypes;
         this.nameRules = nameRules;
@@ -175,7 +177,9 @@ public class TeamService {
         if (team.state() != TeamState.ACTIVE) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
         }
-        team.archive(clock.instant());
+        Instant now = clock.instant();
+        team.archive(now);
+        inviteLinks.disableForTeam(teamId, accountId, now);
         activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "TEAM_ARCHIVED", "TEAM", teamId,
                 "ACTIVE", "ARCHIVED"));
     }
