@@ -122,6 +122,29 @@ public class Invitation {
         updatedAt = at;
     }
 
+    public void expireUnavailable(Instant at) {
+        require(InvitationState.PENDING);
+        state = InvitationState.EXPIRED;
+        updatedAt = at;
+    }
+
+    public void accept(UUID accountId, Instant at) {
+        if (!open(at) || state != InvitationState.PENDING) {
+            throw new IllegalStateException("수락할 수 없는 초대: " + state);
+        }
+        state = InvitationState.ACCEPTED;
+        acceptedBy = accountId;
+        updatedAt = at;
+    }
+
+    public void decline(Instant at) {
+        if (!open(at) || state != InvitationState.PENDING) {
+            throw new IllegalStateException("거절할 수 없는 초대: " + state);
+        }
+        state = InvitationState.DECLINED;
+        updatedAt = at;
+    }
+
     private void require(InvitationState expected) {
         if (state != expected) {
             throw new IllegalStateException("초대 상태 오류: " + state);

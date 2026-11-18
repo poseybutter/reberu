@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.15.0\
-> 수정일: 2026-11-13
+> 버전: v0.16.0\
+> 수정일: 2026-11-17
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -152,10 +152,10 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/me` | 내 계정: 표시 이름, 이메일, 사진 주소, 기본 아바타, 계정 종류(`WORKSPACE`·`PERSONAL`, TEN-ACC-01), 동의한 약관 버전 | 계정 | D3 |
 | `PATCH` | `/api/me` | 표시 이름 바꾸기. 본문 `displayName`, `version`. 금지어 검사(SEC-ORG-13) | 계정 | D3 |
-| `GET` | `/api/me/home` | 첫 화면 판정(`next`), 내 조직 목록과 조직마다 내 팀 목록(조직 이름, 팀 이름, 직무 유형 이름, 내 역할, 손님 표시와 만료 시각, 팀 상태), 받은 초대 수 | 계정 | A0, A3 |
-| `GET` | `/api/me/invitations` | 내 확인된 이메일과 같은 `PENDING` 초대: 조직 이름, 팀 이름, 초대한 사람 표시 이름, 멤버 종류, 수락 기한 | 계정 | 초대 카드(UX-SCR-024) |
-| `POST` | `/api/me/invitations/{invitationId}/accept` | 수락. 조건은 SEC-TOKEN-08·10, 처리는 TEN-AUTH-10~14 | 계정 | 응답에 `next` |
-| `POST` | `/api/me/invitations/{invitationId}/decline` | 거절 → `DECLINED` | 계정 | `204` |
+| `GET` | `/api/me/home` | 첫 화면 판정(`next`), 내 조직 목록과 조직마다 내 팀 목록(조직 이름, 팀 이름, 직무 유형 이름, 내 역할, 손님 표시와 만료 시각, 팀 상태), 받은 초대 수 `invitationCount`(`GET /api/me/invitations`와 같은 기준의 전체 수, TEN-INVT-14) | 계정 | A0, A3 |
+| `GET` | `/api/me/invitations` | 지금 수락할 수 있는 내 초대(TEN-INVT-14) 최신 50개 `items`: `invitationId`, 조직 이름 `orgName`, 팀 이름 `teamName`, 초대한 사람 표시 이름 `invitedByName`, 멤버 종류 `kind`, 팀 역할 `role`, 수락 기한 `acceptBy`. 커서 없음, 전체 수는 home의 `invitationCount` | 계정 | 초대 카드(UX-SCR-024) |
+| `POST` | `/api/me/invitations/{invitationId}/accept` | 수락. 조건은 SEC-TOKEN-08·10, 처리는 TEN-AUTH-10~14·TEN-INVT-15~17. 응답 `{ next }`: 팀 초대면 그 팀 `TEAM_HOME`, 팀 없는 초대면 첫 화면 판정(TEN-HOME-03) | 계정 | 남의 초대·이메일 불일치·승인 대기 `404`, 이미 처리됨·기한 지남·조직이나 팀이 `ACTIVE` 아님 `409 ALREADY_PROCESSED`(기한·상태로 막히면 초대 `EXPIRED`), TEN-AUTH-12·14·TEN-INVT-16 `403 FORBIDDEN_ACTION` |
+| `POST` | `/api/me/invitations/{invitationId}/decline` | 거절 → `DECLINED`(TEN-INVT-18) | 계정 | `204`, `404`는 수락과 같음, 이미 처리됨·기한 지남 `409 ALREADY_PROCESSED` |
 | `GET` | `/api/me/join-requests` | 내 `REQUESTED`·`REJECTED` 조직·팀 멤버십: 대상 이름, 요청 시각, 상태, 다시 요청할 수 있는 시각(TEN-REQ-02) | 계정 | A2, A5 |
 | `POST` | `/api/me/org-requests/{orgId}/cancel` | 내 조직 가입 요청 취소 → `LEFT`(사유 `SELF`) | 계정 | `204` |
 | `POST` | `/api/me/team-requests/{teamId}/cancel` | 내 팀 가입 요청 취소 | 계정 | `204` |
