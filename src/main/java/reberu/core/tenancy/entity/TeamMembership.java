@@ -47,6 +47,9 @@ public class TeamMembership {
     @Column(name = "left_reason")
     private String leftReason;
 
+    @Column(name = "invite_link_id")
+    private UUID inviteLinkId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -81,6 +84,31 @@ public class TeamMembership {
         return membership;
     }
 
+    public static TeamMembership linked(UUID id, UUID teamId, UUID accountId, TeamRole role, boolean requested,
+            UUID inviteLinkId, Instant at) {
+        TeamMembership membership = active(id, teamId, accountId, role, JoinedVia.LINK, at);
+        membership.state = requested ? MembershipState.REQUESTED : MembershipState.ACTIVE;
+        membership.inviteLinkId = inviteLinkId;
+        return membership;
+    }
+
+    public void admitByLink(TeamRole role, UUID inviteLinkId, Instant at) {
+        admit(role, null, at);
+        this.inviteLinkId = inviteLinkId;
+    }
+
+    public void request(TeamRole role, UUID inviteLinkId, Instant at) {
+        if (state == MembershipState.REQUESTED || !admittable(at)) {
+            throw new IllegalStateException("요청으로 바꿀 수 없는 팀 멤버십 상태: " + state);
+        }
+        this.role = role;
+        state = MembershipState.REQUESTED;
+        expiresAt = null;
+        leftReason = null;
+        this.inviteLinkId = inviteLinkId;
+        updatedAt = at;
+    }
+
     public boolean expired(Instant now) {
         return state == MembershipState.ACTIVE && expiresAt != null && !now.isBefore(expiresAt);
     }
@@ -98,6 +126,7 @@ public class TeamMembership {
         state = MembershipState.ACTIVE;
         this.expiresAt = expiresAt;
         leftReason = null;
+        inviteLinkId = null;
         updatedAt = at;
     }
 
@@ -164,6 +193,10 @@ public class TeamMembership {
         }
         state = MembershipState.REJECTED;
         updatedAt = at;
+    }
+
+    public UUID inviteLinkId() {
+        return inviteLinkId;
     }
 
     public Instant expiresAt() {

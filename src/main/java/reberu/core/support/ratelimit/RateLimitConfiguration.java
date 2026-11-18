@@ -25,6 +25,11 @@ class RateLimitConfiguration implements WebMvcConfigurer {
         return new SlidingWindowRateLimits(properties, Clock.systemUTC());
     }
 
+    @Bean
+    MemoryFailureStreaks failureStreaks(RateLimitProperties properties) {
+        return new MemoryFailureStreaks(properties, Clock.systemUTC());
+    }
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new RateLimitInterceptor(rateLimits.getObject())).order(Ordered.HIGHEST_PRECEDENCE + 5);

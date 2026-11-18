@@ -69,6 +69,8 @@ reberu:
       public-org-search: { limit: "${RATE_LIMIT_PUBLIC_ORG_SEARCH:30}", window: 1m }
       posting: { limit: "${RATE_LIMIT_POSTING:30}", window: 1m }
       default: { limit: "${RATE_LIMIT_DEFAULT:300}", window: 1m }
+    failure-streaks:
+      invite-link: { threshold: "${RATE_LIMIT_INVITE_LINK_FAILURES:20}", block: 15m }
   legal:
     terms-version: ${TERMS_VERSION:v1}
     privacy-version: ${PRIVACY_VERSION:v1}
@@ -79,6 +81,7 @@ reberu:
     recent-auth-window: 1h
   tenancy:
     mode: ${DEPLOYMENT_MODE:MULTI_ORG}
+    invite-link-failure-delay: 300ms
     single-org:
       name: ${SINGLE_ORG_NAME:}
       time-zone: ${SINGLE_ORG_TIME_ZONE:}

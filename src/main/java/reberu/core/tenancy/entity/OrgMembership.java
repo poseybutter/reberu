@@ -97,6 +97,31 @@ public class OrgMembership {
         return membership;
     }
 
+    public static OrgMembership linked(UUID id, UUID orgId, UUID accountId, boolean requested, Instant at) {
+        OrgMembership membership = new OrgMembership();
+        membership.id = id;
+        membership.orgId = orgId;
+        membership.accountId = accountId;
+        membership.kind = MembershipKind.MEMBER;
+        membership.state = requested ? MembershipState.REQUESTED : MembershipState.ACTIVE;
+        membership.joinedVia = JoinedVia.LINK;
+        membership.createdAt = at;
+        membership.updatedAt = at;
+        return membership;
+    }
+
+    public void request(Instant at) {
+        if (state != MembershipState.LEFT && state != MembershipState.REJECTED && state != MembershipState.EXPIRED) {
+            throw new IllegalStateException("요청으로 바꿀 수 없는 멤버십 상태: " + state);
+        }
+        kind = MembershipKind.MEMBER;
+        state = MembershipState.REQUESTED;
+        orgAdmin = false;
+        expiresAt = null;
+        leftReason = null;
+        updatedAt = at;
+    }
+
     public boolean expiredGuest(Instant now) {
         return state == MembershipState.ACTIVE && kind == MembershipKind.GUEST && expiresAt != null
                 && !now.isBefore(expiresAt);

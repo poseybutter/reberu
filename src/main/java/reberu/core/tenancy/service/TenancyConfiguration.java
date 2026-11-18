@@ -97,10 +97,10 @@ class TenancyConfiguration {
 
     @Bean
     InviteLinkService inviteLinkService(StateLocks locks, OrganizationRepository organizations,
-            InviteLinkRepository links, OrgMembershipRepository orgMemberships,
+            TeamRepository teams, InviteLinkRepository links, OrgMembershipRepository orgMemberships,
             TeamMembershipRepository teamMemberships, Accounts accounts, ActivityLogs activityLogs,
             CursorCodec cursors, JdbcClient jdbc, @Value("${reberu.app.base-url}") String baseUrl) {
-        return new InviteLinkService(locks, organizations, links, orgMemberships, teamMemberships, accounts,
+        return new InviteLinkService(locks, organizations, teams, links, orgMemberships, teamMemberships, accounts,
                 activityLogs, cursors, jdbc, baseUrl, Clock.systemUTC());
     }
 
