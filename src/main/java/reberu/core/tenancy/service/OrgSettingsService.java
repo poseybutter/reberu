@@ -96,7 +96,7 @@ public class OrgSettingsService {
                 .map(record -> new RecentActivity(record.occurredAt(), record.actorId(), record.action(),
                         record.targetType(), record.targetId()))
                 .toList();
-        long joinRequests = orgMemberships.countByOrgIdAndState(orgId, MembershipState.REQUESTED);
+        long joinRequests = orgMemberships.countByOrgIdAndStateAndAdmissionReviewTrue(orgId, MembershipState.REQUESTED);
         long invitationReviews = jdbc.sql("""
                         SELECT COUNT(*) FROM invitation WHERE org_id = :org AND state = 'PENDING_APPROVAL'
                         """)
@@ -146,12 +146,12 @@ public class OrgSettingsService {
         organization.archive(now);
         for (OrgMembership request : orgMemberships.findByOrgIdAndStateOrderByCreatedAtAscIdAsc(orgId,
                 MembershipState.REQUESTED)) {
-            request.rejectByArchive(now);
+            request.rejectWithoutCooldown(now);
             activityLogs.recordOrg(orgId, new ActivityEntry(actorId, "ORG_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }
         for (TeamMembership request : teamMemberships.findByOrgIdAndState(orgId, MembershipState.REQUESTED)) {
-            request.rejectByArchive(now);
+            request.rejectWithoutCooldown(now);
             activityLogs.recordTeam(request.teamId(), new ActivityEntry(actorId, "TEAM_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }

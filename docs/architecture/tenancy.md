@@ -1,6 +1,6 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.21.0\
+> 버전: v0.22.0\
 > 수정일: 2026-11-19
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
@@ -483,7 +483,7 @@ flowchart TD
 | TEN-LINK-09 | 팀을 보관하면 그 팀의 켜진 링크를, 조직을 보관하면 조직의 켜진 링크를 모두 끈다. 링크마다 팀 활동 기록에 끈 사람으로 남긴다. 복원해도 다시 켜지 않는다(§14.1) | 필수 |
 | TEN-LINK-10 | 위 흐름의 "GUEST"는 그 조직의 `ACTIVE` 손님 멤버십이다. 이용 기한이 지났어도 `ACTIVE`인 손님은 링크로 들어오지 못한다. `EXPIRED`·`LEFT`·`REJECTED`로 끝난 멤버십은 "없음"과 같이 다뤄 `MEMBER`가 된다. 조직 멤버십이 `REQUESTED`이면 링크 판정을 다시 적용해 바로 들이거나 그대로 기다린다 | 필수 |
 | TEN-LINK-11 | 조직·팀 멤버십이 이미 `REQUESTED`이고 이번 판정도 `REQUESTED`이면 아무것도 바꾸지 않고 사용 횟수도 늘리지 않는다. 같은 사람이 링크를 다시 열어 횟수를 쓰지 못한다 | 필수 |
-| TEN-LINK-12 | 링크로 만들거나 바꾼 팀 멤버십에는 그 링크 ID를 남긴다. 팀 관리자 링크 + TEN-ADM-01로 조직 승인을 기다리는 사람은 조직 관리자가 승인할 때 이 링크의 "승인 필요"로 팀 단계를 정한다(승인 처리는 가입 요청 기능에서) | 필수 |
+| TEN-LINK-12 | 링크로 만들거나 바꾼 팀 멤버십에는 그 링크 ID를 남긴다. 팀 관리자 링크 + TEN-ADM-01로 조직 승인을 기다리는 사람은 조직 관리자가 승인할 때 이 링크의 "승인 필요"로 팀 단계를 정한다(TEN-REQ-15) | 필수 |
 | TEN-LINK-13 | 판정과 처리는 한 트랜잭션에서 조직 행, 팀 행, 링크 행 순서로 잠근 뒤 한다. 사용 횟수는 그 안에서 `use_count < max_uses`·켜짐·만료 전 조건의 갱신 한 번으로 늘리고, 갱신된 행이 없으면 실패다. 실패는 아무것도 쓰지 않는다 | 필수 |
 | TEN-LINK-14 | 링크 사용은 팀 활동 기록에 `INVITE_LINK_USED`(결과 값)로, 새로 생기거나 바뀐 멤버십은 조직·팀 활동 기록에 들어옴(`*_JOINED`)·요청(`*_REQUESTED`)으로 남긴다. 행동한 사람은 링크를 쓴 사람이다 | 필수 |
 
@@ -543,6 +543,13 @@ flowchart TD
 | TEN-REQ-11 | 요청 취소는 내 멤버십이 없으면 `404`, `REQUESTED`가 아니면 `409 ALREADY_PROCESSED`다. 취소하면 `LEFT`(사유 `SELF`, 내보내진 사람은 `REMOVED` 그대로, TEN-REQ-05)가 되고, 조직 요청을 취소하면 그 조직의 내 `REQUESTED` 팀 멤버십도 함께 `LEFT`가 된다. 취소한 요청은 다시 요청 대기가 없다 | 필수 |
 | TEN-REQ-12 | 활동 기록: 요청·들어옴은 조직에 `ORG_MEMBER_REQUESTED`·`ORG_MEMBER_JOINED`, 팀에 `TEAM_MEMBER_REQUESTED`·`TEAM_MEMBER_JOINED`(전 값은 예전 상태, 후 값은 조직이면 `REQUESTED`·`MEMBER`, 팀이면 역할), 취소는 `ORG_MEMBER_REQUEST_CANCELLED`·`TEAM_MEMBER_REQUEST_CANCELLED`(`REQUESTED` → `LEFT`)다. 행동한 사람과 대상은 요청한 계정이다. 아무것도 바꾸지 않은 응답은 기록하지 않는다 | 필수 |
 | TEN-REQ-13 | 공개 조직 검색어는 앞뒤 공백을 뺀 2~40자다. 이름에서 대소문자를 가리지 않고 부분 일치로 찾으며, `%`·`_`는 글자 그대로 찾는다. 이름, ID 순으로 20개까지 `orgId`, `name`, `tagline`, `joinRequestMode`만 준다(SEC-ORG-03) | 필수 |
+| TEN-REQ-14 | 조직 관리자의 가입 요청 목록은 조직 관리자 확인 표시(TEN-REQ-09)가 켜진 `REQUESTED` 조직 멤버십만 담는다. 표시가 꺼진 요청은 팀 관리자가 팀 요청으로 처리한다. 조직 개요의 가입 요청 대기 수도 같은 기준이다. 조직·팀 목록 모두 요청한 사람의 표시 이름만 주고 이메일은 주지 않는다 | 필수 |
+| TEN-REQ-15 | 조직 관리자가 승인하면 조직 멤버십이 `ACTIVE`·`MEMBER`가 된다. 함께 기다리던 링크 팀 요청은 TEN-LINK-12대로, 링크가 승인 필요가 아니면 `ACTIVE`(링크 역할)가 되고, 승인 필요이거나 링크가 없어졌으면 `REQUESTED`로 남아 팀 관리자가 처리한다. 선택한 팀(`teamId`)이 있으면 그 팀에 고른 역할(`TEAM_MEMBER`·`VIEWER`, 기본 `TEAM_MEMBER`)로 넣는다(`TEAM_MEMBER_ADDED`). 그 팀이 이 조직의 `ACTIVE` 팀이 아니거나 내 팀 멤버십이 `SUSPENDED`이면, 또는 `teamId` 없이 `role`만 주면 `400`이고 아무것도 바꾸지 않는다. 이미 `ACTIVE`이면 그대로 둔다 | 필수 |
+| TEN-REQ-16 | 조직 관리자가 거절하면 조직 멤버십이 `REJECTED`가 되고 거절 시각을 남긴다(TEN-REQ-07). 그 조직의 내 `REQUESTED` 팀 멤버십도 `REJECTED`가 되며, 조직 대기가 다시 요청을 막으므로 팀에는 거절 시각을 남기지 않는다 | 필수 |
+| TEN-REQ-17 | 조직 관리자 확인 표시가 꺼진 `REQUESTED`를 조직 관리자 엔드포인트로 처리하면 `404`다. 처리할 대상이 `REQUESTED`가 아니면 `409 ALREADY_PROCESSED`다. 승인·거절은 조직 행 → 팀 행 순서로 잠근 뒤 판정해(TEN-CTX-09) 동시에 처리해도 한 번만 성공한다 | 필수 |
+| TEN-REQ-18 | 팀 관리자(조직 관리자 포함)가 팀 요청을 승인하면 팀 멤버십이 요청한 역할로 `ACTIVE`가 된다. 조직 멤버십이 `ACTIVE`이면 팀만 바뀐다. 조직 관리자 확인 표시가 켜진 `REQUESTED`이면 `403 FORBIDDEN_ACTION`이고, 꺼진 `REQUESTED`이면 조직 멤버십도 `ACTIVE`·`MEMBER`가 된다(§7.4 표). 그 밖의 조직 멤버십이면 `404`다 | 필수 |
+| TEN-REQ-19 | 팀 관리자가 거절하면 팀 멤버십이 `REJECTED`가 되고 거절 시각을 남긴다. 조직 멤버십이 확인 표시가 꺼진 `REQUESTED`이고 그 조직에 기다리는 다른 팀 요청이 없으면 조직 멤버십도 `REJECTED`가 되며, 거절 시각은 남기지 않는다 | 필수 |
+| TEN-REQ-20 | 활동 기록: 승인은 조직에 `ORG_MEMBER_APPROVED`(`REQUESTED` → `MEMBER`), 팀에 `TEAM_MEMBER_APPROVED`(`REQUESTED` → 역할), 거절은 `ORG_MEMBER_REJECTED`·`TEAM_MEMBER_REJECTED`(`REQUESTED` → `REJECTED`)다. 행동한 사람은 처리한 관리자, 대상은 요청한 계정이다 | 필수 |
 
 ### 7.6 손님 초대
 

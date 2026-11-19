@@ -262,7 +262,7 @@ public class OrgMembership {
         updatedAt = at;
     }
 
-    public void rejectByArchive(Instant at) {
+    public void rejectWithoutCooldown(Instant at) {
         reject(at);
         rejectedAt = null;
     }
