@@ -520,8 +520,11 @@ flowchart TD
     T -- 예 --> E{내 팀 멤버십}
     E -- ACTIVE --> GO[/그 팀 첫 화면/]
     E -- SUSPENDED --> N
-    E -- 그 밖 --> AP{팀이 승인 필요?}
-    AP -- 예 --> R[팀 멤버십 REQUESTED, 팀 관리자 알림] --> A2[/A2/]
+    E -- REQUESTED --> A2[/A2/]
+    E -- 그 밖 --> RM{내보내진 사람?}
+    RM -- 예 --> R[팀 멤버십 REQUESTED, 팀 관리자 알림] --> A2
+    RM -- 아니오 --> AP{팀이 승인 필요?}
+    AP -- 예 --> R
     AP -- 아니오 --> A[팀 멤버십 ACTIVE·TEAM_MEMBER] --> GO
 ```
 
@@ -531,13 +534,13 @@ flowchart TD
 | TEN-REQ-02 | 거절된 요청은 7일이 지나야 다시 보낼 수 있다(OQ-47). 서버가 거절 시각으로 판정하며, 그 전의 요청은 거부한다 | 필수 |
 | TEN-REQ-03 | 요청 개수 제한은 [architecture/security.md](security.md) §13.2을 따른다 | 필수 |
 | TEN-REQ-04 | 조직 가입 요청은 조직이 없거나 `PRIVATE`이거나 가입 요청이 꺼졌거나 `ACTIVE`가 아니면 `404`다(API-ORG-01). 내 조직 멤버십이 `SUSPENDED`이거나 `ACTIVE` 손님(이용 기한이 지났어도, TEN-LINK-10과 같음)이어도 `404`다. 이미 `ACTIVE` 구성원이면 `JOINED`, 이미 `REQUESTED`이면 `REQUESTED`로 답하고 아무것도 바꾸지 않는다. 그 밖(없음, `LEFT`, `REJECTED`, `EXPIRED`)은 승인 필요면 `REQUESTED`, 바로 가입이면 `ACTIVE`·`MEMBER`가 된다 | 필수 |
-| TEN-REQ-05 | 내보내진 사람(`LEFT`, 사유 `REMOVED`)은 조직·팀이 바로 가입이어도 `REQUESTED`가 된다. 관리자가 내보낸 사람이 스스로 다시 들어오지 못한다 | 필수 |
+| TEN-REQ-05 | 내보내진 사람(`LEFT`, 사유 `REMOVED`)은 조직·팀이 바로 가입이어도 `REQUESTED`가 된다. 관리자가 내보낸 사람이 스스로 다시 들어오지 못한다. 사유 `REMOVED`는 요청·취소·거절을 거쳐도 남고, 들어올 때(승인, 초대 수락, 승인 없는 초대 링크, 관리자 추가)만 지운다 | 필수 |
 | TEN-REQ-06 | 공개 팀 가입은 위 흐름도를 따른다. 역할은 `TEAM_MEMBER`다. 팀 멤버십이 이미 `ACTIVE`이면 `JOINED`, 이미 `REQUESTED`이면 `REQUESTED`로 답하고 아무것도 바꾸지 않는다. 조직이 `ACTIVE`가 아니면 TEN-CTX-09대로 `409 READ_ONLY`다 | 필수 |
 | TEN-REQ-07 | 다시 요청 대기는 조직·팀 멤버십 각각의 거절 시각부터 배포 설정 `reberu.tenancy.request-cooldown`(기본 7일) 동안이고, 그 사이의 요청은 `409 REQUEST_COOLDOWN`이다. 조직·팀 보관으로 거절된 요청(TEN-SET-05, TEN-TEAM-07)은 거절 시각을 비워 대기가 없다 | 필수 |
 | TEN-REQ-08 | 요청·취소는 조직 행 → 팀 행 순서로 잠근 뒤 판정한다(TEN-CTX-09). 같은 계정의 같은 조직 요청은 조직 행 잠금으로 차례대로 처리되어 TEN-REQ-01을 지킨다 | 필수 |
-| TEN-REQ-09 | 조직 멤버십 `REQUESTED`에는 조직 관리자 확인 대기 표시가 있다. 조직 가입 요청과 TEN-ADM-01이 적용된 초대 링크로 생긴 요청은 표시가 켜지고, 그 밖의 승인 필요 링크로 생긴 요청은 꺼진다(팀 관리자 승인이 조직 멤버십도 `ACTIVE`로 바꾼다, §7.4 표). 이미 `REQUESTED`인 멤버십에 표시가 켜지는 판정이 오면 켜고, 꺼지는 판정으로 끄지 않는다. `REQUESTED`를 벗어나면 끈다 | 필수 |
+| TEN-REQ-09 | 조직 멤버십 `REQUESTED`에는 조직 관리자 확인 대기 표시가 있다. 조직 가입 요청과 TEN-ADM-01이 적용된 초대 링크로 생긴 요청은 표시가 켜지고, 그 밖의 승인 필요 링크로 생긴 요청은 꺼진다(팀 관리자 승인이 조직 멤버십도 `ACTIVE`로 바꾼다, §7.4 표). 이미 `REQUESTED`인 멤버십에 초대 링크 사용이 표시가 켜지는 판정을 내리면 켜고, 꺼지는 판정으로 끄지 않는다. 조직 가입 요청은 이미 `REQUESTED`인 멤버십을 바꾸지 않는다(TEN-REQ-04). `REQUESTED`를 벗어나면 끈다 | 필수 |
 | TEN-REQ-10 | 내 가입 요청 목록은 `REQUESTED`와 다시 요청 대기 중인 `REJECTED`만 담는다. 조직 요청은 조직이 `ACTIVE`일 때, 팀 요청은 팀과 조직이 모두 `ACTIVE`일 때만 보인다(TEN-HOME-04와 같은 기준). 최신 50개이고 커서가 없다 | 필수 |
-| TEN-REQ-11 | 요청 취소는 내 멤버십이 없으면 `404`, `REQUESTED`가 아니면 `409 ALREADY_PROCESSED`다. 취소하면 `LEFT`(사유 `SELF`)가 되고, 조직 요청을 취소하면 그 조직의 내 `REQUESTED` 팀 멤버십도 함께 `LEFT`가 된다. 취소한 요청은 다시 요청 대기가 없다 | 필수 |
+| TEN-REQ-11 | 요청 취소는 내 멤버십이 없으면 `404`, `REQUESTED`가 아니면 `409 ALREADY_PROCESSED`다. 취소하면 `LEFT`(사유 `SELF`, 내보내진 사람은 `REMOVED` 그대로, TEN-REQ-05)가 되고, 조직 요청을 취소하면 그 조직의 내 `REQUESTED` 팀 멤버십도 함께 `LEFT`가 된다. 취소한 요청은 다시 요청 대기가 없다 | 필수 |
 | TEN-REQ-12 | 활동 기록: 요청·들어옴은 조직에 `ORG_MEMBER_REQUESTED`·`ORG_MEMBER_JOINED`, 팀에 `TEAM_MEMBER_REQUESTED`·`TEAM_MEMBER_JOINED`(전 값은 예전 상태, 후 값은 조직이면 `REQUESTED`·`MEMBER`, 팀이면 역할), 취소는 `ORG_MEMBER_REQUEST_CANCELLED`·`TEAM_MEMBER_REQUEST_CANCELLED`(`REQUESTED` → `LEFT`)다. 행동한 사람과 대상은 요청한 계정이다. 아무것도 바꾸지 않은 응답은 기록하지 않는다 | 필수 |
 | TEN-REQ-13 | 공개 조직 검색어는 앞뒤 공백을 뺀 2~40자다. 이름에서 대소문자를 가리지 않고 부분 일치로 찾으며, `%`·`_`는 글자 그대로 찾는다. 이름, ID 순으로 20개까지 `orgId`, `name`, `tagline`, `joinRequestMode`만 준다(SEC-ORG-03) | 필수 |
 

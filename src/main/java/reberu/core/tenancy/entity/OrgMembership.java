@@ -135,7 +135,9 @@ public class OrgMembership {
         state = MembershipState.REQUESTED;
         orgAdmin = false;
         expiresAt = null;
-        leftReason = null;
+        if (!LEFT_REMOVED.equals(leftReason)) {
+            leftReason = null;
+        }
         this.admissionReview = admissionReview;
         updatedAt = at;
     }
@@ -152,7 +154,7 @@ public class OrgMembership {
     }
 
     public boolean removed() {
-        return state == MembershipState.LEFT && LEFT_REMOVED.equals(leftReason);
+        return LEFT_REMOVED.equals(leftReason);
     }
 
     public void cancel(Instant at) {
@@ -160,7 +162,9 @@ public class OrgMembership {
             throw new IllegalStateException("취소할 수 없는 멤버십 상태: " + state);
         }
         state = MembershipState.LEFT;
-        leftReason = LEFT_SELF;
+        if (!LEFT_REMOVED.equals(leftReason)) {
+            leftReason = LEFT_SELF;
+        }
         admissionReview = false;
         updatedAt = at;
     }

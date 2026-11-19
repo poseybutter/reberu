@@ -8,6 +8,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +78,7 @@ public class JoinRequestService {
                         ORDER BY name, id
                         LIMIT :limit
                         """)
-                .param("pattern", "%" + escapeLike(term.toLowerCase()) + "%")
+                .param("pattern", "%" + escapeLike(term.toLowerCase(Locale.ROOT)) + "%")
                 .param("limit", SEARCH_LIMIT)
                 .query((rs, rowNum) -> new PublicOrg(UUID.fromString(rs.getString("id")), rs.getString("name"),
                         rs.getString("tagline"), JoinRequestMode.valueOf(rs.getString("join_request_mode"))))

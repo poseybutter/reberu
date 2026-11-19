@@ -326,7 +326,7 @@ erDiagram
 | `state` | `CODE` | ○ | `REQUESTED`·`ACTIVE`·`REJECTED`·`SUSPENDED`·`LEFT`·`EXPIRED`([architecture/tenancy.md](../architecture/tenancy.md) §5.4) |
 | `joined_via` | `CODE` | ○ | `CREATOR`·`BOOTSTRAP`·`INVITATION`·`LINK`·`REQUEST`·`DOMAIN` |
 | `expires_at` | `UTC_TIMESTAMP` | 손님 ○ | TEN-INV-09로 계산해 저장 |
-| `left_reason` | `CODE` | | `SELF`·`REMOVED`·`ACCOUNT_DELETED` |
+| `left_reason` | `CODE` | | `SELF`·`REMOVED`·`ACCOUNT_DELETED`. `REMOVED`는 다시 들어올 때까지 남는다(TEN-REQ-05) |
 | `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02). 보관으로 거절되면 비운다(TEN-REQ-07) |
 | `admission_review` | `BOOL` | ○ | `REQUESTED`가 조직 관리자 확인을 기다리는지(TEN-REQ-09). `REQUESTED`가 아니면 거짓 |
 | `version` | `INT` | ○ | 잠금. 마지막 관리자 보호(TEN-INV-20) |
@@ -343,7 +343,7 @@ erDiagram
 | `state` | `CODE` | ○ | org_membership과 같은 값([architecture/tenancy.md](../architecture/tenancy.md) §5.5) |
 | `joined_via` | `CODE` | ○ | org_membership과 같은 값 + `DIRECT`(관리자 바로 추가) |
 | `expires_at` | `UTC_TIMESTAMP` | 손님 ○ | 90일 이내(TEN-INV-08) |
-| `left_reason` | `CODE` | | |
+| `left_reason` | `CODE` | | org_membership과 같은 값과 규칙 |
 | `invite_link_id` | `UUID` | | 초대 링크로 들어오거나 요청한 경우 그 링크(TEN-LINK-12). 링크 행이 없어져도 값은 남긴다 |
 | `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02). 보관으로 거절되면 비운다(TEN-REQ-07) |
 | `version` | `INT` | ○ | 잠금 |

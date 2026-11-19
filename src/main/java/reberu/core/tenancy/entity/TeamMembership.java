@@ -115,7 +115,9 @@ public class TeamMembership {
         this.role = role;
         state = MembershipState.REQUESTED;
         expiresAt = null;
-        leftReason = null;
+        if (!OrgMembership.LEFT_REMOVED.equals(leftReason)) {
+            leftReason = null;
+        }
         this.inviteLinkId = inviteLinkId;
         updatedAt = at;
     }
@@ -125,7 +127,7 @@ public class TeamMembership {
     }
 
     public boolean removed() {
-        return state == MembershipState.LEFT && OrgMembership.LEFT_REMOVED.equals(leftReason);
+        return OrgMembership.LEFT_REMOVED.equals(leftReason);
     }
 
     public void cancel(Instant at) {
@@ -133,7 +135,9 @@ public class TeamMembership {
             throw new IllegalStateException("취소할 수 없는 팀 멤버십 상태: " + state);
         }
         state = MembershipState.LEFT;
-        leftReason = OrgMembership.LEFT_SELF;
+        if (!OrgMembership.LEFT_REMOVED.equals(leftReason)) {
+            leftReason = OrgMembership.LEFT_SELF;
+        }
         updatedAt = at;
     }
 

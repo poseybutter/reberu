@@ -6,12 +6,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static reberu.TestCsrf.csrfToken;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -186,6 +188,14 @@ class JoinRequestTest {
         List<String> fields = new ArrayList<>();
         item.propertyNames().forEach(fields::add);
         assertThat(fields).containsExactlyInAnyOrder("orgId", "name", "tagline", "joinRequestMode");
+        Locale defaultLocale = Locale.getDefault();
+        Locale.setDefault(Locale.forLanguageTag("tr"));
+        try {
+            assertThat(searchNames(outsider, "MORNING")).containsExactly("Morning Club");
+        }
+        finally {
+            Locale.setDefault(defaultLocale);
+        }
         assertThat(searchNames(outsider, "0%")).containsExactly("100% 모임");
         assertThat(searchNames(outsider, "%%")).isEmpty();
         assertThat(searchNames(outsider, "_0")).isEmpty();
@@ -219,7 +229,7 @@ class JoinRequestTest {
     }
 
     @Test
-    @DisplayName("TEN-REQ-05: 바로 가입 조직·팀이어도 내보내진 사람은 REQUESTED, 스스로 나간 사람은 바로 들어옴")
+    @DisplayName("TEN-REQ-05: 바로 가입 조직·팀이어도 내보내진 사람은 취소·거절 뒤에도 REQUESTED, 스스로 나간 사람은 바로 들어옴")
     void removedPeopleMustRequest() throws Exception {
         openOrg(orgId, "INSTANT");
         UUID removed = newAccount("removed@example.com");
@@ -231,6 +241,11 @@ class JoinRequestTest {
 
         assertThat(json(joinOrg(removed, orgId), 200).get("result").asString()).isEqualTo("REQUESTED");
         assertThat(orgMembership(orgId, removed)).isEqualTo("REQUESTED MEMBER INVITATION true");
+        assertThat(perform(post("/api/me/org-requests/" + orgId + "/cancel"), removed).getStatus()).isEqualTo(204);
+        assertThat(leftReasonOf("org_membership", "org_id", orgId, removed)).isEqualTo("REMOVED");
+        assertThat(json(joinOrg(removed, orgId), 200).get("result").asString()).isEqualTo("REQUESTED");
+        rejectOld("org_membership", "org_id", orgId, removed);
+        assertThat(json(joinOrg(removed, orgId), 200).get("result").asString()).isEqualTo("REQUESTED");
         assertThat(json(joinOrg(self, orgId), 200).get("result").asString()).isEqualTo("JOINED");
         assertThat(orgMembership(orgId, self)).isEqualTo("ACTIVE MEMBER INVITATION false");
 
@@ -240,6 +255,12 @@ class JoinRequestTest {
         JsonNode team = json(joinTeam(member, publicTeam), 200);
         assertThat(team.get("result").asString()).isEqualTo("REQUESTED");
         assertThat(teamMembership(publicTeam, member)).isEqualTo("REQUESTED TEAM_MEMBER INVITATION");
+        assertThat(perform(post("/api/me/team-requests/" + publicTeam + "/cancel"), member).getStatus())
+                .isEqualTo(204);
+        assertThat(leftReasonOf("team_membership", "team_id", publicTeam, member)).isEqualTo("REMOVED");
+        assertThat(json(joinTeam(member, publicTeam), 200).get("result").asString()).isEqualTo("REQUESTED");
+        rejectOld("team_membership", "team_id", publicTeam, member);
+        assertThat(json(joinTeam(member, publicTeam), 200).get("result").asString()).isEqualTo("REQUESTED");
     }
 
     @Test
@@ -529,6 +550,12 @@ class JoinRequestTest {
         jdbc.sql("UPDATE " + table + " SET rejected_at = :at WHERE " + scope + " = :scope AND account_id = :account")
                 .param("at", LocalDateTime.ofInstant(at, ZoneOffset.UTC)).param("scope", scopeId)
                 .param("account", account.toString()).update();
+    }
+
+    private void rejectOld(String table, String scope, String scopeId, UUID account) {
+        jdbc.sql("UPDATE " + table + " SET state = 'REJECTED' WHERE " + scope + " = :scope AND account_id = :account")
+                .param("scope", scopeId).param("account", account.toString()).update();
+        rejectedAt(table, scope, scopeId, account, Instant.now().minus(Duration.ofDays(8)));
     }
 
     private LocalDateTime rejectedAtOf(String table, String scope, String scopeId, UUID account) {
