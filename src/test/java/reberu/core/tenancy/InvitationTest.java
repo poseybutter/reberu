@@ -479,8 +479,8 @@ class InvitationTest {
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
         jdbc.sql("""
                         INSERT INTO org_membership (id, org_id, account_id, kind, org_admin, state, joined_via,
-                            created_at, updated_at, version)
-                        VALUES (:id, :org, :account, :kind, :admin, 'ACTIVE', 'INVITATION', :now, :now, 0)
+                            created_at, updated_at, version, admission_review)
+                        VALUES (:id, :org, :account, :kind, :admin, 'ACTIVE', 'INVITATION', :now, :now, 0, FALSE)
                         """)
                 .param("id", UUID.randomUUID().toString())
                 .param("org", orgId)

@@ -146,12 +146,12 @@ public class OrgSettingsService {
         organization.archive(now);
         for (OrgMembership request : orgMemberships.findByOrgIdAndStateOrderByCreatedAtAscIdAsc(orgId,
                 MembershipState.REQUESTED)) {
-            request.reject(now);
+            request.rejectByArchive(now);
             activityLogs.recordOrg(orgId, new ActivityEntry(actorId, "ORG_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }
         for (TeamMembership request : teamMemberships.findByOrgIdAndState(orgId, MembershipState.REQUESTED)) {
-            request.reject(now);
+            request.rejectByArchive(now);
             activityLogs.recordTeam(request.teamId(), new ActivityEntry(actorId, "TEAM_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }

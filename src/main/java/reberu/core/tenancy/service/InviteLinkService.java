@@ -211,8 +211,8 @@ public class InviteLinkService {
         if (teamMembership != null && teamMembership.state() == MembershipState.ACTIVE && !teamMembership.expired(now)) {
             return orgLive ? Redemption.of(Outcome.ALREADY_MEMBER, organization, team) : Redemption.FAILED;
         }
-        boolean orgRequested = !orgLive
-                && (link.approvalRequired() || !creatorOrgAdmin && organization.memberAdmissionReview());
+        boolean admissionReview = !orgLive && !creatorOrgAdmin && organization.memberAdmissionReview();
+        boolean orgRequested = !orgLive && (link.approvalRequired() || admissionReview);
         boolean teamRequested = link.approvalRequired() || orgRequested;
         boolean orgWaiting = orgLive || orgMembership != null && orgMembership.state() == MembershipState.REQUESTED;
         if (teamRequested && orgWaiting && teamMembership != null
@@ -223,13 +223,19 @@ public class InviteLinkService {
             return Redemption.FAILED;
         }
         if (orgMembership == null) {
-            orgMemberships.save(OrgMembership.linked(Uuids.v7(), organization.id(), accountId, orgRequested, now));
+            orgMemberships.save(OrgMembership.linked(Uuids.v7(), organization.id(), accountId, orgRequested,
+                    admissionReview, now));
             recordOrg(organization.id(), accountId, null, orgRequested);
         }
-        else if (!orgLive && !(orgRequested && orgMembership.state() == MembershipState.REQUESTED)) {
+        else if (orgRequested && orgMembership.state() == MembershipState.REQUESTED) {
+            if (admissionReview) {
+                orgMembership.requireAdmissionReview();
+            }
+        }
+        else if (!orgLive) {
             String before = orgMembership.state().name();
             if (orgRequested) {
-                orgMembership.request(now);
+                orgMembership.request(admissionReview, now);
             }
             else {
                 orgMembership.admit(MembershipKind.MEMBER, null, now);

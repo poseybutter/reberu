@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.15.0\
-> 수정일: 2026-11-18
+> 버전: v0.16.0\
+> 수정일: 2026-11-19
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -327,7 +327,8 @@ erDiagram
 | `joined_via` | `CODE` | ○ | `CREATOR`·`BOOTSTRAP`·`INVITATION`·`LINK`·`REQUEST`·`DOMAIN` |
 | `expires_at` | `UTC_TIMESTAMP` | 손님 ○ | TEN-INV-09로 계산해 저장 |
 | `left_reason` | `CODE` | | `SELF`·`REMOVED`·`ACCOUNT_DELETED` |
-| `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02) |
+| `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02). 보관으로 거절되면 비운다(TEN-REQ-07) |
+| `admission_review` | `BOOL` | ○ | `REQUESTED`가 조직 관리자 확인을 기다리는지(TEN-REQ-09). `REQUESTED`가 아니면 거짓 |
 | `version` | `INT` | ○ | 잠금. 마지막 관리자 보호(TEN-INV-20) |
 
 - 가입 요청은 별도 엔티티가 아니라 이 행의 `REQUESTED` 상태다([architecture/tenancy.md](../architecture/tenancy.md) §5.4, TEN-REQ-01).
@@ -344,6 +345,7 @@ erDiagram
 | `expires_at` | `UTC_TIMESTAMP` | 손님 ○ | 90일 이내(TEN-INV-08) |
 | `left_reason` | `CODE` | | |
 | `invite_link_id` | `UUID` | | 초대 링크로 들어오거나 요청한 경우 그 링크(TEN-LINK-12). 링크 행이 없어져도 값은 남긴다 |
+| `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02). 보관으로 거절되면 비운다(TEN-REQ-07) |
 | `version` | `INT` | ○ | 잠금 |
 
 - 인덱스 후보: (`team_id`, `state`, `role`), (`account_id`, `state`).

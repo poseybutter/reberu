@@ -1,6 +1,7 @@
 package reberu.core.tenancy.service;
 
 import java.time.Clock;
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationEventPublisher;
@@ -102,6 +103,15 @@ class TenancyConfiguration {
             CursorCodec cursors, JdbcClient jdbc, @Value("${reberu.app.base-url}") String baseUrl) {
         return new InviteLinkService(locks, organizations, teams, links, orgMemberships, teamMemberships, accounts,
                 activityLogs, cursors, jdbc, baseUrl, Clock.systemUTC());
+    }
+
+    @Bean
+    JoinRequestService joinRequestService(StateLocks locks, OrganizationRepository organizations,
+            TeamRepository teams, OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships,
+            ActivityLogs activityLogs, JdbcClient jdbc,
+            @Value("${reberu.tenancy.request-cooldown}") Duration cooldown) {
+        return new JoinRequestService(locks, organizations, teams, orgMemberships, teamMemberships, activityLogs,
+                jdbc, cooldown, Clock.systemUTC());
     }
 
     @Bean
