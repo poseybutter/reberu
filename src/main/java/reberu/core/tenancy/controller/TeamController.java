@@ -22,10 +22,16 @@ import reberu.core.access.OrgContext;
 import reberu.core.support.CursorPage;
 import reberu.core.support.IdempotentRequest;
 import reberu.core.support.IdempotentRequests;
+import reberu.core.support.RateLimit;
+import reberu.core.support.RateLimited;
 import reberu.core.support.RequiresRecentAuth;
+import reberu.core.tenancy.HomeScreens.HomeNext;
+import reberu.core.tenancy.HomeScreens.HomeNext.Screen;
 import reberu.core.tenancy.dto.CreateTeamRequest;
 import reberu.core.tenancy.dto.CreateTeamResponse;
 import reberu.core.tenancy.dto.RestoreTeamRequest;
+import reberu.core.tenancy.service.JoinRequestService;
+import reberu.core.tenancy.service.JoinRequestService.Outcome;
 import reberu.core.tenancy.service.TeamService;
 import reberu.core.tenancy.service.TeamService.TeamSummary;
 
@@ -36,10 +42,12 @@ class TeamController {
 
     private final TeamService teams;
     private final IdempotentRequests idempotentRequests;
+    private final JoinRequestService joinRequests;
 
-    TeamController(TeamService teams, IdempotentRequests idempotentRequests) {
+    TeamController(TeamService teams, IdempotentRequests idempotentRequests, JoinRequestService joinRequests) {
         this.teams = teams;
         this.idempotentRequests = idempotentRequests;
+        this.joinRequests = joinRequests;
     }
 
     @GetMapping
@@ -74,6 +82,18 @@ class TeamController {
             @RequestBody(required = false) RestoreTeamRequest body) {
         teams.restore(org.orgId(), teamId, org.accountId(), body == null ? null : body.newAdminAccountId());
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{teamId}/join")
+    @Access(value = AccessLevel.ORG_MEMBER, write = true)
+    @RateLimited(RateLimit.JOIN_REQUEST)
+    Joined join(OrgContext org, @PathVariable UUID teamId) {
+        Outcome outcome = joinRequests.joinTeam(org.orgId(), teamId, org.accountId());
+        return new Joined(outcome, outcome == Outcome.JOINED ? new HomeNext(Screen.TEAM_HOME, teamId)
+                : new HomeNext(Screen.JOIN_PENDING, null));
+    }
+
+    record Joined(Outcome result, HomeNext next) {
     }
 
 }

@@ -179,6 +179,12 @@ public class TeamService {
         }
         Instant now = clock.instant();
         team.archive(now);
+        for (TeamMembership request : teamMemberships.findByTeamIdAndStateOrderByCreatedAtAscIdAsc(teamId,
+                MembershipState.REQUESTED)) {
+            request.rejectByArchive(now);
+            activityLogs.recordTeam(teamId, new ActivityEntry(accountId, "TEAM_MEMBER_REJECTED", "ACCOUNT",
+                    request.accountId(), "REQUESTED", "REJECTED"));
+        }
         inviteLinks.disableForTeam(teamId, accountId, now);
         activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "TEAM_ARCHIVED", "TEAM", teamId,
                 "ACTIVE", "ARCHIVED"));

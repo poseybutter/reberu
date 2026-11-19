@@ -133,7 +133,7 @@ class SingleOrgBootstrapTest {
     }
 
     @Test
-    @DisplayName("TEN-MODE-02: SINGLE_ORG에서 조직 만들기·기본 직무 유형 API는 404")
+    @DisplayName("TEN-MODE-02: SINGLE_ORG에서 조직 만들기·기본 직무 유형·공개 조직 찾기·가입 요청 API는 404")
     void organizationApisAreHidden() throws Exception {
         UUID account = newAccount("member", "member@example.com");
         AccountAuthentication signedIn = new AccountAuthentication(account, Instant.now());
@@ -145,6 +145,24 @@ class SingleOrgBootstrapTest {
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
         assertThat(mockMvc.perform(get("/api/default-job-types").with(authentication(signedIn)))
                 .andReturn().getResponse().getStatus()).isEqualTo(404);
+        assertThat(mockMvc.perform(get("/api/public-orgs").param("q", "단체").with(authentication(signedIn)))
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
+        String orgId = jdbc.sql("SELECT id FROM organization").query(String.class).single();
+        Map<String, Object> before = jdbc.sql("SELECT visibility, join_request_mode FROM organization").query()
+                .singleRow();
+        jdbc.sql("UPDATE organization SET visibility = 'PUBLIC', join_request_mode = 'INSTANT'").update();
+        try {
+            assertThat(mockMvc.perform(post("/api/public-orgs/" + orgId + "/join").with(authentication(signedIn))
+                            .with(csrfToken()))
+                    .andReturn().getResponse().getStatus()).isEqualTo(404);
+            assertThat(jdbc.sql("SELECT COUNT(*) FROM org_membership WHERE account_id = :account")
+                    .param("account", account.toString()).query(Integer.class).single()).isZero();
+        }
+        finally {
+            jdbc.sql("UPDATE organization SET visibility = :visibility, join_request_mode = :mode")
+                    .param("visibility", before.get("visibility")).param("mode", before.get("join_request_mode"))
+                    .update();
+        }
         assertThat(jdbc.sql("SELECT COUNT(*) FROM organization").query(Integer.class).single()).isOne();
         mockMvc.perform(get("/api/auth/session"))
                 .andExpect(jsonPath("$.state").value("ANONYMOUS"))

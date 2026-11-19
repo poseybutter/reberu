@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.18.0\
-> 수정일: 2026-11-18
+> 버전: v0.19.0\
+> 수정일: 2026-11-19
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -156,9 +156,9 @@
 | `GET` | `/api/me/invitations` | 지금 수락할 수 있는 내 초대(TEN-INVT-14) 최신 50개 `items`: `invitationId`, 조직 이름 `orgName`, 팀 이름 `teamName`, 초대한 사람 표시 이름 `invitedByName`, 멤버 종류 `kind`, 팀 역할 `role`, 수락 기한 `acceptBy`. 커서 없음, 전체 수는 home의 `invitationCount` | 계정 | 초대 카드(UX-SCR-024) |
 | `POST` | `/api/me/invitations/{invitationId}/accept` | 수락. 조건은 SEC-TOKEN-08·10, 처리는 TEN-AUTH-10~14·TEN-INVT-15~17. 응답 `{ next }`: 팀 초대면 그 팀 `TEAM_HOME`, 팀 없는 초대면 첫 화면 판정(TEN-HOME-03) | 계정 | 남의 초대·이메일 불일치·승인 대기 `404`, 이미 처리됨·기한 지남·조직이나 팀이 `ACTIVE` 아님 `409 ALREADY_PROCESSED`(기한·상태로 막히면 초대 `EXPIRED`), TEN-AUTH-12·14·TEN-INVT-16 `403 FORBIDDEN_ACTION` |
 | `POST` | `/api/me/invitations/{invitationId}/decline` | 거절 → `DECLINED`(TEN-INVT-18) | 계정 | `204`, `404`는 수락과 같음, 이미 처리됨·기한 지남 `409 ALREADY_PROCESSED` |
-| `GET` | `/api/me/join-requests` | 내 `REQUESTED`·`REJECTED` 조직·팀 멤버십: 대상 이름, 요청 시각, 상태, 다시 요청할 수 있는 시각(TEN-REQ-02) | 계정 | A2, A5 |
-| `POST` | `/api/me/org-requests/{orgId}/cancel` | 내 조직 가입 요청 취소 → `LEFT`(사유 `SELF`) | 계정 | `204` |
-| `POST` | `/api/me/team-requests/{teamId}/cancel` | 내 팀 가입 요청 취소 | 계정 | `204` |
+| `GET` | `/api/me/join-requests` | 내 `REQUESTED`와 다시 요청 대기 중인 `REJECTED` 조직·팀 멤버십(TEN-REQ-10) 최신 50개 `items`: `target`(`ORG`·`TEAM`), `orgId`, `orgName`, `teamId`, `teamName`(조직 요청은 `null`), `state`, `requestedAt`(`REQUESTED`만), `rejectedAt`·`retryAt`(`REJECTED`만, TEN-REQ-02·07). 커서 없음 | 계정 | A2, A5 |
+| `POST` | `/api/me/org-requests/{requestOrgId}/cancel` | 내 조직 가입 요청 취소 → `LEFT`(사유 `SELF`). 그 조직의 내 팀 요청도 함께 취소(TEN-REQ-11) | 계정 | `204`, 내 멤버십 없음 `404`, 요청 중 아님 `409 ALREADY_PROCESSED` |
+| `POST` | `/api/me/team-requests/{requestTeamId}/cancel` | 내 팀 가입 요청 취소(TEN-REQ-11) | 계정 | `204`, 내 멤버십 없음 `404`, 요청 중 아님 `409 ALREADY_PROCESSED` |
 | `POST` | `/api/me/orgs/{orgId}/leave` | 조직 나가기([architecture/tenancy.md](tenancy.md) §14.2) | 계정 | `409 LAST_ADMIN_REQUIRED` |
 | `POST` | `/api/me/teams/{teamId}/leave` | 팀 나가기 | 계정 | `409 LAST_ADMIN_REQUIRED` |
 | `GET` | `/api/me/withdrawal-check` | 탈퇴 전 판정: 관리자를 넘겨야 하는 조직·팀 목록, 함께 보관될 혼자뿐인 조직·팀 목록([architecture/tenancy.md](tenancy.md) §5.1) | 계정 | D3 |
@@ -191,10 +191,10 @@
 | --- | --- | --- | --- | --- |
 | `POST` | `/api/orgs` | 조직 만들기. 본문 `name`, `tagline`, `visibility`, `timeZone`, `firstTeam { name, jobTypeKey }`(`jobTypeKey`는 기본 직무 유형, [architecture/tenancy.md](tenancy.md) §12). 처리는 [architecture/tenancy.md](tenancy.md) §8.1. 응답 `{ orgId, teamId }` | 계정 | `201`, 제한 SEC-RATE-05, `409 LIMIT_EXCEEDED`, `Idempotency-Key` |
 | `GET` | `/api/default-job-types` | 조직 만들기에서 고를 기본 직무 유형 목록(key, 이름, 설명) | 계정 | A4 |
-| `GET` | `/api/public-orgs?q=` | 공개 조직 찾기. 두 글자 이상, 최대 20개, 이름·한 줄 소개·가입 방식만(SEC-ORG-03). `PUBLIC`·`ACTIVE`이고 가입 요청이 켜진 조직만 | 계정 | 제한 SEC-RATE-06 |
-| `POST` | `/api/public-orgs/{orgId}/join` | 가입 요청 또는 바로 가입. 결과 `REQUESTED` 또는 `JOINED` | 계정 | 제한 SEC-RATE-04, 재요청 대기 중이면 `409 REQUEST_COOLDOWN` |
+| `GET` | `/api/public-orgs` | 공개 조직 찾기. 쿼리 `q`(2~40자, TEN-REQ-13). 최대 20개 `items`: `orgId`, `name`, `tagline`, `joinRequestMode`(SEC-ORG-03). `PUBLIC`·`ACTIVE`이고 가입 요청이 켜진 조직만 | 계정 | 제한 SEC-RATE-06, `q`가 짧거나 길면 `400` |
+| `POST` | `/api/public-orgs/{publicOrgId}/join` | 가입 요청 또는 바로 가입(TEN-REQ-04·05). 응답 `{ result, next }`: `result`는 `REQUESTED`·`JOINED`, `next`는 `JOINED`면 `TEAM_PICKER`, `REQUESTED`면 `JOIN_PENDING` | 계정 | 제한 SEC-RATE-04, 재요청 대기 중이면 `409 REQUEST_COOLDOWN` |
 
-- API-ORG-01 (필수): `public-orgs/{orgId}/join`은 조직이 `PRIVATE`이거나 가입 요청이 꺼졌거나 없을 때 모두 같은 `404 NOT_FOUND`다(SEC-ORG-01).
+- API-ORG-01 (필수): `public-orgs/{publicOrgId}/join`은 조직이 `PRIVATE`이거나 가입 요청이 꺼졌거나 없을 때 모두 같은 `404 NOT_FOUND`다(SEC-ORG-01).
 
 ## 8. 조직 관리 (`/api/orgs/{orgId}`)
 
@@ -210,7 +210,7 @@
 | `POST` | `/api/orgs/{orgId}/teams` | 팀 만들기. 본문 `name`, `visibility`, `jobTypeId`, `firstAdminAccountId`(TEN-TEAM-01). 응답 `{ teamId }` | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`(`fields`의 `DUPLICATE`) |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/archive` | 팀 보관(TEN-TEAM-04·05) | 조직 관리자 🔒 | `204` |
 | `POST` | `/api/orgs/{orgId}/teams/{teamId}/restore` | 팀 복원. 본문 `newAdminAccountId`는 팀 관리자가 없을 때만 필수이고, 있을 때 보내면 `400`(TEN-TEAM-02·03) | 조직 관리자 🔒 | `204` |
-| `POST` | `/api/orgs/{orgId}/teams/{teamId}/join` | 공개 팀 가입 요청 또는 바로 들어가기([architecture/tenancy.md](tenancy.md) §7.5) | 조직 멤버 | 구성원만, 제한 SEC-RATE-04 |
+| `POST` | `/api/orgs/{orgId}/teams/{teamId}/join` | 공개 팀 가입 요청 또는 바로 들어가기([architecture/tenancy.md](tenancy.md) §7.5, TEN-REQ-05·06). 응답 `{ result, next }`: `result`는 `REQUESTED`·`JOINED`, `next`는 `JOINED`면 그 팀의 `TEAM_HOME`, `REQUESTED`면 `JOIN_PENDING` | 조직 멤버 | 구성원만, 제한 SEC-RATE-04, 재요청 대기 중이면 `409 REQUEST_COOLDOWN` |
 | `GET` | `/api/orgs/{orgId}/job-types` | 직무 유형 목록. 쿼리 `includeHidden`(기본 거짓). 항목마다 `id`, `name`, `description`, `hidden`, `defaults`(`modules`, `taskLabels`, `noticeTitles`, `reportWeekStart`), `teamCount`, `version`. 만든 순서이며 기본 직무 유형은 정해진 순서로 앞에 온다 | 조직 관리자 | F3 |
 | `POST` | `/api/orgs/{orgId}/job-types` | 직무 유형 추가. 본문 `name`, `description`, `defaults`. 응답 `{ jobTypeId }`(TEN-JOB-03~05) | 조직 관리자 | `201`, `Idempotency-Key`, 이름 중복 `400`, 50개 넘으면 `409 LIMIT_EXCEEDED` |
 | `PATCH` | `/api/orgs/{orgId}/job-types/{jobTypeId}` | 직무 유형 고치기. 보낸 필드만 바꾸고 고친 유형을 돌려준다. 이미 만든 팀은 바뀌지 않는다(TEN-JOB-06) | 조직 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |

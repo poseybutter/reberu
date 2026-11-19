@@ -17,6 +17,8 @@ public interface TeamMembershipRepository extends Repository<TeamMembership, UUI
 
     long countByTeamIdAndRoleAndState(UUID teamId, TeamRole role, MembershipState state);
 
+    List<TeamMembership> findByTeamIdAndStateOrderByCreatedAtAscIdAsc(UUID teamId, MembershipState state);
+
     @Query("""
             select m from TeamMembership m
             where m.state = :state and m.teamId in (select t.id from Team t where t.orgId = :orgId)

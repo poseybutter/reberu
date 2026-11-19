@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import reberu.core.support.Owned;
@@ -50,6 +51,9 @@ public class TeamMembership {
     @Column(name = "invite_link_id")
     private UUID inviteLinkId;
 
+    @Column(name = "rejected_at")
+    private Instant rejectedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -92,6 +96,13 @@ public class TeamMembership {
         return membership;
     }
 
+    public static TeamMembership requested(UUID id, UUID teamId, UUID accountId, TeamRole role, boolean requested,
+            Instant at) {
+        TeamMembership membership = active(id, teamId, accountId, role, JoinedVia.REQUEST, at);
+        membership.state = requested ? MembershipState.REQUESTED : MembershipState.ACTIVE;
+        return membership;
+    }
+
     public void admitByLink(TeamRole role, UUID inviteLinkId, Instant at) {
         admit(role, null, at);
         this.inviteLinkId = inviteLinkId;
@@ -104,8 +115,29 @@ public class TeamMembership {
         this.role = role;
         state = MembershipState.REQUESTED;
         expiresAt = null;
-        leftReason = null;
+        if (!OrgMembership.LEFT_REMOVED.equals(leftReason)) {
+            leftReason = null;
+        }
         this.inviteLinkId = inviteLinkId;
+        updatedAt = at;
+    }
+
+    public boolean coolingDown(Duration cooldown, Instant now) {
+        return state == MembershipState.REJECTED && rejectedAt != null && now.isBefore(rejectedAt.plus(cooldown));
+    }
+
+    public boolean removed() {
+        return OrgMembership.LEFT_REMOVED.equals(leftReason);
+    }
+
+    public void cancel(Instant at) {
+        if (state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("취소할 수 없는 팀 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        if (!OrgMembership.LEFT_REMOVED.equals(leftReason)) {
+            leftReason = OrgMembership.LEFT_SELF;
+        }
         updatedAt = at;
     }
 
@@ -192,7 +224,13 @@ public class TeamMembership {
             throw new IllegalStateException("거절할 수 없는 멤버십 상태: " + state);
         }
         state = MembershipState.REJECTED;
+        rejectedAt = at;
         updatedAt = at;
+    }
+
+    public void rejectByArchive(Instant at) {
+        reject(at);
+        rejectedAt = null;
     }
 
     public UUID inviteLinkId() {

@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import reberu.core.support.Owned;
@@ -21,6 +22,8 @@ import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
 public class OrgMembership {
 
     public static final String LEFT_REMOVED = "REMOVED";
+
+    public static final String LEFT_SELF = "SELF";
 
     @Id
     private UUID id;
@@ -54,6 +57,9 @@ public class OrgMembership {
 
     @Column(name = "rejected_at")
     private Instant rejectedAt;
+
+    @Column(name = "admission_review", nullable = false)
+    private boolean admissionReview;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -97,20 +103,31 @@ public class OrgMembership {
         return membership;
     }
 
-    public static OrgMembership linked(UUID id, UUID orgId, UUID accountId, boolean requested, Instant at) {
+    public static OrgMembership linked(UUID id, UUID orgId, UUID accountId, boolean requested,
+            boolean admissionReview, Instant at) {
+        return joining(id, orgId, accountId, JoinedVia.LINK, requested, admissionReview, at);
+    }
+
+    public static OrgMembership requested(UUID id, UUID orgId, UUID accountId, boolean requested, Instant at) {
+        return joining(id, orgId, accountId, JoinedVia.REQUEST, requested, requested, at);
+    }
+
+    private static OrgMembership joining(UUID id, UUID orgId, UUID accountId, JoinedVia joinedVia,
+            boolean requested, boolean admissionReview, Instant at) {
         OrgMembership membership = new OrgMembership();
         membership.id = id;
         membership.orgId = orgId;
         membership.accountId = accountId;
         membership.kind = MembershipKind.MEMBER;
         membership.state = requested ? MembershipState.REQUESTED : MembershipState.ACTIVE;
-        membership.joinedVia = JoinedVia.LINK;
+        membership.joinedVia = joinedVia;
+        membership.admissionReview = requested && admissionReview;
         membership.createdAt = at;
         membership.updatedAt = at;
         return membership;
     }
 
-    public void request(Instant at) {
+    public void request(boolean admissionReview, Instant at) {
         if (state != MembershipState.LEFT && state != MembershipState.REJECTED && state != MembershipState.EXPIRED) {
             throw new IllegalStateException("요청으로 바꿀 수 없는 멤버십 상태: " + state);
         }
@@ -118,7 +135,37 @@ public class OrgMembership {
         state = MembershipState.REQUESTED;
         orgAdmin = false;
         expiresAt = null;
-        leftReason = null;
+        if (!LEFT_REMOVED.equals(leftReason)) {
+            leftReason = null;
+        }
+        this.admissionReview = admissionReview;
+        updatedAt = at;
+    }
+
+    public void requireAdmissionReview() {
+        if (state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("요청 중이 아닌 멤버십 상태: " + state);
+        }
+        admissionReview = true;
+    }
+
+    public boolean coolingDown(Duration cooldown, Instant now) {
+        return state == MembershipState.REJECTED && rejectedAt != null && now.isBefore(rejectedAt.plus(cooldown));
+    }
+
+    public boolean removed() {
+        return LEFT_REMOVED.equals(leftReason);
+    }
+
+    public void cancel(Instant at) {
+        if (state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("취소할 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        if (!LEFT_REMOVED.equals(leftReason)) {
+            leftReason = LEFT_SELF;
+        }
+        admissionReview = false;
         updatedAt = at;
     }
 
@@ -141,6 +188,7 @@ public class OrgMembership {
         orgAdmin = false;
         this.expiresAt = kind == MembershipKind.GUEST ? expiresAt : null;
         leftReason = null;
+        admissionReview = false;
         updatedAt = at;
     }
 
@@ -210,7 +258,13 @@ public class OrgMembership {
         }
         state = MembershipState.REJECTED;
         rejectedAt = at;
+        admissionReview = false;
         updatedAt = at;
+    }
+
+    public void rejectByArchive(Instant at) {
+        reject(at);
+        rejectedAt = null;
     }
 
     public UUID id() {
@@ -239,6 +293,10 @@ public class OrgMembership {
 
     public Instant expiresAt() {
         return expiresAt;
+    }
+
+    public boolean admissionReview() {
+        return admissionReview;
     }
 
 }
