@@ -148,6 +148,34 @@ class JoinRequestReviewTest {
     }
 
     @Test
+    @DisplayName("T-ISO-TEAM: 팀 승인·거절은 팀 구성원·VIEWER 403, 다른 조직 관리자 404, 요청·멤버십·활동 기록 그대로")
+    void onlyAdminsDecideTeamRequests() throws Exception {
+        UUID peer = newAccount("peer@example.com");
+        UUID viewer = newAccount("viewer@example.com");
+        UUID stranger = newAccount("stranger@example.com");
+        createOrg(stranger, "다른 서재");
+        insertOrgMembership(orgId, peer, "ACTIVE");
+        insertOrgMembership(orgId, viewer, "ACTIVE");
+        insertTeamMembership(publicTeam, peer, "TEAM_MEMBER", "ACTIVE");
+        insertTeamMembership(publicTeam, viewer, "VIEWER", "ACTIVE");
+        json(perform(post("/api/orgs/" + orgId + "/teams/" + publicTeam + "/join"), member), 200);
+
+        for (String action : List.of("approve", "reject")) {
+            String url = teamRequests(publicTeam) + "/" + member + "/" + action;
+            assertThat(perform(post(url), peer).getStatus()).as(action).isEqualTo(403);
+            assertThat(perform(post(url), viewer).getStatus()).as(action).isEqualTo(403);
+            assertThat(perform(post(url), stranger).getStatus()).as(action).isEqualTo(404);
+        }
+        assertThat(teamMembership(publicTeam, member)).isEqualTo("REQUESTED TEAM_MEMBER");
+        assertThat(rejectedAt("team_membership", "team_id", publicTeam, member)).isNull();
+        assertThat(orgMembership(member)).isEqualTo("ACTIVE MEMBER false");
+        for (UUID actor : List.of(peer, viewer, stranger)) {
+            assertThat(log("team_activity_log", "TEAM_MEMBER_APPROVED", actor)).isEmpty();
+            assertThat(log("team_activity_log", "TEAM_MEMBER_REJECTED", actor)).isEmpty();
+        }
+    }
+
+    @Test
     @DisplayName("TEN-TST-15·TEN-REQ-15·18: 팀 관리자 링크 새 구성원은 조직 관리자 승인 전 팀 승인 403, 조직 승인 뒤 링크대로")
     void teamAdminLinksWaitForOrgAdmin() throws Exception {
         json(redeem(outsider, link(privateTeam, teamAdmin, false)), 200);
