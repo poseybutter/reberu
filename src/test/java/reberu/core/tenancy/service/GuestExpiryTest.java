@@ -100,7 +100,7 @@ class GuestExpiryTest {
 
     @Test
     @DisplayName("TEN-GUEST-11: 지난 팀만 EXPIRED, 끝나지 않은 팀이 없거나 조직 만료 시각이 지나면 조직과 정지된 팀도 EXPIRED, 기록은 행동한 사람 없이")
-    void expiresDueGuests(CapturedOutput output) {
+    void expiresDueGuests(CapturedOutput output) throws Exception {
         Instant now = Instant.now();
         Instant past = now.minusSeconds(60);
         Instant later = now.plus(Duration.ofDays(10));
@@ -118,6 +118,12 @@ class GuestExpiryTest {
         insertOrgMembership(orgId, overdue, "GUEST", "ACTIVE", past);
         insertTeamMembership(sea, overdue, "VIEWER", "SUSPENDED", later);
 
+        String otherOrg = createOrg(newAccount("other@example.com"), "다른 서재");
+        String otherTeam = teamOf(otherOrg);
+        UUID removed = newAccount("removed@example.com");
+        insertOrgMembership(otherOrg, removed, "GUEST", "ACTIVE", later);
+        insertTeamMembership(otherTeam, removed, "TEAM_MEMBER", "LEFT", later);
+
         UUID member = newAccount("member@example.com");
         insertOrgMembership(orgId, member, "MEMBER", "ACTIVE", null);
         insertTeamMembership(forest, member, "TEAM_MEMBER", "ACTIVE", null);
@@ -126,7 +132,7 @@ class GuestExpiryTest {
         insertOrgMembership(orgId, fresh, "GUEST", "ACTIVE", later);
         insertTeamMembership(forest, fresh, "TEAM_MEMBER", "ACTIVE", later);
 
-        assertThat(expiry.expireDue()).isEqualTo(5);
+        assertThat(expiry.expireDue()).isEqualTo(6);
 
         assertThat(orgState(partial)).isEqualTo("ACTIVE");
         assertThat(teamState(forest, partial)).isEqualTo("EXPIRED");
@@ -135,6 +141,8 @@ class GuestExpiryTest {
         assertThat(teamState(forest, single)).isEqualTo("EXPIRED");
         assertThat(orgState(overdue)).isEqualTo("EXPIRED");
         assertThat(teamState(sea, overdue)).isEqualTo("EXPIRED");
+        assertThat(orgState(removed, otherOrg)).isEqualTo("EXPIRED");
+        assertThat(teamState(otherTeam, removed)).isEqualTo("LEFT");
         assertThat(orgState(member)).isEqualTo("ACTIVE");
         assertThat(teamState(forest, member)).isEqualTo("ACTIVE");
         assertThat(orgState(fresh)).isEqualTo("ACTIVE");
@@ -146,8 +154,9 @@ class GuestExpiryTest {
                 "null " + overdue + " SUSPENDED EXPIRED");
         assertThat(logs("org_activity_log")).containsExactlyInAnyOrder(
                 "null " + single + " ACTIVE EXPIRED",
-                "null " + overdue + " ACTIVE EXPIRED");
-        assertThat(output).contains("손님 만료 처리: 멤버십 5건");
+                "null " + overdue + " ACTIVE EXPIRED",
+                "null " + removed + " ACTIVE EXPIRED");
+        assertThat(output).contains("손님 만료 처리: 멤버십 6건");
 
         assertThat(expiry.expireDue()).isZero();
     }

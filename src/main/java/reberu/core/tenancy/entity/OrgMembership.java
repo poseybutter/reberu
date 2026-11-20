@@ -213,9 +213,7 @@ public class OrgMembership {
         if (state == MembershipState.EXPIRED) {
             state = MembershipState.ACTIVE;
         }
-        if (this.expiresAt == null || expiresAt.isAfter(this.expiresAt)) {
-            this.expiresAt = expiresAt;
-        }
+        this.expiresAt = expiresAt;
         updatedAt = at;
     }
 

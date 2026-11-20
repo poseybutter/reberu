@@ -70,7 +70,13 @@ public class GuestService {
         String before = membership.expiresAt().toString();
         boolean revived = target.state() == MembershipState.EXPIRED;
         membership.renewGuest(expiresAt, now);
-        target.renewGuest(expiresAt, now);
+        Instant latest = expiresAt;
+        for (TeamMembership other : teamMemberships.findOpenByOrgIdAndAccountId(orgId, accountId)) {
+            if (other.current() && other.expiresAt() != null && other.expiresAt().isAfter(latest)) {
+                latest = other.expiresAt();
+            }
+        }
+        target.renewGuest(latest, now);
         activityLogs.recordTeam(teamId, new ActivityEntry(actorId, "GUEST_EXTENDED", "ACCOUNT", accountId, before,
                 expiresAt.toString()));
         if (revived) {

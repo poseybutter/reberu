@@ -79,7 +79,12 @@ class GuestExpiry {
                         WHERE tm.state = 'ACTIVE' AND tm.expires_at <= :now
                         UNION
                         SELECT m.org_id FROM org_membership m
-                        WHERE m.state = 'ACTIVE' AND m.kind = 'GUEST' AND m.expires_at <= :now
+                        WHERE m.state = 'ACTIVE' AND m.kind = 'GUEST'
+                          AND (m.expires_at <= :now OR NOT EXISTS (
+                            SELECT 1 FROM team_membership tm
+                            JOIN team t ON t.id = tm.team_id
+                            WHERE t.org_id = m.org_id AND tm.account_id = m.account_id
+                              AND tm.state IN ('ACTIVE', 'SUSPENDED')))
                         """)
                 .param("now", LocalDateTime.ofInstant(now, ZoneOffset.UTC))
                 .query((rs, rowNum) -> UUID.fromString(rs.getString(1)))
@@ -97,8 +102,7 @@ class GuestExpiry {
             touched.add(membership.accountId());
             expired++;
         }
-        orgMemberships.findByOrgIdAndStateAndKindAndExpiresAtLessThanEqualOrderByAccountId(orgId,
-                MembershipState.ACTIVE, MembershipKind.GUEST, now)
+        orgMemberships.findByOrgIdAndStateAndKindOrderByAccountId(orgId, MembershipState.ACTIVE, MembershipKind.GUEST)
                 .forEach(membership -> touched.add(membership.accountId()));
         for (UUID accountId : touched) {
             OrgMembership membership = orgMemberships.findByOrgIdAndAccountId(orgId, accountId).orElse(null);

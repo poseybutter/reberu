@@ -1,6 +1,5 @@
 package reberu.core.tenancy.repository;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +20,7 @@ public interface OrgMembershipRepository extends JpaRepository<OrgMembership, UU
 
     long countByOrgIdAndStateAndAdmissionReviewTrue(UUID orgId, MembershipState state);
 
-    List<OrgMembership> findByOrgIdAndStateAndKindAndExpiresAtLessThanEqualOrderByAccountId(UUID orgId,
-            MembershipState state, MembershipKind kind, Instant now);
+    List<OrgMembership> findByOrgIdAndStateAndKindOrderByAccountId(UUID orgId, MembershipState state,
+            MembershipKind kind);
 
 }

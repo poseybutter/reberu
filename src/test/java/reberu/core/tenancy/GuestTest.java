@@ -139,7 +139,7 @@ class GuestTest {
     }
 
     @Test
-    @DisplayName("TEN-GUEST-09: 연장은 지금 + days, 조직 만료 시각은 가장 늦은 팀 값, 줄어드는 연장 409, 범위 밖 days 400, 팀 기록")
+    @DisplayName("TEN-GUEST-09: 연장은 지금 + days, 조직 만료 시각은 끝나지 않은 팀에서 다시 계산, 줄어드는 연장 409, 범위 밖 days 400, 팀 기록")
     void extendsGuest() throws Exception {
         Instant start = Instant.now();
         JsonNode extended = json(extend(guest, forest, 60, orgAdmin), 200);
@@ -169,7 +169,17 @@ class GuestTest {
         assertThat(extend(guest, sea, 30, orgAdmin).getStatus()).isEqualTo(404);
         assertThat(extend(guest, UUID.randomUUID().toString(), 30, orgAdmin).getStatus()).isEqualTo(404);
         assertThat(teamExpiry(forest, guest)).isEqualTo(current);
-        assertThat(logs("team_activity_log", "GUEST_EXTENDED")).hasSize(2)
+
+        jdbc.sql("UPDATE organization SET guest_max_days = 90 WHERE id = :org").param("org", orgId).update();
+        Instant stale = Instant.now().plus(Duration.ofDays(80));
+        insertTeamMembership(sea, guest, "VIEWER", "LEFT", stale);
+        jdbc.sql("UPDATE org_membership SET expires_at = :at WHERE org_id = :org AND account_id = :account")
+                .param("at", LocalDateTime.ofInstant(stale.truncatedTo(ChronoUnit.MICROS), ZoneOffset.UTC))
+                .param("org", orgId).param("account", guest.toString()).update();
+        JsonNode recomputed = json(extend(guest, forest, 70, orgAdmin), 200);
+        assertThat(recomputed.get("orgExpiresAt").asString()).isEqualTo(recomputed.get("teamExpiresAt").asString());
+        assertThat(orgExpiry(guest)).isEqualTo(teamExpiry(forest, guest)).isBefore(stale);
+        assertThat(logs("team_activity_log", "GUEST_EXTENDED")).hasSize(3)
                 .allSatisfy(row -> assertThat(row).startsWith(orgAdmin + " " + guest + " "));
         assertThat(logs("org_activity_log", "GUEST_EXTENDED")).isEmpty();
     }
@@ -198,6 +208,8 @@ class GuestTest {
 
         json(extend(guest, sea, 30, orgAdmin), 200);
         assertThat(teamMembership(sea, guest)).isEqualTo("SUSPENDED VIEWER");
+        assertThat(orgExpiry(guest)).isEqualTo(teamExpiry(sea, guest));
+        json(extend(guest, forest, 20, orgAdmin), 200);
         assertThat(orgExpiry(guest)).isEqualTo(teamExpiry(sea, guest));
 
         jdbc.sql("UPDATE team SET state = 'ARCHIVED' WHERE id = :team").param("team", sea).update();
