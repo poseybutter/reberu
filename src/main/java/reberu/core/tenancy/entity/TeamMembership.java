@@ -145,6 +145,10 @@ public class TeamMembership {
         return state == MembershipState.ACTIVE && expiresAt != null && !now.isBefore(expiresAt);
     }
 
+    public boolean pastExpiry(Instant now) {
+        return expiresAt != null && !now.isBefore(expiresAt);
+    }
+
     public boolean admittable(Instant now) {
         return state == MembershipState.REQUESTED || state == MembershipState.LEFT
                 || state == MembershipState.REJECTED || state == MembershipState.EXPIRED || expired(now);
@@ -172,6 +176,37 @@ public class TeamMembership {
 
     public boolean current() {
         return state == MembershipState.ACTIVE || state == MembershipState.SUSPENDED;
+    }
+
+    public boolean renewableGuest() {
+        return expiresAt != null && (current() || state == MembershipState.EXPIRED);
+    }
+
+    public void renewGuest(Instant expiresAt, Instant at) {
+        if (!renewableGuest()) {
+            throw new IllegalStateException("이용 기간을 늘릴 수 없는 팀 멤버십");
+        }
+        if (state == MembershipState.EXPIRED) {
+            state = MembershipState.ACTIVE;
+        }
+        this.expiresAt = expiresAt;
+        updatedAt = at;
+    }
+
+    public void clearExpiry(Instant at) {
+        if (!current() || pastExpiry(at)) {
+            throw new IllegalStateException("만료 시각을 지울 수 없는 팀 멤버십");
+        }
+        expiresAt = null;
+        updatedAt = at;
+    }
+
+    public void expire(Instant at) {
+        if (!current()) {
+            throw new IllegalStateException("만료할 수 없는 팀 멤버십");
+        }
+        state = MembershipState.EXPIRED;
+        updatedAt = at;
     }
 
     public void changeRole(TeamRole role, Instant at) {

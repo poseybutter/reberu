@@ -83,6 +83,7 @@ reberu:
     mode: ${DEPLOYMENT_MODE:MULTI_ORG}
     invite-link-failure-delay: 300ms
     request-cooldown: 7d
+    guest-expiry-interval: PT10M
     single-org:
       name: ${SINGLE_ORG_NAME:}
       time-zone: ${SINGLE_ORG_TIME_ZONE:}

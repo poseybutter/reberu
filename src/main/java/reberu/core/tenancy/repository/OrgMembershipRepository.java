@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import reberu.core.tenancy.entity.OrgMembership;
+import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
 
 public interface OrgMembershipRepository extends JpaRepository<OrgMembership, UUID> {
@@ -18,5 +19,8 @@ public interface OrgMembershipRepository extends JpaRepository<OrgMembership, UU
     List<OrgMembership> findByOrgIdAndStateOrderByCreatedAtAscIdAsc(UUID orgId, MembershipState state);
 
     long countByOrgIdAndStateAndAdmissionReviewTrue(UUID orgId, MembershipState state);
+
+    List<OrgMembership> findByOrgIdAndStateAndKindOrderByAccountId(UUID orgId, MembershipState state,
+            MembershipKind kind);
 
 }
