@@ -122,6 +122,15 @@ class TenancyConfiguration {
     }
 
     @Bean
+    JoinRequestReviewService joinRequestReviewService(StateLocks locks, TeamRepository teams,
+            OrgMembershipRepository orgMemberships, TeamMembershipRepository teamMemberships,
+            InviteLinkRepository links, Accounts accounts, ActivityLogs activityLogs, CursorCodec cursors,
+            JdbcClient jdbc) {
+        return new JoinRequestReviewService(locks, teams, orgMemberships, teamMemberships, links, accounts,
+                activityLogs, cursors, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
     MemberService memberService(StateLocks locks, OrgMembershipRepository orgMemberships,
             TeamRepository teams, TeamMembershipRepository teamMemberships, Accounts accounts,
             ActivityLogs activityLogs, ApplicationEventPublisher events, CursorCodec cursors, JdbcClient jdbc) {

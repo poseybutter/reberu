@@ -319,9 +319,13 @@ class OrgSettingsTest {
     }
 
     @Test
-    @DisplayName("개요: 팀별 인원, 조직 가입 요청 수, 최근 조직 활동 5개(최신부터), 구성원 403")
+    @DisplayName("개요: 팀별 인원, 조직 관리자 확인 대기 가입 요청 수, 최근 조직 활동 5개(최신부터), 구성원 403")
     void overviewSummarizesOrg() throws Exception {
-        insertOrgMembership(newAccount("requester"), "MEMBER", "REQUESTED");
+        UUID requester = newAccount("requester");
+        insertOrgMembership(requester, "MEMBER", "REQUESTED");
+        jdbc.sql("UPDATE org_membership SET admission_review = TRUE WHERE account_id = :account")
+                .param("account", requester.toString()).update();
+        insertOrgMembership(newAccount("linked"), "MEMBER", "REQUESTED");
         insertTeamMembership(firstTeamId, member, "ACTIVE");
         for (String name : List.of("둘째 서재", "셋째 서재", "넷째 서재")) {
             update(admin, with(version(), "name", name));

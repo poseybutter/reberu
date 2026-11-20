@@ -181,7 +181,7 @@ public class TeamService {
         team.archive(now);
         for (TeamMembership request : teamMemberships.findByTeamIdAndStateOrderByCreatedAtAscIdAsc(teamId,
                 MembershipState.REQUESTED)) {
-            request.rejectByArchive(now);
+            request.rejectWithoutCooldown(now);
             activityLogs.recordTeam(teamId, new ActivityEntry(accountId, "TEAM_MEMBER_REJECTED", "ACCOUNT",
                     request.accountId(), "REQUESTED", "REJECTED"));
         }

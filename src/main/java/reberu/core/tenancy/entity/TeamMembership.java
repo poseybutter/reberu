@@ -228,7 +228,7 @@ public class TeamMembership {
         updatedAt = at;
     }
 
-    public void rejectByArchive(Instant at) {
+    public void rejectWithoutCooldown(Instant at) {
         reject(at);
         rejectedAt = null;
     }

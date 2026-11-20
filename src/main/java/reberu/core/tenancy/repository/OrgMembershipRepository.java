@@ -17,6 +17,6 @@ public interface OrgMembershipRepository extends JpaRepository<OrgMembership, UU
 
     List<OrgMembership> findByOrgIdAndStateOrderByCreatedAtAscIdAsc(UUID orgId, MembershipState state);
 
-    long countByOrgIdAndState(UUID orgId, MembershipState state);
+    long countByOrgIdAndStateAndAdmissionReviewTrue(UUID orgId, MembershipState state);
 
 }

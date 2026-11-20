@@ -15,6 +15,8 @@ public interface InviteLinkRepository extends Repository<InviteLink, UUID> {
 
     InviteLink save(InviteLink link);
 
+    Optional<InviteLink> findByTeamIdAndId(UUID teamId, UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from InviteLink l where l.teamId = :teamId and l.id = :linkId")
     Optional<InviteLink> findForUpdate(UUID teamId, UUID linkId);
