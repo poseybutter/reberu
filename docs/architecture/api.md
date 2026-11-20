@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.20.0\
-> 수정일: 2026-11-19
+> 버전: v0.21.0\
+> 수정일: 2026-11-20
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -219,8 +219,8 @@
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/suspend`, `/unsuspend` | 조직 멤버십 정지·해제(TEN-MEM-01·02·05) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/remove` | 조직에서 내보내기(TEN-MEM-01·03·05) | 조직 관리자 🔒 | `204`, 마지막 조직·팀 관리자 `409 LAST_ADMIN_REQUIRED`, 자기 자신 `400` |
 | `POST` | `/api/orgs/{orgId}/members/{accountId}/grant-org-admin`, `/revoke-org-admin` | 조직 관리자 지정·해제. 손님·정지된 사람은 지정 불가(TEN-INV-07, TEN-MEM-04) | 조직 관리자 🔒 | `204`, 반복 `409 ALREADY_PROCESSED`, 마지막 관리자 해제 `409 LAST_ADMIN_REQUIRED`. 지정이 커밋되면 대상의 세션을 모두 끊는다(SEC-SESS-03) |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/convert-to-member` | 손님을 구성원으로 바꾸기(TEN-GUEST-07) | 조직 관리자 🔒 | |
-| `POST` | `/api/orgs/{orgId}/members/{accountId}/extend-guest` | 손님 이용 기간 연장. 본문 `teamId`, `days`(상한 TEN-GUEST-03) | 조직 관리자 🔒 | 연장 요청 API는 없다. 팀 관리자는 조직 관리자에게 직접 알린다 |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/convert-to-member` | 손님을 구성원으로 바꾸기(TEN-GUEST-07·10) | 조직 관리자 🔒 | `204`, 이미 구성원 `409 ALREADY_PROCESSED`, 만료된 손님 `400` |
+| `POST` | `/api/orgs/{orgId}/members/{accountId}/extend-guest` | 손님 이용 기간 연장. 본문 `teamId`, `days`(1~조직 상한, TEN-GUEST-03·09). 응답 `teamExpiresAt`, `orgExpiresAt` | 조직 관리자 🔒 | 늘지 않으면 `409 ALREADY_PROCESSED`, 구성원 `400`. 연장 요청 API는 없다. 팀 관리자는 조직 관리자에게 직접 알린다 |
 | `GET` | `/api/orgs/{orgId}/join-requests` | 조직 관리자 확인을 기다리는 `REQUESTED` 조직 멤버십(조직 가입 요청, TEN-ADM-01 링크, TEN-REQ-14). 항목마다 `accountId`, `displayName`, `joinedVia`(`REQUEST`·`LINK`), `requestedAt`, `teams`(함께 기다리는 팀 요청 `teamId`, `name`, `role`). 이메일은 주지 않는다. 오래된 순, 커서 페이지(§3.3) | 조직 관리자 | F5 |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/approve` | 승인(TEN-REQ-15). 선택 본문 `teamId`, `role`(`TEAM_MEMBER`·`VIEWER`, 기본 `TEAM_MEMBER`) | 조직 관리자 | `204`, 처리된 요청 `409 ALREADY_PROCESSED`, 목록에 없는 요청 `404`, 넣을 수 없는 팀 `400` |
 | `POST` | `/api/orgs/{orgId}/join-requests/{accountId}/reject` | 거절(TEN-REQ-16) | 조직 관리자 | `204`, 처리된 요청 `409 ALREADY_PROCESSED` |

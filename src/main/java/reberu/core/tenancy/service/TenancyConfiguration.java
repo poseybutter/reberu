@@ -139,6 +139,20 @@ class TenancyConfiguration {
     }
 
     @Bean
+    GuestService guestService(StateLocks locks, OrgMembershipRepository orgMemberships, TeamRepository teams,
+            TeamMembershipRepository teamMemberships, ActivityLogs activityLogs) {
+        return new GuestService(locks, orgMemberships, teams, teamMemberships, activityLogs, Clock.systemUTC());
+    }
+
+    @Bean
+    GuestExpiry guestExpiry(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+            TeamMembershipRepository teamMemberships, ActivityLogs activityLogs, TransactionTemplate transactions,
+            JdbcClient jdbc) {
+        return new GuestExpiry(organizations, orgMemberships, teamMemberships, activityLogs, transactions, jdbc,
+                Clock.systemUTC());
+    }
+
+    @Bean
     TeamMemberService teamMemberService(StateLocks locks, OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
             Accounts accounts, ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc) {
         return new TeamMemberService(locks, orgMemberships, teams, teamMemberships, accounts, activityLogs,
@@ -167,7 +181,7 @@ class TenancyConfiguration {
 
     @Bean
     HomeService homeService(JdbcClient jdbc, InvitationService invitations) {
-        return new HomeService(jdbc, invitations);
+        return new HomeService(jdbc, invitations, Clock.systemUTC());
     }
 
     @Bean

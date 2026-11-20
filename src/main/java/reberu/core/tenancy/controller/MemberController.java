@@ -1,5 +1,6 @@
 package reberu.core.tenancy.controller;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.Instant;
@@ -9,6 +10,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,8 +19,11 @@ import reberu.core.access.AccessLevel;
 import reberu.core.access.OrgContext;
 import reberu.core.support.CursorPage;
 import reberu.core.support.RequiresRecentAuth;
+import reberu.core.tenancy.dto.GuestRequests;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.service.GuestService;
+import reberu.core.tenancy.service.GuestService.GuestPeriod;
 import reberu.core.tenancy.service.MemberService;
 import reberu.core.tenancy.service.MemberService.MemberFilter;
 import reberu.core.tenancy.service.MemberService.MemberView;
@@ -32,10 +37,12 @@ import reberu.core.tenancy.service.OrgActivityService.ActivityView;
 class MemberController {
 
     private final MemberService members;
+    private final GuestService guests;
     private final OrgActivityService activity;
 
-    MemberController(MemberService members, OrgActivityService activity) {
+    MemberController(MemberService members, GuestService guests, OrgActivityService activity) {
         this.members = members;
+        this.guests = guests;
         this.activity = activity;
     }
 
@@ -87,6 +94,22 @@ class MemberController {
     ResponseEntity<Void> revokeAdmin(OrgContext org, @PathVariable UUID accountId) {
         members.revokeAdmin(org.orgId(), org.accountId(), accountId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/members/{accountId}/convert-to-member")
+    @RequiresRecentAuth
+    @Access(value = AccessLevel.ORG_ADMIN, write = true)
+    ResponseEntity<Void> convertToMember(OrgContext org, @PathVariable UUID accountId) {
+        guests.convert(org.orgId(), org.accountId(), accountId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/members/{accountId}/extend-guest")
+    @RequiresRecentAuth
+    @Access(value = AccessLevel.ORG_ADMIN, write = true)
+    GuestPeriod extendGuest(OrgContext org, @PathVariable UUID accountId,
+            @Valid @RequestBody GuestRequests.Extend body) {
+        return guests.extend(org.orgId(), org.accountId(), accountId, body.teamId(), body.days());
     }
 
     @GetMapping("/activity")

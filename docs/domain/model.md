@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.16.0\
-> 수정일: 2026-11-19
+> 버전: v0.17.0\
+> 수정일: 2026-11-20
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -332,7 +332,7 @@ erDiagram
 | `version` | `INT` | ○ | 잠금. 마지막 관리자 보호(TEN-INV-20) |
 
 - 가입 요청은 별도 엔티티가 아니라 이 행의 `REQUESTED` 상태다([architecture/tenancy.md](../architecture/tenancy.md) §5.4, TEN-REQ-01).
-- 인덱스 후보: (`org_id`, `state`), (`account_id`, `state`), (`org_id`, `org_admin`, `state`).
+- 인덱스 후보: (`org_id`, `state`), (`account_id`, `state`), (`org_id`, `org_admin`, `state`). 손님 만료 작업용 (`state`, `expires_at`)(TEN-GUEST-11).
 
 ### team_membership
 
@@ -348,7 +348,7 @@ erDiagram
 | `rejected_at` | `UTC_TIMESTAMP` | | 다시 요청 대기(TEN-REQ-02). 보관으로 거절되면 비운다(TEN-REQ-07) |
 | `version` | `INT` | ○ | 잠금 |
 
-- 인덱스 후보: (`team_id`, `state`, `role`), (`account_id`, `state`).
+- 인덱스 후보: (`team_id`, `state`, `role`), (`account_id`, `state`). 손님 만료 작업용 (`state`, `expires_at`)(TEN-GUEST-11).
 - 불변식: TEN-INV-04, TEN-INV-06, TEN-INV-08.
 
 ### invitation (이메일 초대)

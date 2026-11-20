@@ -1,5 +1,6 @@
 package reberu.core.tenancy.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,5 +37,14 @@ public interface TeamMembershipRepository extends Repository<TeamMembership, UUI
             order by m.teamId
             """)
     List<TeamMembership> findOpenByOrgIdAndAccountId(UUID orgId, UUID accountId);
+
+    @Query("""
+            select m from TeamMembership m
+            where m.state = reberu.core.tenancy.entity.TenancyCodes.MembershipState.ACTIVE
+              and m.expiresAt <= :now
+              and m.teamId in (select t.id from Team t where t.orgId = :orgId)
+            order by m.teamId, m.accountId
+            """)
+    List<TeamMembership> findDueByOrgId(UUID orgId, Instant now);
 
 }

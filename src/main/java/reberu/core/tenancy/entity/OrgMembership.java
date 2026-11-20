@@ -202,6 +202,40 @@ public class OrgMembership {
         }
     }
 
+    public boolean renewableGuest() {
+        return kind == MembershipKind.GUEST && (current() || state == MembershipState.EXPIRED);
+    }
+
+    public void renewGuest(Instant expiresAt, Instant at) {
+        if (!renewableGuest()) {
+            throw new IllegalStateException("이용 기간을 늘릴 수 없는 멤버십");
+        }
+        if (state == MembershipState.EXPIRED) {
+            state = MembershipState.ACTIVE;
+        }
+        if (this.expiresAt == null || expiresAt.isAfter(this.expiresAt)) {
+            this.expiresAt = expiresAt;
+        }
+        updatedAt = at;
+    }
+
+    public void convertToMember(Instant at) {
+        if (kind != MembershipKind.GUEST || !current() || (expiresAt != null && !at.isBefore(expiresAt))) {
+            throw new IllegalStateException("구성원으로 바꿀 수 없는 멤버십");
+        }
+        kind = MembershipKind.MEMBER;
+        expiresAt = null;
+        updatedAt = at;
+    }
+
+    public void expire(Instant at) {
+        if (state != MembershipState.ACTIVE || kind != MembershipKind.GUEST) {
+            throw new IllegalStateException("만료할 수 없는 멤버십");
+        }
+        state = MembershipState.EXPIRED;
+        updatedAt = at;
+    }
+
     public boolean canBecomeAdmin() {
         return state == MembershipState.ACTIVE && kind == MembershipKind.MEMBER && !orgAdmin;
     }
