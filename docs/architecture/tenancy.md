@@ -1,6 +1,6 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.25.0\
+> 버전: v0.26.0\
 > 수정일: 2026-11-23
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
@@ -55,8 +55,8 @@ erDiagram
     TEAM ||--o{ INVITE_LINK : "대상"
     ORGANIZATION ||--o{ JOB_TYPE : "가진다"
     JOB_TYPE |o--o{ TEAM : "만들 때 복사"
-    ORGANIZATION ||--o{ ORG_MODULE_SETTING : "허용·켬"
-    TEAM ||--o{ TEAM_MODULE_SETTING : "켬"
+    ORGANIZATION ||--o{ ORG_MODULE_STATE : "허용·켬"
+    TEAM ||--o{ TEAM_MODULE_STATE : "켬"
     ORGANIZATION ||--o{ VERIFIED_DOMAIN : "확인한다"
     ORGANIZATION ||--o{ HOLIDAY : "정한다"
     ORGANIZATION ||--o{ ORG_ACTIVITY_LOG : "남긴다"
@@ -899,6 +899,8 @@ flowchart LR
 | TEN-MOD-04 | 모듈 A가 모듈 B를 필요로 하면, B가 켜져 있어야 A를 켤 수 있고, B를 끄면 A도 함께 꺼진다. 끄기 전에 함께 꺼지는 모듈 목록을 보여 주고 확인을 받는다 | 필수 |
 | TEN-MOD-05 | 모듈 켜기·끄기·허용·거두기는 활동 기록에 남고, 지금 접속한 사람의 화면에 실시간으로 반영된다(`team.modules-changed`, [architecture/realtime.md](realtime.md)) | 필수 |
 | TEN-MOD-06 | 모듈 테이블은 켜짐 여부와 관계없이 마이그레이션으로 만든다. `BUNDLED`는 `db/migration/core`, `EXTENSION`은 `db/migration/company` 위치를 쓴다(CONTRIBUTING.md §3) | 필수 |
+| TEN-MOD-07 | 조직 모듈 상태 행이 없으면 `TEAM` 모듈은 `BUNDLED`일 때 허용, `EXTENSION`일 때 허용하지 않은 것으로 본다(TEN-ORG-04). `ORG` 모듈과 팀 모듈 상태는 행이 없으면 꺼진 것이다. 그래서 이미 있는 조직·팀이나 나중에 설치한 모듈에 행을 채워 넣지 않는다 | 필수 |
+| TEN-MOD-08 | `TEAM` 모듈은 설치됨, 조직 허용, 팀 켬이 모두 참일 때만 그 팀에서 켜진 것이다. `ORG` 모듈은 설치됨과 조직 켬이 모두 참일 때만 켜진 것이다. 범위가 맞지 않는 key의 행은 무시한다 | 필수 |
 
 ### 13.3 확장 지점 등록 항목
 

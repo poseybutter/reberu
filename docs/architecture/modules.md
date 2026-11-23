@@ -1,7 +1,7 @@
 # 모듈 구조
 
-> 버전: v0.5.0\
-> 수정일: 2026-11-11
+> 버전: v0.6.0\
+> 수정일: 2026-11-23
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
@@ -191,25 +191,25 @@ sequenceDiagram
 
 ### 5.1 모듈 정의
 
-모듈은 정의 클래스 하나를 Spring 빈으로 등록한다. 아래는 계약의 모양이며 실제 이름은 구현에서 정한다.
+모듈은 정의 클래스 하나(`reberu.core.module.ModuleDefinition` 구현)를 Spring 빈으로 등록한다. 정의 클래스가 있는 패키지와 그 아래 패키지가 그 모듈의 코드다.
 
 ```java
 public interface ModuleDefinition {
-    String key();                         // 전역 유일. 예: "praise"
-    ModuleScope scope();                  // TEAM 또는 ORG
-    ModuleSource source();                // BUNDLED 또는 EXTENSION
-    Set<String> requires();               // 필요한 모듈 key
-    boolean enabledByDefault();           // 직무 유형에 값이 없을 때 (OQ-41)
-    List<PermissionDeclaration> permissions();
-    List<MenuEntry> menus();
-    List<ExpSource> expSources();         // 출처 key, 기본 양, 하루 상한
-    List<NotificationKind> notificationKinds();
-    List<RealtimeEventType> realtimeEvents();
-    List<ScheduledJob> scheduledJobs();   // 켜진 범위에서만 실행
-    ModuleSettingsSchema settings();      // 팀·조직 설정 항목과 기본값
-    String migrationLocation();           // BUNDLED: core, EXTENSION: company
+    String key();                          // 전역 유일. 예: "praise"
+    String name();                         // 화면에 보일 이름
+    String description();                  // 화면에 보일 설명
+    Scope scope();                         // TEAM 또는 ORG
+    Source source();                       // BUNDLED 또는 EXTENSION
+    Set<String> requires();                // 필요한 모듈 key (기본 없음)
+    boolean enabledByDefault();            // 직무 유형에 값이 없을 때 (OQ-41, 기본 거짓)
+    Set<String> expSources();              // EXP 출처 key (기본 없음)
+    Set<String> notificationKinds();       // 알림 종류 (기본 없음)
+    Set<String> realtimeEvents();          // 실시간 이벤트 이름 (기본 없음)
+    MigrationLocation migrationLocation(); // NONE, CORE, COMPANY (기본 NONE)
 }
 ```
+
+v0.1 계약은 위와 같다. 권한, 메뉴, 정해진 시각 작업, 설정 스키마는 그것을 쓰는 기능의 단계에서 같은 인터페이스에 기본 구현이 있는 메서드로 더한다(ARCH-EVT-09처럼 더하기만 한다).
 
 ### 5.2 등록과 시작 검증
 
@@ -237,6 +237,10 @@ flowchart TD
 | ARCH-MOD-02 | 확장 모듈은 Spring Boot 자동 구성(`AutoConfiguration.imports`)으로 등록한다. 업스트림의 컴포넌트 스캔 설정을 고치지 않는다 | 필수 |
 | ARCH-MOD-03 | 레지스트리는 서버 시작 뒤 바뀌지 않는다. 설치는 배포 단위, 허용·켜기는 데이터([architecture/tenancy.md](tenancy.md) §13)다 | 필수 |
 | ARCH-MOD-04 | 배포에서 모듈 코드를 뺐는데 데이터에 그 모듈의 켜짐 기록이 남아 있으면, 그 모듈은 "설치되지 않음"으로 보고 꺼진 것으로 다룬다. 데이터는 지우지 않는다 | 필수 |
+| ARCH-MOD-05 | 모듈 key는 `[a-z][a-z0-9-]` 40자 이내다(TEN-JOB-05). 이름과 설명은 비울 수 없다. 모듈마다 정의 클래스의 패키지가 달라야 한다 | 필수 |
+| ARCH-MOD-06 | `requires`는 같은 범위의 모듈만 가리킨다. 자기 자신이나 범위가 다른 모듈을 가리키면 서버가 시작하지 않는다 | 필수 |
+| ARCH-MOD-07 | 마이그레이션 위치는 `BUNDLED`이면 `CORE` 또는 `NONE`, `EXTENSION`이면 `COMPANY` 또는 `NONE`이다(V5). `EXTENSION` 정의 클래스는 `reberu` 밖 패키지에 있어야 한다(ARCH-PKG-04) | 필수 |
+| ARCH-MOD-08 | 모듈 API는 `@Access(module = "<key>")`로 모듈 key를 선언한다. 선언한 key는 설치된 모듈이고, 그 모듈 범위가 권한 범위와 같고, 경로가 `/api/orgs/{orgId}/mod/<key>/…` 또는 `/api/teams/{teamId}/mod/<key>/…`이어야 한다(API-MOD-01·02). 모듈 패키지 안의 컨트롤러가 그 모듈 key를 선언하지 않으면 서버가 시작하지 않는다(V3) | 필수 |
 
 ### 5.3 실행 중 켜짐 확인
 
