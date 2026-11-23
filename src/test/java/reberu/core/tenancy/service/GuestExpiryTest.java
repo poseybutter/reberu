@@ -175,13 +175,18 @@ class GuestExpiryTest {
         insertOrgMembership(orgId, guest, "GUEST", "ACTIVE", now.plus(Duration.ofDays(10)));
         insertTeamMembership(forest, guest, "TEAM_MEMBER", "SUSPENDED", now.minusSeconds(60));
         insertTeamMembership(sea, guest, "VIEWER", "ACTIVE", now.plus(Duration.ofDays(10)));
+        UUID due = newAccount("due@example.com");
+        insertOrgMembership(orgId, due, "GUEST", "ACTIVE", now.plus(Duration.ofDays(10)));
+        insertTeamMembership(forest, due, "TEAM_MEMBER", "ACTIVE", now.minusSeconds(60));
+        insertTeamMembership(sea, due, "VIEWER", "ACTIVE", now.plus(Duration.ofDays(10)));
 
-        assertThat(expiry.expireDue()).isZero();
+        assertThat(expiry.expireDue()).isEqualTo(1);
 
+        assertThat(teamState(forest, due)).isEqualTo("EXPIRED");
         assertThat(orgState(guest)).isEqualTo("ACTIVE");
         assertThat(teamState(forest, guest)).isEqualTo("SUSPENDED");
         assertThat(teamState(sea, guest)).isEqualTo("ACTIVE");
-        assertThat(logs("team_activity_log")).isEmpty();
+        assertThat(logs("team_activity_log")).containsExactly("null " + due + " ACTIVE EXPIRED");
 
         MockHttpServletResponse unsuspended = perform(
                 post("/api/teams/" + forest + "/members/" + guest + "/unsuspend"), orgAdmin, Map.of());
@@ -192,7 +197,8 @@ class GuestExpiryTest {
         assertThat(orgState(guest)).isEqualTo("ACTIVE");
         assertThat(teamState(forest, guest)).isEqualTo("EXPIRED");
         assertThat(teamState(sea, guest)).isEqualTo("ACTIVE");
-        assertThat(logs("team_activity_log")).containsExactly("null " + guest + " ACTIVE EXPIRED");
+        assertThat(logs("team_activity_log")).containsExactlyInAnyOrder("null " + due + " ACTIVE EXPIRED",
+                "null " + guest + " ACTIVE EXPIRED");
     }
 
     @Test
