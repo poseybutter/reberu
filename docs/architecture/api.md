@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.21.0\
+> 버전: v0.22.0\
 > 수정일: 2026-11-23
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -228,10 +228,10 @@
 | `POST` | `/api/orgs/{orgId}/invitations` | 이메일 초대 만들기. 본문 `emails`(최대 50), `kind`, `teamId`(손님은 필수), `role`(팀이 있을 때만), `guestDays`(손님만). 응답 `invitations`: 이메일마다 `invitationId`, `email`, `state`, `acceptBy`(TEN-INVT-07~09) | 조직 관리자 | `201`, 제한 SEC-RATE-03, `Idempotency-Key` |
 | `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/approve`, `/reject` | `PENDING_APPROVAL` 초대 승인·거절(손님 초대, 팀 관리자의 새 구성원 초대, TEN-INVT-12) | 조직 관리자 🔒 | `204`, 처리된 초대 `409 ALREADY_PROCESSED`, 보관된 팀 승인 `409 READ_ONLY` |
 | `POST` | `/api/orgs/{orgId}/invitations/{invitationId}/revoke` | 초대 취소 → `REVOKED` | 조직 관리자 | `204`, 대기 중이 아니면 `409 ALREADY_PROCESSED`(TEN-INVT-10) |
-| `GET` | `/api/orgs/{orgId}/modules` | 설치된 모듈: key, 이름, 설명, 범위, 출처, 허용·켜짐, 켠 팀 수, 필요한 모듈 | 조직 관리자 | F4 |
-| `GET` | `/api/orgs/{orgId}/modules/{moduleKey}/impact` | 허용을 거두거나 끌 때 영향: 꺼질 팀 수, 함께 꺼질 모듈 | 조직 관리자 | TEN-MOD-04 확인 화면 |
-| `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/allowed` | `TEAM` 모듈 허용·거두기. 본문 `allowed` | 조직 관리자 🔒 | TEN-MOD-03 |
-| `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/enabled` | `ORG` 모듈 켜기·끄기. 본문 `enabled` | 조직 관리자 🔒 | TEN-MOD-04 |
+| `GET` | `/api/orgs/{orgId}/modules` | 설치된 모듈 배열(key 순): `key`, `name`, `description`, `scope`, `source`, `allowed`(`TEAM`만), `enabled`(`ORG`만), `enabledTeamCount`(`TEAM`만, 켠 팀 수), `requires` | 조직 관리자 | F4 |
+| `GET` | `/api/orgs/{orgId}/modules/{moduleKey}/impact` | 허용을 거두거나 끌 때 영향: `affectedTeamCount`(`TEAM`만, 꺼질 팀 수), `cascade`(함께 꺼질 모듈) | 조직 관리자 | TEN-MOD-04 확인 화면, 설치되지 않은 key `404` |
+| `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/allowed` | `TEAM` 모듈 허용·거두기. 본문 `allowed`(필수) | 조직 관리자 🔒 | `204`, 같은 상태 `409 ALREADY_PROCESSED`, 설치되지 않았거나 `ORG` 모듈 `404`, TEN-MOD-03·09 |
+| `PUT` | `/api/orgs/{orgId}/modules/{moduleKey}/enabled` | `ORG` 모듈 켜기·끄기. 본문 `enabled`(필수) | 조직 관리자 🔒 | `204`, 같은 상태 `409 ALREADY_PROCESSED`, 필요한 모듈이 꺼져 있으면 `400`(`enabled`), 설치되지 않았거나 `TEAM` 모듈 `404`, TEN-MOD-04·10 |
 | `GET` | `/api/orgs/{orgId}/activity` | 조직 활동 기록(조직과 모든 팀, TEN-LOG-06). 쿼리 `from`, `to`(ISO 시각), `actorId`, `action`, `teamId`. 항목마다 `id`, `occurredAt`, `teamId`, `teamName`, `actorId`, `actorName`, `action`, `targetType`, `targetId`, `targetName`, `beforeValue`, `afterValue`. 최신부터, 커서 페이지(§3.3) | 조직 관리자 | F6 |
 
 | ID | 요구사항 | 수준 |
@@ -244,7 +244,7 @@
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 모듈 key 목록 `modules`와 메뉴(#22 전까지 빈 목록) | 팀 멤버, 조직 관리자 | 화면 공통 |
+| `GET` | `/api/teams/{teamId}` | `id`, `name`, `state`, `visibility`, `myRole`(조직 관리자 열람이면 `null`, TEN-PERM-05로 기록), 켜진 `TEAM` 모듈 key 목록 `modules`(TEN-MOD-08, key 순. 메뉴는 메뉴 계약을 더하는 단계에서) | 팀 멤버, 조직 관리자 | 화면 공통 |
 | `GET` | `/api/teams/{teamId}/overview` | 팀 가입 요청 대기 수 `pendingJoinRequests`, 손님 만료 임박 수 `expiringGuests`(TEN-TSET-07), 최근 팀 활동 5개(최신부터, 바뀌기 전·후 값 제외) | 팀 관리자 | E1. 출석 수는 v0.2 |
 | `GET` | `/api/teams/{teamId}/settings` | `name`, `jobTypeName`, `visibility`, `joinMode`, `reportWeekStart`, `noticeTitles`, `state`, `version` | 팀 관리자 | E4 |
 | `PATCH` | `/api/teams/{teamId}/settings` | 이름(조직 안 유일), 공개 범위, 공개 팀 가입 방식, 리포트 주 시작 요일, 공지 칸 제목. 보낸 필드만 바꾸고 새 설정을 돌려준다(TEN-TSET-01~03) | 팀 관리자 | `version` 필수, 어긋나면 `409 VERSION_CONFLICT` |
@@ -267,9 +267,9 @@
 | `GET` | `/api/teams/{teamId}/invite-links` | 링크 목록: `linkId`, `approvalRequired`, `role`, `expiresAt`, `useCount`, `maxUses`, `enabled`, `createdBy`, `createdByName`, `createdAt`. 토큰·해시 없음. 최신부터, 커서 페이지(§3.3) | 팀 관리자 | E2. 조직이 링크를 껐으면 `404` |
 | `POST` | `/api/teams/{teamId}/invite-links` | 링크 만들기. 본문 `approvalRequired`(필수), `role`(`TEAM_MEMBER`·`VIEWER`), `expiresInDays`(기본 7, 1~30), `maxUses`(필수, 1~1000, TEN-LINK-07). 응답 `{ linkId, url, expiresAt }`, `url`은 `APP_BASE_URL/join#<토큰>`이고 이 응답에만 한 번 들어 있다(TEN-LINK-04) | 팀 관리자 | `201`, 조직이 링크를 껐으면 `404`, `Idempotency-Key`(같은 키 두 번째는 `409`, API-CON-05) |
 | `POST` | `/api/teams/{teamId}/invite-links/{linkId}/disable` | 링크 끄기. 다시 켜는 API는 없다. 새로 만든다 | 팀 관리자 | `204`, 이미 꺼졌으면 `409 ALREADY_PROCESSED`, 조직이 링크를 껐으면 `404` |
-| `GET` | `/api/teams/{teamId}/modules` | 조직이 허용한 `TEAM` 모듈과 켜짐 | 팀 관리자 | E6 |
-| `GET` | `/api/teams/{teamId}/modules/{moduleKey}/impact` | 끌 때 함께 꺼질 모듈, 켤 때 먼저 켜야 할 모듈 | 팀 관리자 | |
-| `PUT` | `/api/teams/{teamId}/modules/{moduleKey}/enabled` | 켜기·끄기. 본문 `enabled`, `confirmCascade`(함께 꺼지는 모듈이 있으면 참이어야 함) | 팀 관리자 | TEN-MOD-04·05 |
+| `GET` | `/api/teams/{teamId}/modules` | 조직이 허용한 `TEAM` 모듈 배열(key 순): `key`, `name`, `description`, `source`, `enabled`, `requires` | 팀 관리자 | E6 |
+| `GET` | `/api/teams/{teamId}/modules/{moduleKey}/impact` | `cascade`(끌 때 함께 꺼질 모듈), `requiredFirst`(켤 때 먼저 켜야 할 모듈) | 팀 관리자 | 설치되지 않았거나 허용되지 않은 key `404` |
+| `PUT` | `/api/teams/{teamId}/modules/{moduleKey}/enabled` | 켜기·끄기. 본문 `enabled`(필수), `confirmCascade`(함께 꺼지는 모듈이 있으면 참이어야 함) | 팀 관리자 | `204`, 같은 상태 `409 ALREADY_PROCESSED`, 필요한 모듈이 꺼져 있으면 `400`(`enabled`), 함께 꺼질 모듈이 있는데 확인이 없으면 `400`(`confirmCascade`), 설치되지 않았거나 허용되지 않은 key `404`, TEN-MOD-04·05·10 |
 | `GET` | `/api/teams/{teamId}/activity` | 팀 활동 기록(TEN-TMEM-07). 쿼리 `from`, `to`, `actorId`, `action`. 항목마다 `id`, `occurredAt`, `actorId`, `actorName`, `action`, `targetType`, `targetId`, `targetName`, `beforeValue`, `afterValue`. 최신부터, 커서 페이지 | 팀 관리자 | E5 |
 
 | ID | 요구사항 | 수준 |

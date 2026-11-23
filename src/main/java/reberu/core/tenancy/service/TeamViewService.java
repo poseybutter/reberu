@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import reberu.core.access.TeamContext;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
+import reberu.core.module.ModuleStates;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ReberuException;
 import reberu.core.tenancy.entity.Team;
@@ -21,11 +22,13 @@ public class TeamViewService {
 
     private final TeamRepository teams;
     private final ActivityLogs activityLogs;
+    private final ModuleStates moduleStates;
     private final Clock clock;
 
-    TeamViewService(TeamRepository teams, ActivityLogs activityLogs, Clock clock) {
+    TeamViewService(TeamRepository teams, ActivityLogs activityLogs, ModuleStates moduleStates, Clock clock) {
         this.teams = teams;
         this.activityLogs = activityLogs;
+        this.moduleStates = moduleStates;
         this.clock = clock;
     }
 
@@ -42,7 +45,8 @@ public class TeamViewService {
             }
         }
         return new TeamView(team.id(), team.name(), team.state().name(), team.visibility().name(),
-                context.role() == null ? null : context.role().name(), List.of());
+                context.role() == null ? null : context.role().name(),
+                moduleStates.enabledTeamModules(team.id()));
     }
 
     public record TeamView(UUID id, String name, String state, String visibility, String myRole,

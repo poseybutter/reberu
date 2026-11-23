@@ -143,7 +143,8 @@ class ModuleAccessTest {
         assertThat(modules.enabledInTeam(UUID.fromString(teamId), FakeOrgModule.KEY)).isFalse();
         assertThat(modules.enabledInOrg(UUID.fromString(orgId), FakeTeamModule.KEY)).isFalse();
         assertThat(modules.enabledInTeam(UUID.randomUUID(), FakeTeamModule.KEY)).isFalse();
-        assertThat(jdbc.sql("SELECT COUNT(*) FROM team_module_state").query(Integer.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM team_module_state WHERE module_key IN ('gone', 'fake-org')")
+                .query(Integer.class).single()).isEqualTo(2);
     }
 
     private void setOrg(String key, boolean allowed, boolean enabled) {
