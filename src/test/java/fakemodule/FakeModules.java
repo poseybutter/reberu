@@ -23,6 +23,21 @@ public class FakeModules {
     }
 
     @Bean
+    FakeTeamModule.Listener fakeTeamModuleListener() {
+        return new FakeTeamModule.Listener();
+    }
+
+    @Bean
+    FakeOrgModule.Listener fakeOrgModuleListener() {
+        return new FakeOrgModule.Listener();
+    }
+
+    @Bean
+    FakeEvents.UnownedListener unownedListener() {
+        return new FakeEvents.UnownedListener();
+    }
+
+    @Bean
     FakeOrgModule fakeOrgModule() {
         return new FakeOrgModule();
     }

@@ -53,6 +53,18 @@ class ArchitectureTest {
 
         UnitDirectionRules.coreDependsOnlyOnCore(ROOT).check(classes);
         UnitDirectionRules.fixedFeaturesDoNotDependOnModules(ROOT).check(classes);
+        UnitDirectionRules.onlyCoreEventUsesEventInfrastructure(ROOT).check(classes);
+    }
+
+    @Test
+    @DisplayName("실패 사례: core.event 밖에서 이벤트 구독 기반을 직접 사용")
+    void directEventInfrastructureUseFails() {
+        String root = FIXTURE + ".listener";
+
+        assertThatThrownBy(() -> UnitDirectionRules.onlyCoreEventUsesEventInfrastructure(root)
+                .check(fixtureClasses(root)))
+                .isInstanceOf(AssertionError.class)
+                .hasMessageContaining("DirectListener");
     }
 
     @Test

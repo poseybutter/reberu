@@ -19,6 +19,19 @@ final class UnitDirectionRules {
                 .allowEmptyShould(true);
     }
 
+    static ArchRule onlyCoreEventUsesEventInfrastructure(String root) {
+        return noClasses()
+                .that().resideInAPackage(root + "..")
+                .and().resideOutsideOfPackage(root + ".core.event..")
+                .should().dependOnClassesThat().resideInAPackage("org.springframework.modulith.events..")
+                .orShould().dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.transaction.event.TransactionalEventListener")
+                .orShould().dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.context.event.EventListener")
+                .as("구독은 core 구독 표시만 쓰고 이벤트 저장소를 직접 부르지 않음(ARCH-EVT-10)")
+                .allowEmptyShould(true);
+    }
+
     static ArchRule fixedFeaturesDoNotDependOnModules(String root) {
         return noClasses()
                 .that().resideInAPackage(root + "..")

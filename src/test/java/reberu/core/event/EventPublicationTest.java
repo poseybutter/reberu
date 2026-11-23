@@ -20,7 +20,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
-import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.CompletedEventPublications;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.IncompleteEventPublications;
@@ -143,7 +142,7 @@ class EventPublicationTest {
             return count == null ? 0 : count.get();
         }
 
-        @ApplicationModuleListener
+        @DomainEventListener
         void on(SampleEvent event) {
             ATTEMPTS.computeIfAbsent(event.id(), key -> new AtomicInteger()).incrementAndGet();
             if (FAILING.contains(event.id())) {
