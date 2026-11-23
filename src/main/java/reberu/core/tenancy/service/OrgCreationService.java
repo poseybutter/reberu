@@ -12,6 +12,7 @@ import reberu.core.account.AccountState;
 import reberu.core.account.Accounts;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
+import reberu.core.module.ModuleStates;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.FieldReason;
 import reberu.core.support.FieldViolation;
@@ -44,12 +45,13 @@ public class OrgCreationService {
     private final TeamFieldService teamFields;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
+    private final ModuleStates moduleStates;
     private final Clock clock;
 
     OrgCreationService(Accounts accounts, OrganizationRepository organizations,
             OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
             DefaultJobTypes defaultJobTypes, TeamFieldService teamFields, NameRules nameRules,
-            ActivityLogs activityLogs, Clock clock) {
+            ActivityLogs activityLogs, ModuleStates moduleStates, Clock clock) {
         this.accounts = accounts;
         this.organizations = organizations;
         this.orgMemberships = orgMemberships;
@@ -59,6 +61,7 @@ public class OrgCreationService {
         this.teamFields = teamFields;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
+        this.moduleStates = moduleStates;
         this.clock = clock;
     }
 
@@ -97,6 +100,7 @@ public class OrgCreationService {
                 new ActivityEntry(accountId, "TEAM_CREATED", "TEAM", team.id(), null, null));
         activityLogs.recordTeam(team.id(),
                 new ActivityEntry(accountId, "TEAM_MEMBER_JOINED", "ACCOUNT", accountId, null, "TEAM_ADMIN"));
+        moduleStates.enableForNewTeam(organization.id(), team.id(), selected.defaults().modules(), accountId, now);
         return new CreatedOrg(organization.id(), team.id());
     }
 

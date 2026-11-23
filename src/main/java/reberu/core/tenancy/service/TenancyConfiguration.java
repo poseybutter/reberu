@@ -12,6 +12,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import reberu.core.access.MembershipDirectory;
 import reberu.core.account.Accounts;
 import reberu.core.audit.ActivityLogs;
+import reberu.core.module.ModuleStates;
 import reberu.core.support.CursorCodec;
 import reberu.core.support.RateLimits;
 import reberu.core.tenancy.Deployment;
@@ -57,9 +58,9 @@ class TenancyConfiguration {
     OrgCreationService orgCreationService(Accounts accounts, OrganizationRepository organizations,
             OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
             DefaultJobTypes defaultJobTypes, TeamFieldService teamFields, NameRules nameRules,
-            ActivityLogs activityLogs) {
+            ActivityLogs activityLogs, ModuleStates moduleStates) {
         return new OrgCreationService(accounts, organizations, orgMemberships, teams, teamMemberships,
-                defaultJobTypes, teamFields, nameRules, activityLogs, Clock.systemUTC());
+                defaultJobTypes, teamFields, nameRules, activityLogs, moduleStates, Clock.systemUTC());
     }
 
     @Bean
@@ -83,9 +84,10 @@ class TenancyConfiguration {
     TeamService teamService(StateLocks locks, TeamRepository teams,
             TeamMembershipRepository teamMemberships, TeamFieldService teamFields, InviteLinkService inviteLinks,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
-            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper) {
+            ActivityLogs activityLogs, ModuleStates moduleStates, CursorCodec cursors, JdbcClient jdbc,
+            JsonMapper jsonMapper) {
         return new TeamService(locks, teams, teamMemberships, teamFields, inviteLinks, orgMemberships, jobTypes,
-                nameRules, activityLogs, cursors, jdbc, jsonMapper, Clock.systemUTC());
+                nameRules, activityLogs, moduleStates, cursors, jdbc, jsonMapper, Clock.systemUTC());
     }
 
     @Bean
@@ -175,8 +177,8 @@ class TenancyConfiguration {
     }
 
     @Bean
-    TeamViewService teamViewService(TeamRepository teams, ActivityLogs activityLogs) {
-        return new TeamViewService(teams, activityLogs, Clock.systemUTC());
+    TeamViewService teamViewService(TeamRepository teams, ActivityLogs activityLogs, ModuleStates moduleStates) {
+        return new TeamViewService(teams, activityLogs, moduleStates, Clock.systemUTC());
     }
 
     @Bean

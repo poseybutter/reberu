@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
+import reberu.core.module.ModuleStates;
 import reberu.core.support.CursorCodec;
 import reberu.core.support.CursorPage;
 import reberu.core.support.ErrorCode;
@@ -55,6 +56,7 @@ public class TeamService {
     private final JobTypeRepository jobTypes;
     private final NameRules nameRules;
     private final ActivityLogs activityLogs;
+    private final ModuleStates moduleStates;
     private final CursorCodec cursors;
     private final JdbcClient jdbc;
     private final JsonMapper jsonMapper;
@@ -63,7 +65,8 @@ public class TeamService {
     TeamService(StateLocks locks, TeamRepository teams,
             TeamMembershipRepository teamMemberships, TeamFieldService teamFields, InviteLinkService inviteLinks,
             OrgMembershipRepository orgMemberships, JobTypeRepository jobTypes, NameRules nameRules,
-            ActivityLogs activityLogs, CursorCodec cursors, JdbcClient jdbc, JsonMapper jsonMapper, Clock clock) {
+            ActivityLogs activityLogs, ModuleStates moduleStates, CursorCodec cursors, JdbcClient jdbc,
+            JsonMapper jsonMapper, Clock clock) {
         this.locks = locks;
         this.teams = teams;
         this.teamMemberships = teamMemberships;
@@ -73,6 +76,7 @@ public class TeamService {
         this.jobTypes = jobTypes;
         this.nameRules = nameRules;
         this.activityLogs = activityLogs;
+        this.moduleStates = moduleStates;
         this.cursors = cursors;
         this.jdbc = jdbc;
         this.jsonMapper = jsonMapper;
@@ -167,6 +171,7 @@ public class TeamService {
         activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "TEAM_CREATED", "TEAM", team.id(), null, null));
         activityLogs.recordTeam(team.id(), new ActivityEntry(accountId, "TEAM_MEMBER_JOINED", "ACCOUNT",
                 input.firstAdminAccountId(), null, "TEAM_ADMIN"));
+        moduleStates.enableForNewTeam(orgId, team.id(), defaults.modules(), accountId, now);
         return team.id();
     }
 
