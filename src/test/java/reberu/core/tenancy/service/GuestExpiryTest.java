@@ -99,7 +99,7 @@ class GuestExpiryTest {
     }
 
     @Test
-    @DisplayName("TEN-GUEST-11: 지난 팀만 EXPIRED, 끝나지 않은 팀이 없거나 조직 만료 시각이 지나면 조직과 정지된 팀도 EXPIRED, 기록은 행동한 사람 없이")
+    @DisplayName("TEN-GUEST-11: 지난 팀만 EXPIRED, 끝나지 않은 팀이 없거나 조직 만료 시각이 지나면 조직과 정지된 팀도 EXPIRED, 정지된 손님 조직은 그대로, 기록은 행동한 사람 없이")
     void expiresDueGuests(CapturedOutput output) throws Exception {
         Instant now = Instant.now();
         Instant past = now.minusSeconds(60);
@@ -124,6 +124,10 @@ class GuestExpiryTest {
         insertOrgMembership(otherOrg, removed, "GUEST", "ACTIVE", later);
         insertTeamMembership(otherTeam, removed, "TEAM_MEMBER", "LEFT", later);
 
+        UUID suspended = newAccount("suspended@example.com");
+        insertOrgMembership(orgId, suspended, "GUEST", "SUSPENDED", past);
+        insertTeamMembership(sea, suspended, "VIEWER", "SUSPENDED", later);
+
         UUID member = newAccount("member@example.com");
         insertOrgMembership(orgId, member, "MEMBER", "ACTIVE", null);
         insertTeamMembership(forest, member, "TEAM_MEMBER", "ACTIVE", null);
@@ -143,6 +147,8 @@ class GuestExpiryTest {
         assertThat(teamState(sea, overdue)).isEqualTo("EXPIRED");
         assertThat(orgState(removed, otherOrg)).isEqualTo("EXPIRED");
         assertThat(teamState(otherTeam, removed)).isEqualTo("LEFT");
+        assertThat(orgState(suspended)).isEqualTo("SUSPENDED");
+        assertThat(teamState(sea, suspended)).isEqualTo("SUSPENDED");
         assertThat(orgState(member)).isEqualTo("ACTIVE");
         assertThat(teamState(forest, member)).isEqualTo("ACTIVE");
         assertThat(orgState(fresh)).isEqualTo("ACTIVE");

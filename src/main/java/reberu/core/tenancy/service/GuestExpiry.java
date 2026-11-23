@@ -102,8 +102,7 @@ class GuestExpiry {
             touched.add(membership.accountId());
             expired++;
         }
-        orgMemberships.findByOrgIdAndStateAndKindOrderByAccountId(orgId, MembershipState.ACTIVE, MembershipKind.GUEST)
-                .forEach(membership -> touched.add(membership.accountId()));
+        orgMemberships.findDueGuestsByOrgId(orgId, now).forEach(membership -> touched.add(membership.accountId()));
         for (UUID accountId : touched) {
             OrgMembership membership = orgMemberships.findByOrgIdAndAccountId(orgId, accountId).orElse(null);
             if (membership == null || membership.state() != MembershipState.ACTIVE

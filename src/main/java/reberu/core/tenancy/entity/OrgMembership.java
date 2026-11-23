@@ -203,7 +203,7 @@ public class OrgMembership {
     }
 
     public boolean renewableGuest() {
-        return kind == MembershipKind.GUEST && (current() || state == MembershipState.EXPIRED);
+        return kind == MembershipKind.GUEST && (state == MembershipState.ACTIVE || state == MembershipState.EXPIRED);
     }
 
     public void renewGuest(Instant expiresAt, Instant at) {

@@ -139,7 +139,7 @@ class GuestTest {
     }
 
     @Test
-    @DisplayName("TEN-GUEST-09: 연장은 지금 + days, 조직 만료 시각은 끝나지 않은 팀에서 다시 계산, 줄어드는 연장 409, 범위 밖 days 400, 팀 기록")
+    @DisplayName("TEN-GUEST-09: 연장은 지금 + days, 조직 만료 시각은 끝나지 않은 팀에서 다시 계산, 줄어드는 연장 409, 범위 밖 days·정지된 손님 400, 팀 기록")
     void extendsGuest() throws Exception {
         Instant start = Instant.now();
         JsonNode extended = json(extend(guest, forest, 60, orgAdmin), 200);
@@ -166,6 +166,13 @@ class GuestTest {
                 .content("{\"teamId\":\"" + forest + "\"}"), orgAdmin).getStatus()).isEqualTo(400);
 
         assertThat(extend(member, forest, 30, orgAdmin).getStatus()).isEqualTo(400);
+        UUID suspended = newAccount("suspended@example.com");
+        Instant suspendedUntil = Instant.now().plus(Duration.ofDays(5));
+        insertOrgMembership(suspended, "GUEST", "SUSPENDED", suspendedUntil);
+        insertTeamMembership(forest, suspended, "TEAM_MEMBER", "EXPIRED", Instant.now().minus(Duration.ofDays(1)));
+        assertThat(extend(suspended, forest, 30, orgAdmin).getStatus()).isEqualTo(400);
+        assertThat(teamMembership(forest, suspended)).isEqualTo("EXPIRED TEAM_MEMBER");
+        assertThat(orgMembership(suspended)).isEqualTo("GUEST SUSPENDED false");
         assertThat(extend(guest, sea, 30, orgAdmin).getStatus()).isEqualTo(404);
         assertThat(extend(guest, UUID.randomUUID().toString(), 30, orgAdmin).getStatus()).isEqualTo(404);
         assertThat(teamExpiry(forest, guest)).isEqualTo(current);
