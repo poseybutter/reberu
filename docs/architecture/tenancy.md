@@ -83,7 +83,7 @@ erDiagram
 | TEN-INV-01 | 계정은 Google `sub`로 유일하다. 같은 `sub`로 계정이 둘 생기지 않는다 | 필수 |
 | TEN-INV-02 | 팀은 정확히 한 조직에 속하고, 소속 조직은 바뀌지 않는다 | 필수 |
 | TEN-INV-03 | 계정 × 조직의 조직 멤버십은 최대 하나다. 계정 × 팀의 팀 멤버십은 최대 하나다 | 필수 |
-| TEN-INV-04 | 팀 멤버십이 `ACTIVE`·`SUSPENDED`이려면 같은 계정이 그 팀의 조직에 `ACTIVE`·`SUSPENDED` 조직 멤버십을 가진다. 조직 멤버십이 끝나면(`LEFT`·`EXPIRED`) 팀 멤버십도 함께 끝난다(TEN-MEM-03, TEN-GUEST-11). 조직 단위 정지는 팀 멤버십 상태를 바꾸지 않으므로(TEN-MEM-02) 조직 멤버십 `SUSPENDED`와 팀 멤버십 `ACTIVE`가 함께 있을 수 있다. 팀 범위 접근은 활동 중인 팀 멤버십일 때만 된다(§10 판정 4·5단계) | 필수 |
+| TEN-INV-04 | 팀 멤버십이 `ACTIVE`·`SUSPENDED`이려면 같은 계정이 그 팀의 조직에 `ACTIVE`·`SUSPENDED` 조직 멤버십을 가진다. 조직 멤버십이 끝나면(`LEFT`·`EXPIRED`) 팀 멤버십도 함께 끝난다(TEN-MEM-03, TEN-GUEST-11). 조직 단위 정지는 팀 멤버십 상태를 바꾸지 않으므로(TEN-MEM-02) 조직 멤버십 `SUSPENDED`와 팀 멤버십 `ACTIVE`가 함께 있을 수 있다. 팀 범위 접근은 활동 중인 팀 멤버십이 있을 때만 된다. 예외로 `ACTIVE` 조직 관리자는 팀 멤버십이 없어도 된다(§10 판정 4·5단계, TEN-PERM-04·05) | 필수 |
 | TEN-INV-05 | `ACTIVE`·`ARCHIVED`·`DELETION_SCHEDULED` 조직에는 `ACTIVE` 조직 관리자가 한 명 이상 있다. 예외는 혼자뿐인 조직 관리자가 탈퇴해 보관된 "관리자 없는 보관 조직"(§5.1)뿐이다 | 필수 |
 | TEN-INV-06 | `ACTIVE` 팀에는 팀 멤버십이 `ACTIVE`인 팀 관리자(`TEAM_ADMIN`)가 한 명 이상 있다. 조직 단위 정지로 활동 중인 팀 관리자가 0명이 될 수는 있고, 그동안 그 팀은 조직 관리자가 관리한다(TEN-MEM-02). 팀 관리자를 줄이는 내보내기·강등·팀 단위 정지는 활동 중인 팀 관리자 수로 판단한다(TEN-MEM-03, TEN-TMEM-04) | 필수 |
 | TEN-INV-07 | 손님(`GUEST`)은 조직 관리자가 될 수 없고, 팀 역할은 `TEAM_MEMBER` 또는 `VIEWER`만 가진다 | 필수 |
