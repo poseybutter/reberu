@@ -322,7 +322,10 @@ class TeamTest {
         assertThat(seen).hasSize(4).doesNotHaveDuplicates();
 
         String firstCursor = json(list(admin, "?limit=1")).get("nextCursor").asString();
-        String tampered = firstCursor.substring(0, firstCursor.length() - 2) + "AA";
+        int signature = firstCursor.indexOf('.') + 1;
+        char replaced = firstCursor.charAt(signature) == 'A' ? 'B' : 'A';
+        String tampered = firstCursor.substring(0, signature) + replaced + firstCursor.substring(signature + 1);
+        assertThat(tampered).isNotEqualTo(firstCursor);
         assertThat(list(admin, "?limit=1&cursor=" + tampered).getStatus()).isEqualTo(400);
         String otherOrg = json(createOrg(outsider, "다른 조직")).get("orgId").asString();
         MockHttpServletResponse foreign = perform(get("/api/orgs/" + otherOrg + "/teams?cursor=" + firstCursor),
