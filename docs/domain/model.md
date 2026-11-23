@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.17.0\
-> 수정일: 2026-11-20
+> 버전: v0.18.0\
+> 수정일: 2026-11-23
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -423,9 +423,9 @@ erDiagram
 
 | 엔티티 | 필드 | 제약 |
 | --- | --- | --- |
-| `org_module_state` | `org_id`, `module_key` `TEXT(40)`, `allowed` `BOOL`(`TEAM` 범위), `enabled` `BOOL`(`ORG` 범위), `changed_by`, `changed_at` | 유일 (`org_id`, `module_key`) |
-| `team_module_state` | `team_id`, `module_key`, `enabled` `BOOL`, `changed_by`, `changed_at` | 유일 (`team_id`, `module_key`) |
-| `org_module_setting`, `team_module_setting` | 소속 id, `module_key`, `setting_key` `TEXT(60)`, `setting_value` `TEXT(2000)`, `version` | 유일 (소속 id, `module_key`, `setting_key`). 값의 형식과 기본값은 ModuleDefinition의 설정 스키마([architecture/modules.md](../architecture/modules.md) §5.1)가 검사한다 |
+| `org_module_state` | `id`, `org_id`, `module_key` `TEXT(40)`, `allowed` `BOOL`(`TEAM` 범위), `enabled` `BOOL`(`ORG` 범위), `changed_by`(비울 수 있음), `changed_at` | 유일 (`org_id`, `module_key`). `version` 없이 조직 행 잠금으로 동시 변경을 막는다. 행이 없을 때의 뜻은 TEN-MOD-07 |
+| `team_module_state` | `id`, `team_id`, `module_key` `TEXT(40)`, `enabled` `BOOL`, `changed_by`(비울 수 있음), `changed_at` | 유일 (`team_id`, `module_key`). `version` 없이 조직 행 → 팀 행 잠금으로 동시 변경을 막는다 |
+| `org_module_setting`, `team_module_setting` | 소속 id, `module_key`, `setting_key` `TEXT(60)`, `setting_value` `TEXT(2000)`, `version` | 유일 (소속 id, `module_key`, `setting_key`). 값의 형식과 기본값은 ModuleDefinition의 설정 스키마([architecture/modules.md](../architecture/modules.md) §5.1)가 검사한다. 설정을 처음 쓰는 모듈의 단계에서 만든다 |
 | `org_holiday` | `org_id`, `day` `LOCAL_DATE`, `name` `TEXT(40)`, `created_by` | 유일 (`org_id`, `day`) |
 | `org_activity_log`, `team_activity_log` | 소속 id, `actor_id`(계정 또는 시스템이면 비움), `action` `CODE`, `target_type` `CODE`, `target_id` `UUID`, `before_value`·`after_value` `TEXT(2000)`, `occurred_at` | 추가만(SEC-LOG-03). DB 트리거가 `UPDATE`(PostgreSQL은 `TRUNCATE`도)를 막는다. 인덱스 (소속 id, `occurred_at`), (소속 id, `actor_id`), 보관 기간 정리용 (`occurred_at`) |
 | `member_presence_status` | `team_id`, `account_id`, `status` `CODE`(`AVAILABLE`·`FOCUS`·`MEETING`·`AWAY`), `away_by_idle` `BOOL`(무활동으로 생긴 `AWAY`. 입력이 생기면 `AVAILABLE`로, UX-FLOW-12), `changed_at` | 유일 (`team_id`, `account_id`). 마지막 상태만 저장한다([architecture/realtime.md](../architecture/realtime.md) `status.changed`) |

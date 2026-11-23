@@ -17,4 +17,6 @@ public @interface Access {
 
     boolean guestAllowed() default false;
 
+    String module() default "";
+
 }

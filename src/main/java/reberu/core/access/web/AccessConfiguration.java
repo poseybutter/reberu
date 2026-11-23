@@ -14,19 +14,22 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import reberu.core.access.MembershipDirectory;
+import reberu.core.access.ModuleSwitch;
 
 @Configuration(proxyBeanMethods = false)
 class AccessConfiguration implements WebMvcConfigurer {
 
     private final MembershipDirectory directory;
+    private final ModuleSwitch modules;
 
-    AccessConfiguration(MembershipDirectory directory) {
+    AccessConfiguration(MembershipDirectory directory, ModuleSwitch modules) {
         this.directory = directory;
+        this.modules = modules;
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AccessInterceptor(new AccessDecider(directory, Clock.systemUTC())))
+        registry.addInterceptor(new AccessInterceptor(new AccessDecider(directory, modules, Clock.systemUTC())))
                 .order(Ordered.HIGHEST_PRECEDENCE + 10);
     }
 
@@ -37,9 +40,11 @@ class AccessConfiguration implements WebMvcConfigurer {
 
     @Bean
     static ApplicationListener<ContextRefreshedEvent> accessDeclarationCheck(
-            @Qualifier("requestMappingHandlerMapping") ObjectProvider<RequestMappingHandlerMapping> handlerMapping) {
+            @Qualifier("requestMappingHandlerMapping") ObjectProvider<RequestMappingHandlerMapping> handlerMapping,
+            ObjectProvider<ModuleSwitch> modules) {
         return event -> {
-            List<String> violations = AccessDeclarations.violations(handlerMapping.getObject().getHandlerMethods());
+            List<String> violations = AccessDeclarations.violations(handlerMapping.getObject().getHandlerMethods(),
+                    modules.getObject());
             if (!violations.isEmpty()) {
                 throw new IllegalStateException("엔드포인트 권한 선언 오류(SEC-AUTHZ-02):\n" + String.join("\n", violations));
             }

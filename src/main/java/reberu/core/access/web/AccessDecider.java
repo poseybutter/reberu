@@ -12,6 +12,7 @@ import reberu.core.access.MembershipDirectory.Role;
 import reberu.core.access.MembershipDirectory.Status;
 import reberu.core.access.MembershipDirectory.TeamMember;
 import reberu.core.access.MembershipDirectory.TeamView;
+import reberu.core.access.ModuleSwitch;
 import reberu.core.access.OrgContext;
 import reberu.core.access.TeamContext;
 import reberu.core.support.ErrorCode;
@@ -20,10 +21,12 @@ import reberu.core.support.ReberuException;
 class AccessDecider {
 
     private final MembershipDirectory directory;
+    private final ModuleSwitch modules;
     private final Clock clock;
 
-    AccessDecider(MembershipDirectory directory, Clock clock) {
+    AccessDecider(MembershipDirectory directory, ModuleSwitch modules, Clock clock) {
         this.directory = directory;
+        this.modules = modules;
         this.clock = clock;
     }
 
@@ -33,6 +36,9 @@ class AccessDecider {
         OrgView org = directory.org(orgId, accountId).orElseThrow(AccessDecider::notFound);
         OrgMember member = visibleMember(org, now);
         if (member.guest() && !access.guestAllowed()) {
+            throw notFound();
+        }
+        if (!access.module().isEmpty() && !modules.enabledInOrg(orgId, access.module())) {
             throw notFound();
         }
         if (access.write() && org.status() != Status.ACTIVE) {
@@ -53,6 +59,9 @@ class AccessDecider {
         boolean member = teamMember != null && teamMember.active() && notExpired(teamMember.expiresAt(), now);
         boolean orgAdmin = orgMember.orgAdmin() && !orgMember.guest();
         if (!member && !orgAdmin) {
+            throw notFound();
+        }
+        if (!access.module().isEmpty() && !modules.enabledInTeam(teamId, access.module())) {
             throw notFound();
         }
         Role role = member ? teamMember.role() : null;
