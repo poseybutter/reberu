@@ -168,6 +168,40 @@ class GuestExpiryTest {
     }
 
     @Test
+    @DisplayName("TEN-GUEST-11: 팀 단위로 정지된 손님 팀은 만료 시각이 지나도 SUSPENDED 유지, 정지를 풀면 다음 작업에서 EXPIRED")
+    void keepsTeamSuspendedGuestUntilUnsuspended() throws Exception {
+        Instant now = Instant.now();
+        UUID guest = newAccount("paused@example.com");
+        insertOrgMembership(orgId, guest, "GUEST", "ACTIVE", now.plus(Duration.ofDays(10)));
+        insertTeamMembership(forest, guest, "TEAM_MEMBER", "SUSPENDED", now.minusSeconds(60));
+        insertTeamMembership(sea, guest, "VIEWER", "ACTIVE", now.plus(Duration.ofDays(10)));
+        UUID due = newAccount("due@example.com");
+        insertOrgMembership(orgId, due, "GUEST", "ACTIVE", now.plus(Duration.ofDays(10)));
+        insertTeamMembership(forest, due, "TEAM_MEMBER", "ACTIVE", now.minusSeconds(60));
+        insertTeamMembership(sea, due, "VIEWER", "ACTIVE", now.plus(Duration.ofDays(10)));
+
+        assertThat(expiry.expireDue()).isEqualTo(1);
+
+        assertThat(teamState(forest, due)).isEqualTo("EXPIRED");
+        assertThat(orgState(guest)).isEqualTo("ACTIVE");
+        assertThat(teamState(forest, guest)).isEqualTo("SUSPENDED");
+        assertThat(teamState(sea, guest)).isEqualTo("ACTIVE");
+        assertThat(logs("team_activity_log")).containsExactly("null " + due + " ACTIVE EXPIRED");
+
+        MockHttpServletResponse unsuspended = perform(
+                post("/api/teams/" + forest + "/members/" + guest + "/unsuspend"), orgAdmin, Map.of());
+        assertThat(unsuspended.getStatus()).as(unsuspended.getContentAsString()).isEqualTo(204);
+
+        assertThat(expiry.expireDue()).isEqualTo(1);
+
+        assertThat(orgState(guest)).isEqualTo("ACTIVE");
+        assertThat(teamState(forest, guest)).isEqualTo("EXPIRED");
+        assertThat(teamState(sea, guest)).isEqualTo("ACTIVE");
+        assertThat(logs("team_activity_log")).containsExactlyInAnyOrder("null " + due + " ACTIVE EXPIRED",
+                "null " + guest + " ACTIVE EXPIRED");
+    }
+
+    @Test
     @DisplayName("TEN-ISO-07: 한 조직의 만료 처리가 실패해도 다른 조직은 처리하고, 실패한 조직은 하나도 바뀌지 않음")
     void failureStaysInsideOneOrg(CapturedOutput output) throws Exception {
         Instant past = Instant.now().minusSeconds(60);
