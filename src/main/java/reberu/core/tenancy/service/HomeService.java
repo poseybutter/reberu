@@ -1,5 +1,6 @@
 package reberu.core.tenancy.service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -19,16 +20,19 @@ public class HomeService implements HomeScreens {
 
     private final JdbcClient jdbc;
     private final InvitationService invitations;
+    private final Clock clock;
 
-    HomeService(JdbcClient jdbc, InvitationService invitations) {
+    HomeService(JdbcClient jdbc, InvitationService invitations, Clock clock) {
         this.jdbc = jdbc;
         this.invitations = invitations;
+        this.clock = clock;
     }
 
     @Override
     @Transactional(readOnly = true)
     public HomeNext next(UUID accountId) {
         String account = accountId.toString();
+        LocalDateTime now = now();
         List<UUID> activeTeams = jdbc.sql("""
                         SELECT t.id
                         FROM team_membership tm
@@ -36,11 +40,14 @@ public class HomeService implements HomeScreens {
                         JOIN org_membership m ON m.org_id = t.org_id AND m.account_id = tm.account_id
                         JOIN organization o ON o.id = t.org_id
                         WHERE tm.account_id = :account AND tm.state = 'ACTIVE' AND t.state = 'ACTIVE'
-                          AND m.state = 'ACTIVE' AND o.state NOT IN ('SUSPENDED', 'DELETED')
+                          AND (tm.expires_at IS NULL OR tm.expires_at > :now)
+                          AND m.state = 'ACTIVE' AND (m.expires_at IS NULL OR m.expires_at > :now)
+                          AND o.state NOT IN ('SUSPENDED', 'DELETED')
                         ORDER BY tm.created_at, t.id
                         LIMIT 2
                         """)
                 .param("account", account)
+                .param("now", now)
                 .query((rs, rowNum) -> UUID.fromString(rs.getString("id")))
                 .list();
         if (activeTeams.size() == 1) {
@@ -52,9 +59,12 @@ public class HomeService implements HomeScreens {
         boolean inOrg = jdbc.sql("""
                         SELECT COUNT(*) FROM org_membership m
                         JOIN organization o ON o.id = m.org_id
-                        WHERE m.account_id = :account AND m.state = 'ACTIVE' AND o.state NOT IN ('SUSPENDED', 'DELETED')
+                        WHERE m.account_id = :account AND m.state = 'ACTIVE'
+                          AND (m.expires_at IS NULL OR m.expires_at > :now)
+                          AND o.state NOT IN ('SUSPENDED', 'DELETED')
                         """)
                 .param("account", account)
+                .param("now", now)
                 .query(Long.class)
                 .single() > 0;
         return decide(!inOrg, List.of(), pendingRequest(account));
@@ -63,16 +73,19 @@ public class HomeService implements HomeScreens {
     @Transactional(readOnly = true)
     public Home home(UUID accountId) {
         String account = accountId.toString();
+        LocalDateTime now = now();
         Map<UUID, OrgEntry> orgs = new LinkedHashMap<>();
         jdbc.sql("""
                         SELECT o.id, o.name, m.org_admin, m.kind, m.expires_at
                         FROM org_membership m
                         JOIN organization o ON o.id = m.org_id
                         WHERE m.account_id = :account AND m.state = 'ACTIVE'
+                          AND (m.expires_at IS NULL OR m.expires_at > :now)
                           AND o.state NOT IN ('SUSPENDED', 'DELETED')
                         ORDER BY m.created_at, o.id
                         """)
                 .param("account", account)
+                .param("now", now)
                 .query((rs, rowNum) -> new OrgEntry(UUID.fromString(rs.getString("id")), rs.getString("name"),
                         rs.getBoolean("org_admin"), "GUEST".equals(rs.getString("kind")),
                         instant(rs.getObject("expires_at", LocalDateTime.class)), new ArrayList<>()))
@@ -85,9 +98,11 @@ public class HomeService implements HomeScreens {
                         JOIN team t ON t.id = tm.team_id
                         LEFT JOIN job_type j ON j.id = t.job_type_id AND j.org_id = t.org_id
                         WHERE tm.account_id = :account AND tm.state = 'ACTIVE'
+                          AND (tm.expires_at IS NULL OR tm.expires_at > :now)
                         ORDER BY tm.created_at, t.id
                         """)
                 .param("account", account)
+                .param("now", now)
                 .query((rs, rowNum) -> new Object[] {
                         UUID.fromString(rs.getString("org_id")),
                         new TeamEntry(UUID.fromString(rs.getString("id")), rs.getString("name"),
@@ -134,6 +149,10 @@ public class HomeService implements HomeScreens {
             return new HomeNext(Screen.TEAM_PICKER, null);
         }
         return new HomeNext(requested ? Screen.JOIN_PENDING : Screen.START, null);
+    }
+
+    private LocalDateTime now() {
+        return LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC);
     }
 
     private static Instant instant(LocalDateTime value) {
