@@ -1,6 +1,6 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.24.0\
+> 버전: v0.25.0\
 > 수정일: 2026-11-23
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
@@ -234,6 +234,7 @@ stateDiagram-v2
     ACTIVE --> LEFT: 본인 나가기 / 내보내기 / 조직 멤버십 LEFT
     SUSPENDED --> LEFT: 내보내기 / 조직 멤버십 LEFT
     ACTIVE --> EXPIRED: 손님 만료
+    SUSPENDED --> EXPIRED: 손님 조직 멤버십 만료
     REJECTED --> REQUESTED: 다시 요청
     LEFT --> REQUESTED: 다시 요청
     LEFT --> ACTIVE: 새 초대 수락 / 바로 추가
@@ -589,7 +590,7 @@ sequenceDiagram
 | TEN-GUEST-08 | 동료 화면과 목록에 손님 표시를 붙인다 | 필수 |
 | TEN-GUEST-09 | 연장은 조직 관리자가 팀 하나씩 한다. 새 팀 만료 시각은 연장한 시각 + `days`이고 `days`는 1일부터 조직의 손님 이용 일수 상한까지다(넘으면 `400`). 새 만료 시각이 지금 만료 시각보다 늦지 않으면 `409 ALREADY_PROCESSED`이며 기간을 줄이지 않는다. 같은 요청을 반복해도 기간이 두 번 늘지 않는다. 끝난(`EXPIRED`, 만료 시각이 지난 `ACTIVE`) 팀 멤버십은 연장하면 `ACTIVE`가 되고, 조직 멤버십이 `EXPIRED`이면 함께 `ACTIVE`가 된다. 팀 멤버십의 정지(`SUSPENDED`)는 그대로 둔다. 조직 멤버십이 정지된 손님은 연장할 수 없고(`400`) 정지를 먼저 푼다. 조직 만료 시각은 TEN-INV-09대로 끝나지 않은 팀 멤버십의 만료 시각에서 다시 계산한다. 대상이 구성원이면 `400`, 팀이 `ACTIVE`가 아니면 `409 READ_ONLY`다. 팀 기록 `GUEST_EXTENDED`(바뀌기 전·후 만료 시각)를 남기고, 조직 멤버십이 되살아나면 조직 기록 `GUEST_EXTENDED`도 남긴다 | 필수 |
 | TEN-GUEST-10 | 구성원으로 바꾸기는 `ACTIVE`·`SUSPENDED`이고 만료 시각 전인 손님만 된다. 만료된 손님은 `400`이며 구성원 초대로 다시 들인다(TEN-INVT-16). 이미 구성원이면 `409 ALREADY_PROCESSED`다. 정지는 그대로 두고, 끝나지 않은 팀 멤버십의 만료 시각을 지운다. 그중 만료 시각이 이미 지난 팀 멤버십은 지우지 않고 `EXPIRED`로 바꾼다. 조직 기록 `GUEST_CONVERTED`를 남긴다 | 필수 |
-| TEN-GUEST-11 | 서버 작업(배포 설정 `reberu.tenancy.guest-expiry-interval`, 기본 10분)이 만료 시각이 지난 `ACTIVE` 손님 팀 멤버십을 `EXPIRED`로 바꾼다. 손님 조직 멤버십은 만료 시각이 지났거나 끝나지 않은(`ACTIVE`·`SUSPENDED`) 팀 멤버십이 남지 않으면 `EXPIRED`가 되고, 이때 남은 팀 멤버십도 `EXPIRED`가 된다. 정지된(`SUSPENDED`) 손님 조직 멤버십은 바꾸지 않는다. 만료로 바꾸면 다시 초대해 정지를 풀 수 있게 되기 때문이며, 정지된 동안 접근은 정지와 TEN-GUEST-04로 막히고 정지를 풀면 다음 작업에서 판정한다. 조직마다 조직 행을 잠근 트랜잭션 하나로 처리하며 한 조직의 실패가 다른 조직을 멈추지 않는다(TEN-ISO-07). 기록 `GUEST_EXPIRED`는 행동한 사람 없이 남긴다. 접근 판정은 이 작업을 기다리지 않는다(TEN-GUEST-04) | 필수 |
+| TEN-GUEST-11 | 서버 작업(배포 설정 `reberu.tenancy.guest-expiry-interval`, 기본 10분)이 만료 시각이 지난 `ACTIVE` 손님 팀 멤버십을 `EXPIRED`로 바꾼다. 손님 조직 멤버십은 만료 시각이 지났거나 끝나지 않은(`ACTIVE`·`SUSPENDED`) 팀 멤버십이 남지 않으면 `EXPIRED`가 되고, 이때 남은 팀 멤버십도 `EXPIRED`가 된다. 정지된(`SUSPENDED`) 손님 조직 멤버십은 바꾸지 않는다. 만료로 바꾸면 다시 초대해 정지를 풀 수 있게 되기 때문이며, 정지된 동안 접근은 정지와 TEN-GUEST-04로 막히고 정지를 풀면 다음 작업에서 판정한다. 팀 단위로 정지된(`SUSPENDED`) 손님 팀 멤버십도 같은 이유로 만료 시각이 지나도 바꾸지 않는다. 정지를 풀면 `ACTIVE`가 되지만 접근은 TEN-GUEST-04로 막히고 다음 작업에서 `EXPIRED`가 된다. 조직 멤버십이 만료될 때는 함께 `EXPIRED`가 된다. 조직마다 조직 행을 잠근 트랜잭션 하나로 처리하며 한 조직의 실패가 다른 조직을 멈추지 않는다(TEN-ISO-07). 기록 `GUEST_EXPIRED`는 행동한 사람 없이 남긴다. 접근 판정은 이 작업을 기다리지 않는다(TEN-GUEST-04) | 필수 |
 | TEN-GUEST-12 | 첫 화면 판정(`next`)과 `GET /api/me/home`의 목록은 만료 시각이 지난 손님 조직·팀 멤버십을 빼고 계산한다 | 필수 |
 
 ### 7.7 도메인 자동 가입 (v0.3)
