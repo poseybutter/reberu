@@ -1,7 +1,7 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.28.0\
-> 수정일: 2026-11-23
+> 버전: v0.29.0\
+> 수정일: 2026-11-24
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
 
@@ -954,7 +954,7 @@ flowchart LR
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
-| TEN-MEM-01 | 정지·해제·내보내기·조직 관리자 지정·해제의 대상은 그 조직의 `ACTIVE`·`SUSPENDED` 조직 멤버십뿐이다. 멤버십이 없거나 다른 상태면 `404`다. 자기 자신의 정지·내보내기는 `400`이다(스스로 나가기는 `/api/me/orgs/{orgId}/leave`) | 필수 |
+| TEN-MEM-01 | 정지·해제·내보내기·조직 관리자 지정·해제의 대상은 그 조직의 `ACTIVE`·`SUSPENDED` 조직 멤버십뿐이다. 멤버십이 없거나 다른 상태면 `404`다. 자기 자신의 정지·내보내기는 `400`이다(스스로 나가기는 `/api/me/orgs/{leaveOrgId}/leave`, TEN-LEAVE-01~03) | 필수 |
 | TEN-MEM-02 | 정지는 `ACTIVE`에서, 해제는 `SUSPENDED`에서만 된다. 반복하면 `409 ALREADY_PROCESSED`다. 팀 멤버십 상태는 바꾸지 않는다(§5.4). 대상이 어느 팀의 마지막 팀 관리자여도 정지할 수 있다. 정지는 되돌릴 수 있고, 그동안 그 팀은 조직 관리자가 관리한다 | 필수 |
 | TEN-MEM-03 | 내보내기는 조직 멤버십을 `LEFT`(사유 `REMOVED`)로 바꾸고 조직 관리자 여부를 해제한다. 그 조직의 `ACTIVE`·`SUSPENDED`·`REQUESTED` 팀 멤버십도 모두 `LEFT`(사유 `REMOVED`)로 바꾼다. 대상이 `ACTIVE` 팀의 마지막 팀 관리자면 `409 LAST_ADMIN_REQUIRED`다. 팀 관리자 수에는 조직 멤버십도 `ACTIVE`인 사람만 센다 | 필수 |
 | TEN-MEM-04 | 조직 관리자 지정은 `ACTIVE` 구성원(`MEMBER`)만 받는다. 손님·정지된 사람은 `400`, 이미 관리자면 `409 ALREADY_PROCESSED`다. 지정이 커밋되면 대상의 세션을 모두 끊는다(SEC-SESS-03, 이벤트 `OrgAdminGranted`). 해제는 관리자가 아니면 `409 ALREADY_PROCESSED`이고, 마지막이 아니면 자기 자신도 해제할 수 있다. 해제할 때는 세션을 끊지 않는다(권한은 요청마다 다시 조회한다) | 필수 |
@@ -971,9 +971,19 @@ flowchart LR
 | TEN-TMEM-02 | 바로 추가는 그 조직의 `ACTIVE` 구성원(`MEMBER`)만, 역할은 `TEAM_MEMBER`·`VIEWER`만 받는다. 손님은 초대로만 들어온다. 팀 관리자는 역할 바꾸기(최근 인증)로만 준다. 나갔거나 거절된 멤버십은 같은 행을 다시 `ACTIVE`로 쓰고, 이미 있거나 요청 중·만료면 `409 ALREADY_PROCESSED`다 | 필수 |
 | TEN-TMEM-03 | 역할 바꾸기는 `version`이 필수이고, 같은 역할이면 `409 ALREADY_PROCESSED`다. `TEAM_ADMIN`으로 올리는 것은 팀 멤버십과 조직 멤버십이 모두 `ACTIVE`인 구성원만 된다(손님은 `400`, TEN-INV-07) | 필수 |
 | TEN-TMEM-04 | 활동 중인 팀(`ACTIVE`)의 활동 중인 팀 관리자를 0명으로 만드는 강등·정지·내보내기는 `409 LAST_ADMIN_REQUIRED`다(TEN-INV-06). 팀 관리자 수에는 조직 멤버십도 `ACTIVE`인 사람만 센다. 조직 단위 정지(TEN-MEM-02)와 달리 팀 단위 정지도 막는다 | 필수 |
-| TEN-TMEM-05 | 대상은 그 팀의 `ACTIVE`·`SUSPENDED` 팀 멤버십뿐이다(아니면 `404`, API-TADM-03). 자기 자신의 정지·내보내기는 `400`이고(스스로 나가기는 `/api/me/teams/{teamId}/leave`), 마지막이 아니면 자기 강등은 된다 | 필수 |
+| TEN-TMEM-05 | 대상은 그 팀의 `ACTIVE`·`SUSPENDED` 팀 멤버십뿐이다(아니면 `404`, API-TADM-03). 자기 자신의 정지·내보내기는 `400`이고(스스로 나가기는 `/api/me/teams/{leaveTeamId}/leave`, TEN-LEAVE-04), 마지막이 아니면 자기 강등은 된다 | 필수 |
 | TEN-TMEM-06 | 팀원을 바꾸는 요청은 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 조직과 팀이 아직 `ACTIVE`인지(아니면 `409 READ_ONLY`, TEN-CTX-09), 요청자가 아직 그 팀의 `ACTIVE` 팀 관리자이거나 `ACTIVE` 조직 관리자인지 다시 확인한다. 아니면 `403`(조직 멤버십이 활동 중이 아니면 `404`)이다. 권한 판정과 잠금 사이에 보관되어도 바뀌지 않는다 | 필수 |
 | TEN-TMEM-07 | 활동 기록: `TEAM_MEMBER_ADDED`(전 값은 예전 상태, 후 값은 역할), `TEAM_ROLE_CHANGED`, `TEAM_MEMBER_SUSPENDED`, `TEAM_MEMBER_UNSUSPENDED`, `TEAM_MEMBER_REMOVED`. 팀 활동 기록 조회는 그 팀 기록만, (시각, ID) 최신순 커서이고 거르기 규칙은 TEN-LOG-06과 같다 | 필수 |
+
+### 14.5 스스로 나가기
+
+| ID | 요구사항 | 수준 |
+| --- | --- | --- |
+| TEN-LEAVE-01 | 나가기는 조직 행 → 팀 행 순서로 잠근 뒤(TEN-MEM-06) 판정한다. 내 조직 멤버십(팀 나가기는 팀 멤버십도)이 `ACTIVE`·`SUSPENDED`가 아니면 `404`(API-ME-01), 조직(팀 나가기는 팀도)이 `ACTIVE`가 아니면 `409 READ_ONLY`, 조직이나 팀 단위로 정지됐으면 `403 FORBIDDEN_ACTION`이다. 정지된 사람이 나갔다가 다시 들어와 정지를 벗어나지 못하게 한다. 보관된 조직·팀의 멤버십은 탈퇴할 때 함께 끝난다 | 필수 |
+| TEN-LEAVE-02 | 조직 나가기는 조직 멤버십을 `LEFT`(사유 `SELF`)로 바꾸고 조직 관리자 여부를 해제한다. 그 조직의 `ACTIVE`·`SUSPENDED` 팀 멤버십은 `LEFT`(사유 `SELF`), `REQUESTED` 팀 멤버십은 요청 취소(TEN-REQ-11)와 같이 `LEFT`로 바꾼다. 세션은 끊지 않는다(권한은 요청마다 다시 조회한다, [architecture/security.md](security.md) §7.3) | 필수 |
+| TEN-LEAVE-03 | 조직 나가기는 내가 마지막 조직 관리자(TEN-MEM-05)이거나 `ACTIVE` 팀의 마지막 팀 관리자(TEN-MEM-03과 같은 기준)면 `409 LAST_ADMIN_REQUIRED`다. 내가 관리자인 팀 행은 팀 ID 순서로 잠근다 | 필수 |
+| TEN-LEAVE-04 | 팀 나가기는 팀 멤버십만 `LEFT`(사유 `SELF`)로 바꾼다. 내가 그 팀의 마지막 팀 관리자(TEN-TMEM-04와 같은 기준)면 `409 LAST_ADMIN_REQUIRED`다 | 필수 |
+| TEN-LEAVE-05 | 활동 기록: 조직에 `ORG_MEMBER_LEFT`, 팀마다 `TEAM_MEMBER_LEFT`(요청이었던 팀은 `TEAM_MEMBER_REQUEST_CANCELLED`). 행위자와 대상은 모두 본인 계정 ID, 바뀌기 전·후 값은 멤버십 상태뿐이다 | 필수 |
 
 ## 15. 활동 기록
 

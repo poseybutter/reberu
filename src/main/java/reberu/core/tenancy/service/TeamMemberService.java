@@ -27,11 +27,13 @@ import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
 import reberu.core.support.Uuids;
 import reberu.core.tenancy.entity.OrgMembership;
+import reberu.core.tenancy.entity.Organization;
 import reberu.core.tenancy.entity.Team;
 import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.JoinedVia;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.entity.TenancyCodes.TeamState;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
@@ -227,6 +229,31 @@ public class TeamMemberService {
         target.remove(clock.instant());
         activityLogs.recordTeam(teamId, new ActivityEntry(actorId, "TEAM_MEMBER_REMOVED", "ACCOUNT", accountId,
                 before, "LEFT"));
+    }
+
+    @Transactional
+    public void leave(UUID teamId, UUID accountId) {
+        UUID orgId = jdbc.sql("SELECT org_id FROM team WHERE id = :team")
+                .param("team", teamId.toString())
+                .query((rs, rowNum) -> UUID.fromString(rs.getString("org_id")))
+                .optional()
+                .orElseThrow(TeamMemberService::notFound);
+        Organization organization = locks.org(orgId);
+        Team team = locks.team(orgId, teamId);
+        OrgMembership orgMembership = orgMemberships.findByOrgIdAndAccountId(orgId, accountId)
+                .filter(OrgMembership::current)
+                .orElseThrow(TeamMemberService::notFound);
+        TeamMembership membership = target(teamId, accountId);
+        if (organization.state() != OrgState.ACTIVE || team.state() != TeamState.ACTIVE) {
+            throw new ReberuException(ErrorCode.READ_ONLY);
+        }
+        if (orgMembership.state() != MembershipState.ACTIVE || membership.state() != MembershipState.ACTIVE) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+        keepTeamAdmin(team, membership, Optional.of(orgMembership));
+        membership.leave(clock.instant());
+        activityLogs.recordTeam(teamId, new ActivityEntry(accountId, "TEAM_MEMBER_LEFT", "ACCOUNT", accountId,
+                "ACTIVE", "LEFT"));
     }
 
     @Transactional(readOnly = true)

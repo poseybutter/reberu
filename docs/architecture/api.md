@@ -1,7 +1,7 @@
 # API 목록
 
-> 버전: v0.22.0\
-> 수정일: 2026-11-23
+> 버전: v0.23.0\
+> 수정일: 2026-11-24
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -159,8 +159,8 @@
 | `GET` | `/api/me/join-requests` | 내 `REQUESTED`와 다시 요청 대기 중인 `REJECTED` 조직·팀 멤버십(TEN-REQ-10) 최신 50개 `items`: `target`(`ORG`·`TEAM`), `orgId`, `orgName`, `teamId`, `teamName`(조직 요청은 `null`), `state`, `requestedAt`(`REQUESTED`만), `rejectedAt`·`retryAt`(`REJECTED`만, TEN-REQ-02·07). 커서 없음 | 계정 | A2, A5 |
 | `POST` | `/api/me/org-requests/{requestOrgId}/cancel` | 내 조직 가입 요청 취소 → `LEFT`(사유 `SELF`). 그 조직의 내 팀 요청도 함께 취소(TEN-REQ-11) | 계정 | `204`, 내 멤버십 없음 `404`, 요청 중 아님 `409 ALREADY_PROCESSED` |
 | `POST` | `/api/me/team-requests/{requestTeamId}/cancel` | 내 팀 가입 요청 취소(TEN-REQ-11) | 계정 | `204`, 내 멤버십 없음 `404`, 요청 중 아님 `409 ALREADY_PROCESSED` |
-| `POST` | `/api/me/orgs/{orgId}/leave` | 조직 나가기([architecture/tenancy.md](tenancy.md) §14.2) | 계정 | `409 LAST_ADMIN_REQUIRED` |
-| `POST` | `/api/me/teams/{teamId}/leave` | 팀 나가기 | 계정 | `409 LAST_ADMIN_REQUIRED` |
+| `POST` | `/api/me/orgs/{leaveOrgId}/leave` | 조직 나가기 → 조직 멤버십과 그 조직의 팀 멤버십 `LEFT`(사유 `SELF`, TEN-LEAVE-02) | 계정 | `204`, 내 멤버십이 `ACTIVE`·`SUSPENDED`가 아님 `404`, 조직 `ACTIVE` 아님 `409 READ_ONLY`, 정지됨 `403 FORBIDDEN_ACTION`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`(TEN-LEAVE-01~03) |
+| `POST` | `/api/me/teams/{leaveTeamId}/leave` | 팀 나가기 → 팀 멤버십 `LEFT`(사유 `SELF`, TEN-LEAVE-04) | 계정 | `204`, `404`·`409 READ_ONLY`·`403`·`409 LAST_ADMIN_REQUIRED`는 조직 나가기와 같은 기준(TEN-LEAVE-01·04) |
 | `GET` | `/api/me/withdrawal-check` | 탈퇴 전 판정: 관리자를 넘겨야 하는 조직·팀 목록, 함께 보관될 혼자뿐인 조직·팀 목록([architecture/tenancy.md](tenancy.md) §5.1) | 계정 | D3 |
 | `POST` | `/api/me/withdraw` | 탈퇴. 본문 `confirmText`(정한 문구), 보관될 조직마다 `orgNameConfirmations`. 판정과 처리는 한 트랜잭션 | 계정 🔒 | `204`, 세션 삭제 |
 

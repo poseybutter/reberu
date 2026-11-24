@@ -25,9 +25,11 @@ import reberu.core.support.FieldViolation;
 import reberu.core.support.ReberuException;
 import reberu.core.tenancy.OrgAdminGranted;
 import reberu.core.tenancy.entity.OrgMembership;
+import reberu.core.tenancy.entity.Organization;
 import reberu.core.tenancy.entity.TeamMembership;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipKind;
 import reberu.core.tenancy.entity.TenancyCodes.MembershipState;
+import reberu.core.tenancy.entity.TenancyCodes.OrgState;
 import reberu.core.tenancy.entity.TenancyCodes.TeamRole;
 import reberu.core.tenancy.repository.OrgMembershipRepository;
 import reberu.core.tenancy.repository.TeamMembershipRepository;
@@ -164,16 +166,7 @@ public class MemberService {
         rejectSelf(actorId, accountId);
         OrgMembership target = lockTarget(orgId, actorId, accountId);
         keepOrgAdmin(orgId, target);
-        List<TeamMembership> memberships = teamMemberships.findOpenByOrgIdAndAccountId(orgId, accountId);
-        memberships.stream()
-                .filter(membership -> membership.state() == MembershipState.ACTIVE
-                        && membership.role() == TeamRole.TEAM_ADMIN)
-                .map(TeamMembership::teamId)
-                .sorted()
-                .forEach(teamId -> teams.findForUpdate(orgId, teamId));
-        if (lastTeamAdmin(orgId, accountId)) {
-            throw new ReberuException(ErrorCode.LAST_ADMIN_REQUIRED);
-        }
+        List<TeamMembership> memberships = keepTeamAdmins(orgId, accountId);
         Instant now = clock.instant();
         String before = target.state().name();
         target.remove(now);
@@ -184,6 +177,39 @@ public class MemberService {
                     accountId, teamBefore, "LEFT"));
         }
         activityLogs.recordOrg(orgId, new ActivityEntry(actorId, "ORG_MEMBER_REMOVED", "ACCOUNT", accountId, before,
+                "LEFT"));
+    }
+
+    @Transactional
+    public void leave(UUID orgId, UUID accountId) {
+        Organization organization = locks.org(orgId);
+        OrgMembership membership = orgMemberships.findByOrgIdAndAccountId(orgId, accountId)
+                .filter(OrgMembership::current)
+                .orElseThrow(MemberService::notFound);
+        if (organization.state() != OrgState.ACTIVE) {
+            throw new ReberuException(ErrorCode.READ_ONLY);
+        }
+        if (membership.state() != MembershipState.ACTIVE) {
+            throw new ReberuException(ErrorCode.FORBIDDEN_ACTION);
+        }
+        keepOrgAdmin(orgId, membership);
+        List<TeamMembership> memberships = keepTeamAdmins(orgId, accountId);
+        Instant now = clock.instant();
+        membership.leave(now);
+        for (TeamMembership teamMembership : memberships) {
+            String teamBefore = teamMembership.state().name();
+            if (teamMembership.state() == MembershipState.REQUESTED) {
+                teamMembership.cancel(now);
+                activityLogs.recordTeam(teamMembership.teamId(), new ActivityEntry(accountId,
+                        "TEAM_MEMBER_REQUEST_CANCELLED", "ACCOUNT", accountId, teamBefore, "LEFT"));
+            }
+            else {
+                teamMembership.leave(now);
+                activityLogs.recordTeam(teamMembership.teamId(), new ActivityEntry(accountId, "TEAM_MEMBER_LEFT",
+                        "ACCOUNT", accountId, teamBefore, "LEFT"));
+            }
+        }
+        activityLogs.recordOrg(orgId, new ActivityEntry(accountId, "ORG_MEMBER_LEFT", "ACCOUNT", accountId, "ACTIVE",
                 "LEFT"));
     }
 
@@ -233,6 +259,20 @@ public class MemberService {
                         target.accountId()) == 0) {
             throw new ReberuException(ErrorCode.LAST_ADMIN_REQUIRED);
         }
+    }
+
+    private List<TeamMembership> keepTeamAdmins(UUID orgId, UUID accountId) {
+        List<TeamMembership> memberships = teamMemberships.findOpenByOrgIdAndAccountId(orgId, accountId);
+        memberships.stream()
+                .filter(membership -> membership.state() == MembershipState.ACTIVE
+                        && membership.role() == TeamRole.TEAM_ADMIN)
+                .map(TeamMembership::teamId)
+                .sorted()
+                .forEach(teamId -> teams.findForUpdate(orgId, teamId));
+        if (lastTeamAdmin(orgId, accountId)) {
+            throw new ReberuException(ErrorCode.LAST_ADMIN_REQUIRED);
+        }
+        return memberships;
     }
 
     private boolean lastTeamAdmin(UUID orgId, UUID accountId) {
