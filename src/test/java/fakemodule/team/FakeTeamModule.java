@@ -1,11 +1,13 @@
 package fakemodule.team;
 
+import fakemodule.FakeEvents;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reberu.core.access.Access;
 import reberu.core.access.AccessLevel;
 import reberu.core.access.TeamContext;
+import reberu.core.event.DomainEventListener;
 import reberu.core.module.ModuleDefinition;
 
 public class FakeTeamModule implements ModuleDefinition {
@@ -35,6 +37,17 @@ public class FakeTeamModule implements ModuleDefinition {
     @Override
     public Source source() {
         return Source.BUNDLED;
+    }
+
+    public static class Listener {
+
+        public static final String NAME = "fake";
+
+        @DomainEventListener
+        void on(FakeEvents.TeamPinged event) {
+            FakeEvents.received(NAME, event.id());
+        }
+
     }
 
     @RestController

@@ -1,6 +1,6 @@
 # 모듈 구조
 
-> 버전: v0.6.0\
+> 버전: v0.7.0\
 > 수정일: 2026-11-23
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
@@ -152,12 +152,13 @@ sequenceDiagram
 | ARCH-EVT-02 | 구독자 처리는 원인 트랜잭션이 커밋된 뒤, 구독자마다 별도 트랜잭션에서 한다. 한 구독자의 실패가 원인 변경과 다른 구독자를 되돌리지 않는다 | 필수 |
 | ARCH-EVT-03 | 모든 구독자는 멱등이다. 같은 이벤트를 두 번 받아도 결과가 같다(예: EXP 원장의 멱등 키, [domain/rules.md](../domain/rules.md) §6) | 필수 |
 | ARCH-EVT-04 | 실패한 전달은 간격을 늘려 다시 시도하고, 정해진 횟수를 넘으면 운영 로그에 남기고 멈춘다. 서버를 다시 켜도 미처리 이벤트는 이어서 전달한다 | 필수 |
-| ARCH-EVT-05 | 이벤트는 팀 또는 조직 식별자를 반드시 담는다. 전달기는 구독자의 모듈이 그 범위에서 켜져 있을 때만 전달한다(TEN-MOD-01) | 필수 |
+| ARCH-EVT-05 | 이벤트는 팀 또는 조직 식별자를 반드시 담는다. 범위가 있는 이벤트 레코드는 `reberu.core.event`의 `TeamScoped`(`orgId()`, `teamId()`) 또는 `OrgScoped`(`orgId()`)를 구현한다. 전달기는 구독자의 모듈이 그 범위에서 켜져 있을 때만 전달하고, 꺼져 있으면 구독 메서드를 부르지 않고 완료로 기록한다(TEN-MOD-01). 구독자가 어느 모듈인지는 구독 클래스의 패키지로 정한다(§5.1). 모듈 밖(core·고정 기능) 구독자는 확인 없이 받는다 | 필수 |
 | ARCH-EVT-06 | 이벤트 본문은 불변 레코드이고, 다른 단위의 엔티티가 아니라 식별자와 값만 담는다 | 필수 |
 | ARCH-EVT-07 | 실시간 메시지([architecture/realtime.md](realtime.md))는 도메인 이벤트의 구독자 하나로 보낸다. 실시간 전송 실패가 도메인 처리를 되돌리지 않는다 | 필수 |
 | ARCH-EVT-08 | 이벤트 저장소는 세 DB에서 같게 동작해야 한다([architecture/tenancy.md](tenancy.md) §11.4). 처리된 이벤트는 보관 기간이 지나면 정리한다 | 필수 |
 | ARCH-EVT-09 | 이벤트 레코드는 JSON으로 직렬화할 수 있는 값만 담고, 이름과 필드를 공개 계약으로 다룬다. 필드를 지우거나 뜻을 바꾸지 않고 더하기만 한다. 나중에 외부 메시지 브로커로 내보낼 때 레코드를 고치지 않기 위해서다(§4.2) | 필수 |
-| ARCH-EVT-10 | 발행하는 쪽은 Spring의 이벤트 발행 인터페이스만 쓰고, 구독하는 쪽은 core가 정한 구독 표시만 쓴다. 이벤트 저장소 구현의 클래스를 업무 코드에서 직접 부르지 않는다 | 필수 |
+| ARCH-EVT-10 | 발행하는 쪽은 Spring의 이벤트 발행 인터페이스만 쓰고, 구독하는 쪽은 core가 정한 구독 표시 `@DomainEventListener`(`reberu.core.event`)만 쓴다. 이벤트 저장소 구현의 클래스를 업무 코드에서 직접 부르지 않는다. `reberu.core.event` 밖에서 Spring Modulith 이벤트 클래스, `@TransactionalEventListener`, `@EventListener`를 쓰면 경계 테스트가 실패한다 | 필수 |
+| ARCH-EVT-11 | 구독 메서드는 이벤트 하나만 받는다. `TEAM` 모듈 구독자는 `TeamScoped`, `ORG` 모듈 구독자는 `OrgScoped` 이벤트만 받는다. 어기면 서버가 시작하지 않는다 | 필수 |
 
 ### 4.2 외부 메시지 브로커로 옮기는 경로
 
