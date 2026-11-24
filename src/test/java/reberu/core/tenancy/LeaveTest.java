@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,10 +28,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.support.TransactionTemplate;
 import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.security.AccountAuthentication;
+import reberu.core.tenancy.service.MemberService;
+import reberu.core.tenancy.service.TeamMemberService;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -57,6 +58,15 @@ class LeaveTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    TransactionTemplate transactions;
+
+    @Autowired
+    MemberService members;
+
+    @Autowired
+    TeamMemberService teamMembers;
 
     private UUID admin;
     private UUID member;
@@ -183,7 +193,7 @@ class LeaveTest {
         String team = createTeam("둘째 팀");
         insertTeamMembership(team, member, "TEAM_ADMIN", "ACTIVE");
 
-        assertThat(race(leaveTeam(team), leaveTeam(team))).containsExactlyInAnyOrder(204, 409);
+        assertThat(race(() -> teamMembers.leave(UUID.fromString(team), admin), leaveTeam(team))).isEqualTo(409);
         assertThat(jdbc.sql("""
                         SELECT COUNT(*) FROM team_membership
                         WHERE team_id = :team AND role = 'TEAM_ADMIN' AND state = 'ACTIVE'
@@ -194,7 +204,7 @@ class LeaveTest {
         UUID helper = newAccount("helper");
         insertOrgMembership(helper, "ACTIVE", false);
         insertTeamMembership(firstTeamId, helper, "TEAM_ADMIN", "ACTIVE");
-        assertThat(race(leaveOrg(orgId), leaveOrg(orgId))).containsExactlyInAnyOrder(204, 409);
+        assertThat(race(() -> members.leave(UUID.fromString(orgId), admin), leaveOrg(orgId))).isEqualTo(409);
         assertThat(jdbc.sql("""
                         SELECT COUNT(*) FROM org_membership
                         WHERE org_id = :org AND org_admin = :admin AND state = 'ACTIVE'
@@ -202,35 +212,38 @@ class LeaveTest {
                 .param("org", orgId).param("admin", true).query(Integer.class).single()).isOne();
     }
 
-    private List<Integer> race(String adminPath, String memberPath) throws Exception {
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        try {
-            CountDownLatch ready = new CountDownLatch(2);
-            CountDownLatch start = new CountDownLatch(1);
-            CompletableFuture<Integer> first = CompletableFuture.supplyAsync(
-                    () -> leaveWhenStarted(ready, start, adminPath, admin), executor);
-            CompletableFuture<Integer> second = CompletableFuture.supplyAsync(
-                    () -> leaveWhenStarted(ready, start, memberPath, member), executor);
-            assertThat(ready.await(30, TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            return List.of(first.get(30, TimeUnit.SECONDS), second.get(30, TimeUnit.SECONDS));
-        }
-        finally {
-            executor.shutdownNow();
-        }
-    }
-
-    private int leaveWhenStarted(CountDownLatch ready, CountDownLatch start, String path, UUID actor) {
-        try {
-            ready.countDown();
-            if (!start.await(30, TimeUnit.SECONDS)) {
-                throw new IllegalStateException("시작 신호 시간 초과");
+    private int race(Runnable adminLeave, String memberPath) throws Exception {
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> transactions.executeWithoutResult(status -> {
+            adminLeave.run();
+            held.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
             }
-            return perform(post(path), actor).getStatus();
-        }
-        catch (Exception failed) {
-            throw new IllegalStateException(failed);
-        }
+            catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        holder.start();
+        assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+
+        CountDownLatch started = new CountDownLatch(1);
+        CompletableFuture<Integer> second = CompletableFuture.supplyAsync(() -> {
+            started.countDown();
+            try {
+                return perform(post(memberPath), member).getStatus();
+            }
+            catch (Exception failed) {
+                throw new IllegalStateException(failed);
+            }
+        });
+        assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(500);
+        assertThat(second.isDone()).as("잠금 대기").isFalse();
+        release.countDown();
+        holder.join();
+        return second.get(30, TimeUnit.SECONDS);
     }
 
     private void setTeamRole(UUID account, String role) {
