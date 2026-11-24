@@ -254,6 +254,15 @@ public class TeamMembership {
         updatedAt = at;
     }
 
+    public void leave(Instant at) {
+        if (!current()) {
+            throw new IllegalStateException("나갈 수 없는 팀 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        leftReason = OrgMembership.LEFT_SELF;
+        updatedAt = at;
+    }
+
     public void reject(Instant at) {
         if (state != MembershipState.REQUESTED) {
             throw new IllegalStateException("거절할 수 없는 멤버십 상태: " + state);
