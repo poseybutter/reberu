@@ -142,7 +142,11 @@ public class OrgSettingsService {
         if (organization.state() != OrgState.ACTIVE) {
             throw new ReberuException(ErrorCode.READ_ONLY);
         }
-        Instant now = clock.instant();
+        archiveLocked(organization, actorId, clock.instant());
+    }
+
+    void archiveLocked(Organization organization, UUID actorId, Instant now) {
+        UUID orgId = organization.id();
         organization.archive(now);
         for (OrgMembership request : orgMemberships.findByOrgIdAndStateOrderByCreatedAtAscIdAsc(orgId,
                 MembershipState.REQUESTED)) {

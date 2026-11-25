@@ -25,6 +25,8 @@ public class OrgMembership {
 
     public static final String LEFT_SELF = "SELF";
 
+    public static final String LEFT_ACCOUNT_DELETED = "ACCOUNT_DELETED";
+
     @Id
     private UUID id;
 
@@ -291,6 +293,17 @@ public class OrgMembership {
         state = MembershipState.LEFT;
         leftReason = LEFT_SELF;
         orgAdmin = false;
+        updatedAt = at;
+    }
+
+    public void withdraw(Instant at) {
+        if (!current() && state != MembershipState.REQUESTED) {
+            throw new IllegalStateException("탈퇴로 끝낼 수 없는 멤버십 상태: " + state);
+        }
+        state = MembershipState.LEFT;
+        leftReason = LEFT_ACCOUNT_DELETED;
+        orgAdmin = false;
+        admissionReview = false;
         updatedAt = at;
     }
 

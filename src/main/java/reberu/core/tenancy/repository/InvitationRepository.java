@@ -17,6 +17,18 @@ public interface InvitationRepository extends JpaRepository<Invitation, UUID> {
     @Query("select i from Invitation i where i.orgId = :orgId and i.id = :invitationId")
     Optional<Invitation> findForUpdate(UUID orgId, UUID invitationId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Invitation i where i.orgId = :orgId and i.state in :states order by i.id")
+    List<Invitation> findForUpdateByOrgIdAndStateIn(UUID orgId, Collection<InvitationState> states);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Invitation i where i.email = :email or i.acceptedBy = :accountId order by i.id")
+    List<Invitation> findForUpdateByEmailOrAcceptedBy(String email, UUID accountId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from Invitation i where i.acceptedBy = :accountId order by i.id")
+    List<Invitation> findForUpdateByAcceptedBy(UUID accountId);
+
     List<Invitation> findByOrgIdAndTeamIdAndEmailInAndStateIn(UUID orgId, UUID teamId, Collection<String> emails,
             Collection<InvitationState> states);
 

@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.18.0\
-> 수정일: 2026-11-23
+> 버전: v0.19.0\
+> 수정일: 2026-11-25
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -143,12 +143,12 @@ erDiagram
 | 필드 | 타입 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `id` | `UUID` | ○ | |
-| `google_sub` | `TEXT(255)` | ○ | Google `sub`. 유일. 탈퇴 시 되돌릴 수 없는 해시로 바꾼다(SEC-PRIV-02) |
+| `google_sub` | `TEXT(255)` | ○ | Google `sub`. 유일. 탈퇴 시 `deleted:`와 무작위 64자로 바꾼다(SEC-PRIV-02) |
 | `email` | `TEXT(254)` | 탈퇴 전 ○ | 확인된 이메일, 소문자. 탈퇴 시 지운다 |
 | `display_name` | `TEXT(30)` | ○ | 표시 이름. 처음 값은 Google 이름이다. 탈퇴 시 지운다 |
 | `display_name_custom` | `BOOL` | ○ | 사용자가 바꿨는지. 참이면 로그인 때 Google 이름으로 덮지 않는다(TEN-AUTH-04) |
-| `picture_url` | `TEXT(1024)` | | 프로필 사진 주소 |
-| `workspace_domain` | `TEXT(253)` | | ID 토큰의 `hd`. 없으면 개인 계정(TEN-ACC-01~04) |
+| `picture_url` | `TEXT(1024)` | | 프로필 사진 주소. 탈퇴 시 지운다 |
+| `workspace_domain` | `TEXT(253)` | | ID 토큰의 `hd`. 없으면 개인 계정(TEN-ACC-01~04). 탈퇴 시 지운다 |
 | `state` | `CODE` | ○ | `ACTIVE`·`SUSPENDED`·`DELETED`([architecture/tenancy.md](../architecture/tenancy.md) §5.1) |
 | `default_avatar` | `TEXT(40)` | | 기본 아바타 코드 |
 | `last_login_at` | `UTC_TIMESTAMP` | | |
@@ -357,7 +357,7 @@ erDiagram
 | --- | --- | --- | --- |
 | `org_id` | `UUID` | ○ | |
 | `team_id` | `UUID` | 손님 ○ | 구성원 초대는 선택 |
-| `email` | `TEXT(254)` | ○ | 소문자(TEN-INVT-01) |
+| `email` | `TEXT(254)` | 탈퇴 전 ○ | 소문자(TEN-INVT-01). 받은 사람이 탈퇴하면 지운다(TEN-WD-07, V26) |
 | `kind` | `CODE` | ○ | `MEMBER`·`GUEST` |
 | `role` | `CODE` | 팀 ○ | `TEAM_MEMBER`·`VIEWER`(TEN-INV-11). 팀 없는 구성원 초대는 비운다(TEN-INVT-08) |
 | `guest_days` | `INT` | 손님 ○ | 이용 일수 |

@@ -1,0 +1,1 @@
+ALTER TABLE invitation MODIFY email VARCHAR(254) NULL;

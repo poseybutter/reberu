@@ -182,7 +182,11 @@ public class TeamService {
         if (team.state() != TeamState.ACTIVE) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
         }
-        Instant now = clock.instant();
+        archiveLocked(orgId, team, accountId, clock.instant());
+    }
+
+    void archiveLocked(UUID orgId, Team team, UUID accountId, Instant now) {
+        UUID teamId = team.id();
         team.archive(now);
         for (TeamMembership request : teamMemberships.findByTeamIdAndStateOrderByCreatedAtAscIdAsc(teamId,
                 MembershipState.REQUESTED)) {

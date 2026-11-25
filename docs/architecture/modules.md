@@ -1,7 +1,7 @@
 # 모듈 구조
 
-> 버전: v0.7.0\
-> 수정일: 2026-11-23
+> 버전: v0.8.0\
+> 수정일: 2026-11-25
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
 
@@ -32,8 +32,8 @@
 ```text
 reberu/
 ├── core/
-│   ├── account/        계정, 약관 동의, 탈퇴
-│   ├── tenancy/        조직, 팀, 멤버십, 초대, 가입 방법, 직무 유형
+│   ├── account/        계정, 약관 동의, 탈퇴한 계정의 개인정보 지우기
+│   ├── tenancy/        조직, 팀, 멤버십, 초대, 가입 방법, 직무 유형, 탈퇴 판정·처리
 │   ├── auth/           Google OIDC 로그인, 세션, 최근 인증
 │   ├── access/         TeamContext 확정, 권한 선언·판정
 │   ├── module/         모듈 계약, 레지스트리, 켜짐 상태, 설정
@@ -183,6 +183,7 @@ sequenceDiagram
 | `RestEnded` | healing | progression(업적만, EXP 없음), quest |
 | `MemberJoined`, `MembershipEnded` | core.tenancy | realtime(구독 해제), space, progression(정리 없음) |
 | `OrgAdminGranted` | core.tenancy | core.auth(대상의 세션 모두 끊기, SEC-SESS-03) |
+| `AccountWithdrawn` | core.account | core.auth(그 계정의 세션 모두 끊기, TEN-WD-08) |
 | `TeamModuleChanged`, `OrgModuleChanged` | core.module | realtime, 해당 모듈 |
 | `WorkdayStarted` | core.calendar (팀마다 조직 시간대 근무일 시작) | briefing(모닝 브리핑), attendance(없음), certificate |
 

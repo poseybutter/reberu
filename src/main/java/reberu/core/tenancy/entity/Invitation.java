@@ -29,7 +29,6 @@ public class Invitation {
     @Column(name = "team_id", updatable = false)
     private UUID teamId;
 
-    @Column(nullable = false, updatable = false)
     private String email;
 
     @Enumerated(EnumType.STRING)
@@ -134,6 +133,11 @@ public class Invitation {
         }
         state = InvitationState.ACCEPTED;
         acceptedBy = accountId;
+        updatedAt = at;
+    }
+
+    public void forgetEmail(Instant at) {
+        email = null;
         updatedAt = at;
     }
 

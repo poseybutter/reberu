@@ -217,6 +217,14 @@ public class Organization {
         updatedAt = at;
     }
 
+    public void abandon(Instant at) {
+        if (state != OrgState.ARCHIVED) {
+            throw new IllegalStateException("관리자 없음으로 표시할 수 없는 조직 상태: " + state);
+        }
+        ownerless = true;
+        updatedAt = at;
+    }
+
     public void restore(Instant at) {
         if (state != OrgState.ARCHIVED || ownerless) {
             throw new IllegalStateException("복원할 수 없는 조직");

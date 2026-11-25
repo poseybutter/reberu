@@ -232,6 +232,32 @@ public class InvitationService {
                 .intValue();
     }
 
+    void revokeOpenForOrg(UUID orgId, UUID actorId, Instant at) {
+        invitations.findForUpdateByOrgIdAndStateIn(orgId, OPEN_STATES)
+                .forEach(invitation -> revokeOpen(invitation, actorId, at));
+    }
+
+    void forget(UUID accountId, String email, Instant at) {
+        String normalized = email == null ? null : EmailAddresses.normalize(email);
+        boolean shared = normalized != null && accounts.idsByEmail(List.of(normalized))
+                .getOrDefault(normalized, Set.of()).stream().anyMatch(id -> !id.equals(accountId));
+        List<Invitation> rows = normalized == null || shared ? invitations.findForUpdateByAcceptedBy(accountId)
+                : invitations.findForUpdateByEmailOrAcceptedBy(normalized, accountId);
+        for (Invitation invitation : rows) {
+            if (OPEN_STATES.contains(invitation.state())) {
+                revokeOpen(invitation, accountId, at);
+            }
+            invitation.forgetEmail(at);
+        }
+    }
+
+    private void revokeOpen(Invitation invitation, UUID actorId, Instant at) {
+        String before = invitation.state().name();
+        invitation.revoke(at);
+        record(invitation, new ActivityEntry(actorId, "INVITATION_REVOKED", "INVITATION", invitation.id(), before,
+                InvitationState.REVOKED.name()));
+    }
+
     @Transactional
     public Acceptance accept(UUID accountId, UUID invitationId) {
         Target target = target(accountId, invitationId);
@@ -519,10 +545,7 @@ public class InvitationService {
         if (!invitation.open(clock.instant())) {
             throw new ReberuException(ErrorCode.ALREADY_PROCESSED);
         }
-        String before = invitation.state().name();
-        invitation.revoke(clock.instant());
-        record(invitation, new ActivityEntry(actorId, "INVITATION_REVOKED", "INVITATION", invitation.id(), before,
-                InvitationState.REVOKED.name()));
+        revokeOpen(invitation, actorId, clock.instant());
     }
 
     private void record(Invitation invitation, ActivityEntry entry) {

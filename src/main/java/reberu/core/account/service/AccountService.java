@@ -1,19 +1,23 @@
 package reberu.core.account.service;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import reberu.core.account.AccountProfile;
 import reberu.core.account.AccountState;
 import reberu.core.account.AccountSummary;
+import reberu.core.account.AccountWithdrawn;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.account.entity.Account;
@@ -25,12 +29,19 @@ import reberu.core.support.Uuids;
 @Service
 class AccountService implements Accounts {
 
+    private static final String DELETED_SUB_PREFIX = "deleted:";
+
+    private static final int DELETED_SUB_BYTES = 32;
+    private static final SecureRandom RANDOM = new SecureRandom();
+
     private final AccountRepository accounts;
     private final AccountConsentRepository consents;
+    private final ApplicationEventPublisher events;
 
-    AccountService(AccountRepository accounts, AccountConsentRepository consents) {
+    AccountService(AccountRepository accounts, AccountConsentRepository consents, ApplicationEventPublisher events) {
         this.accounts = accounts;
         this.consents = consents;
+        this.events = events;
     }
 
     @Override
@@ -92,6 +103,21 @@ class AccountService implements Accounts {
         Account account = accounts.saveAndFlush(Account.create(Uuids.v7(), profile, at));
         consents.save(AccountConsent.of(Uuids.v7(), account.id(), termsVersion, privacyVersion, at));
         return account.id();
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void withdraw(UUID accountId, Instant at) {
+        accounts.findForUpdate(accountId)
+                .orElseThrow(() -> new IllegalStateException("탈퇴할 계정 없음"))
+                .withdraw(DELETED_SUB_PREFIX + randomHex(), at);
+        events.publishEvent(new AccountWithdrawn(accountId));
+    }
+
+    private static String randomHex() {
+        byte[] bytes = new byte[DELETED_SUB_BYTES];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
     }
 
 }

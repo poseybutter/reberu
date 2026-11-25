@@ -23,7 +23,7 @@ public class Account {
     @Id
     private UUID id;
 
-    @Column(name = "google_sub", nullable = false, updatable = false)
+    @Column(name = "google_sub", nullable = false)
     private String googleSub;
 
     private String email;
@@ -78,6 +78,21 @@ public class Account {
             throw new IllegalStateException("로그인 정보를 갱신할 수 없는 계정 상태: " + state);
         }
         applyProfile(profile, at);
+    }
+
+    public void withdraw(String replacedSub, Instant at) {
+        if (state != AccountState.ACTIVE) {
+            throw new IllegalStateException("탈퇴할 수 없는 계정 상태: " + state);
+        }
+        googleSub = replacedSub;
+        email = null;
+        displayName = null;
+        displayNameCustom = false;
+        pictureUrl = null;
+        workspaceDomain = null;
+        state = AccountState.DELETED;
+        deletedAt = at;
+        updatedAt = at;
     }
 
     private void applyProfile(GoogleProfile profile, Instant at) {

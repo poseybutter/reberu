@@ -23,4 +23,6 @@ public interface Accounts {
 
     UUID createWithConsent(GoogleProfile profile, String termsVersion, String privacyVersion, Instant at);
 
+    void withdraw(UUID accountId, Instant at);
+
 }
