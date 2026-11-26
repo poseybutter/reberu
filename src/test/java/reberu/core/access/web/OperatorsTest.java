@@ -33,7 +33,8 @@ class OperatorsTest {
     @DisplayName("TEN-OPS-01: 계정 UUID가 아닌 값이 있으면 시작 실패, 메시지에 값 미포함")
     void rejectsMalformedIds() {
         for (String value : List.of("operator@example.com", "1-1-1-1-1", FIRST + "0",
-                "zzzzzzzz-0000-7000-8000-00000000a001")) {
+                "zzzzzzzz-0000-7000-8000-00000000a001", "100000000-000-7000-8000-00000000a001",
+                "0000000-00000-7000-8000-00000000a001")) {
             assertThatThrownBy(() -> Operators.parse(List.of(FIRST.toString(), value)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("OPERATOR_ACCOUNT_IDS")

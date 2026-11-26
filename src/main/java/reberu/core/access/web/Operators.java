@@ -36,12 +36,17 @@ final class Operators {
         if (value.length() != UUID_LENGTH) {
             throw invalid();
         }
+        UUID parsed;
         try {
-            return UUID.fromString(value);
+            parsed = UUID.fromString(value);
         }
         catch (IllegalArgumentException malformed) {
             throw invalid();
         }
+        if (!parsed.toString().equalsIgnoreCase(value)) {
+            throw invalid();
+        }
+        return parsed;
     }
 
     private static IllegalStateException invalid() {
