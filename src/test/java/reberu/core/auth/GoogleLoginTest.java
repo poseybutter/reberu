@@ -2,6 +2,7 @@ package reberu.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -29,6 +30,8 @@ import reberu.TestcontainersConfiguration;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.FakeGoogle.IdToken;
+import reberu.core.support.SecurityMetrics;
+import reberu.core.support.SecurityMetrics.Rejection;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -51,6 +54,9 @@ class GoogleLoginTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    MeterRegistry registry;
 
     private TestBrowser browser;
 
@@ -182,6 +188,20 @@ class GoogleLoginTest {
         browser.send("POST", "/api/auth/logout", null);
         assertThat(location(browser.get("/login/oauth2/code/google?code=" + code + "&state=" + login.state())))
                 .isEqualTo(FAILED);
+    }
+
+    @Test
+    @DisplayName("OPS-OBS-08: 로그인 실패는 실패 수로만 집계, 성공은 세지 않음")
+    void countsFailedLogins() {
+        double before = loginFailures();
+
+        assertFailed(callback(startLogin(null), IdToken.valid("sub-new", "new@example.com", "other-nonce")));
+        existingAccount("sub-existing", "member@example.com");
+        Login login = startLogin(null);
+        assertThat(location(callback(login, IdToken.valid("sub-existing", "member@example.com", login.nonce()))))
+                .isEqualTo(START);
+
+        assertThat(loginFailures() - before).isEqualTo(1);
     }
 
     @Test
@@ -326,6 +346,11 @@ class GoogleLoginTest {
         String code = GOOGLE.issue(login.challenge(), idToken);
         return browser.get("/login/oauth2/code/google?code=" + code + "&state="
                 + URLEncoder.encode(login.state(), StandardCharsets.UTF_8));
+    }
+
+    private double loginFailures() {
+        return registry.counter(SecurityMetrics.REJECTIONS, SecurityMetrics.KIND, Rejection.LOGIN_FAILED.tag())
+                .count();
     }
 
     private void assertFailed(HttpResponse<String> callback) {

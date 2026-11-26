@@ -36,7 +36,7 @@ class MemoryFailureStreaks implements FailureStreaks {
         Streak streak = keys.get(key);
         long now = clock.millis();
         if (streak != null && streak.blockedUntil() > now) {
-            throw new RateLimitExceededException(rule, Duration.ofMillis(streak.blockedUntil() - now));
+            throw SlidingWindowRateLimits.exceeded(rule, Duration.ofMillis(streak.blockedUntil() - now));
         }
     }
 

@@ -13,6 +13,8 @@ import reberu.core.access.Access;
 import reberu.core.access.AccessLevel;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ReberuException;
+import reberu.core.support.SecurityMetrics;
+import reberu.core.support.SecurityMetrics.Rejection;
 
 class AccessInterceptor implements HandlerInterceptor {
 
@@ -29,10 +31,26 @@ class AccessInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+        try {
+            decide(request, handler);
+        }
+        catch (ReberuException denied) {
+            if (denied.code() == ErrorCode.NOT_FOUND) {
+                SecurityMetrics.rejected(Rejection.ACCESS_HIDDEN);
+            }
+            else if (denied.code() == ErrorCode.FORBIDDEN_ACTION) {
+                SecurityMetrics.rejected(Rejection.ACCESS_FORBIDDEN);
+            }
+            throw denied;
+        }
+        return true;
+    }
+
+    private void decide(HttpServletRequest request, Object handler) {
         Object pattern = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
         if (!(handler instanceof HandlerMethod method) || pattern == null
                 || !AccessDeclarations.isApi(pattern.toString())) {
-            return true;
+            return;
         }
         Access access = method.getMethodAnnotation(Access.class);
         if (access == null) {
@@ -49,7 +67,6 @@ class AccessInterceptor implements HandlerInterceptor {
                 }
             }
         }
-        return true;
     }
 
     private static UUID accountId() {

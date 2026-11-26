@@ -30,6 +30,8 @@ docker compose up -d
 
 아직 화면을 만들지 않았기 때문에, 브라우저로 접속하면 `401` JSON 응답(`UNAUTHENTICATED`)이 옵니다. 정상 동작입니다. `http://localhost:8080/oauth2/authorization/google`로 Google 로그인을 시작할 수 있습니다.
 
+지표와 대시보드(Prometheus, Grafana)를 로컬에서 보는 방법은 [docs/operations/observability.md](docs/operations/observability.md) §5에 있습니다.
+
 ## 테스트
 
 ```bash

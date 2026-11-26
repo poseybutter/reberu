@@ -9,6 +9,7 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfFilter;
+import reberu.core.support.SecurityMetrics.Rejection;
 import reberu.core.support.security.CrossOriginRejectFilter;
 import reberu.core.support.security.CsrfCookieFilter;
 
@@ -44,9 +45,13 @@ public final class WebSecurityDefaults {
         return (request, response, exception) -> {
             ErrorCode code = ErrorCode.FORBIDDEN_ACTION;
             if (exception instanceof CsrfException) {
+                SecurityMetrics.rejected(Rejection.CSRF_INVALID);
                 code = TRUST_RESOLVER.isAuthenticated(SecurityContextHolder.getContext().getAuthentication())
                         ? ErrorCode.CSRF_INVALID
                         : ErrorCode.UNAUTHENTICATED;
+            }
+            else {
+                SecurityMetrics.rejected(Rejection.ACCESS_FORBIDDEN);
             }
             errorWriter.write(request, response, code);
         };
