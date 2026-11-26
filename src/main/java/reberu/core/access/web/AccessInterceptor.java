@@ -10,6 +10,7 @@ import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.HandlerMapping;
 import reberu.core.access.Access;
+import reberu.core.access.AccessLevel;
 import reberu.core.support.ErrorCode;
 import reberu.core.support.ReberuException;
 
@@ -19,9 +20,11 @@ class AccessInterceptor implements HandlerInterceptor {
     static final String TEAM_CONTEXT = AccessInterceptor.class.getName() + ".team";
 
     private final AccessDecider decider;
+    private final Operators operators;
 
-    AccessInterceptor(AccessDecider decider) {
+    AccessInterceptor(AccessDecider decider, Operators operators) {
         this.decider = decider;
+        this.operators = operators;
     }
 
     @Override
@@ -41,6 +44,9 @@ class AccessInterceptor implements HandlerInterceptor {
             case TEAM -> request.setAttribute(TEAM_CONTEXT,
                     decider.team(access, accountId(), pathVariable(request, AccessDeclarations.TEAM_ID)));
             case NONE -> {
+                if (access.value() == AccessLevel.OPERATOR && !operators.contains(accountId())) {
+                    throw AccessDecider.notFound();
+                }
             }
         }
         return true;

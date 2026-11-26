@@ -233,6 +233,23 @@ public class Organization {
         updatedAt = at;
     }
 
+    public void suspend(Instant at) {
+        if (state != OrgState.ACTIVE && state != OrgState.ARCHIVED) {
+            throw new IllegalStateException("정지할 수 없는 조직 상태: " + state);
+        }
+        stateBeforeSuspend = state;
+        state = OrgState.SUSPENDED;
+        updatedAt = at;
+    }
+
+    public void unsuspend(Instant at) {
+        if (state != OrgState.SUSPENDED) {
+            throw new IllegalStateException("정지 해제할 수 없는 조직 상태: " + state);
+        }
+        state = OrgState.ACTIVE;
+        updatedAt = at;
+    }
+
     public record Settings(String name, String tagline, String timeZone, Visibility visibility,
             boolean joinLinkEnabled, JoinRequestMode joinRequestMode, boolean memberAdmissionReview,
             boolean guestApprovalRequired, int guestDefaultDays, int guestMaxDays, boolean guestOrgspaceAllowed,

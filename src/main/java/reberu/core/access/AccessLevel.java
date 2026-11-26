@@ -5,6 +5,7 @@ public enum AccessLevel {
     PUBLIC(Scope.NONE),
     SIGNUP_PENDING(Scope.NONE),
     ACCOUNT(Scope.NONE),
+    OPERATOR(Scope.NONE),
     ORG_MEMBER(Scope.ORG),
     ORG_ADMIN(Scope.ORG),
     TEAM_VIEWER(Scope.TEAM),

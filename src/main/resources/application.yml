@@ -71,6 +71,8 @@ reberu:
       default: { limit: "${RATE_LIMIT_DEFAULT:300}", window: 1m }
     failure-streaks:
       invite-link: { threshold: "${RATE_LIMIT_INVITE_LINK_FAILURES:20}", block: 15m }
+  operator:
+    account-ids: ${OPERATOR_ACCOUNT_IDS:}
   legal:
     terms-version: ${TERMS_VERSION:v1}
     privacy-version: ${PRIVACY_VERSION:v1}

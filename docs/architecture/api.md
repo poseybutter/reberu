@@ -1,6 +1,6 @@
 # API 목록
 
-> 버전: v0.24.0\
+> 버전: v0.25.0\
 > 수정일: 2026-11-26
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
@@ -302,11 +302,12 @@ v0.2 이후 API는 그 단계를 시작할 때 이 문서에 더한다. 주소�
 
 | 메서드 | 경로 | 하는 일 | 권한 | 비고 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/operator/orgs/{orgId}/suspend` | 조직 정지. 본문 `reason`(운영 기록용, 200자) | 운영자 🔒 | SEC-ORG-12 |
-| `POST` | `/api/operator/orgs/{orgId}/unsuspend` | 정지 해제 | 운영자 🔒 | |
+| `POST` | `/api/operator/orgs/{targetOrgId}/suspend` | 조직 정지. 본문 `reason`(운영 기록용, 1~200자, TEN-OPS-05) → `ACTIVE`·`ARCHIVED` 조직이 `SUSPENDED`(TEN-OPS-03) | 운영자 🔒 | `204`, 없는 조직 `404`, 이미 정지 `409 ALREADY_PROCESSED`. SEC-ORG-12 |
+| `POST` | `/api/operator/orgs/{targetOrgId}/unsuspend` | 정지 해제 → `ACTIVE`(TEN-OPS-04). 본문 없음 | 운영자 🔒 | `204`, 없는 조직 `404`, 정지가 아님 `409 ALREADY_PROCESSED`, 활동 중인 조직 관리자 없음 `409 LAST_ADMIN_REQUIRED` |
 
-- API-OPS-01 (필수): 운영자 API는 조직 식별자와 상태만 다룬다. 조직·팀의 업무 데이터, 구성원 목록, 이메일을 돌려주지 않는다(SEC-ORG-12). 운영자 행동은 모두 활동 기록에 남긴다.
-- API-OPS-02 (필수): 운영자가 아닌 계정이 운영자 API를 부르면 `404 NOT_FOUND`다.
+- API-OPS-01 (필수): 운영자 API는 조직 식별자와 상태만 다룬다. 응답 본문이 없고, 조직·팀의 업무 데이터, 구성원 목록, 이메일을 돌려주지 않는다(SEC-ORG-12). 운영자 행동은 모두 운영 기록과 조직 활동 기록에 남긴다(TEN-OPS-06).
+- API-OPS-02 (필수): 운영자가 아닌 계정이 운영자 API를 부르면 조직이 있든 없든 `404 NOT_FOUND`다. 최근 인증이 지난 요청은 운영자 여부와 관계없이 먼저 `401 REAUTH_REQUIRED`다(TEN-CTX-05).
+- API-OPS-03 (필수): 운영자 API는 `MULTI_ORG` 배포에만 있다. `SINGLE_ORG`에서는 `404 NOT_FOUND`다(TEN-OPS-02).
 
 ## 13. 검증
 

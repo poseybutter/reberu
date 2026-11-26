@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.19.0\
-> 수정일: 2026-11-25
+> 버전: v0.20.0\
+> 수정일: 2026-11-26
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -77,6 +77,7 @@
 | 조직 멤버십 | `org_membership` | 조직 | core.tenancy |
 | 이메일 초대 | `invitation` | 조직 | core.tenancy |
 | 직무 유형 | `job_type` | 조직 | core.tenancy |
+| 운영 기록 | `operator_action_log` | 배포(조직 ID를 값으로 담음) | core.tenancy |
 | 조직 휴일 | `org_holiday` | 조직 | core.calendar |
 | 조직 모듈 허용·켜짐 | `org_module_state` | 조직 | core.module |
 | 조직 모듈 설정 | `org_module_setting` | 조직 | core.module |
@@ -406,6 +407,19 @@ erDiagram
 | `team_custom_field` | `team_id`, `target` `CODE`(`TASK`·`PROJECT`), `label` `TEXT(40)`, `label_key` `TEXT(40)`, `kind` `CODE`(`TEXT`·`MEMO`), `required` `BOOL`, `sort_order` `INT`, `hidden` `BOOL`, `version` `INT`. 유일: (`team_id`, `target`, `label_key`) |
 
 - 추가 항목 종류에 비밀 정보는 없다(OQ-12).
+
+### operator_action_log (운영 기록, 추가만)
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `operator_account_id` | `UUID` | ○ | 행동한 운영자 계정 |
+| `action` | `CODE` | ○ | `ORG_SUSPENDED`·`ORG_UNSUSPENDED` |
+| `org_id` | `UUID` | ○ | 대상 조직 |
+| `reason` | `TEXT(200)` | | 정지 사유. 해제는 비운다(TEN-OPS-05) |
+| `occurred_at` | `UTC_TIMESTAMP` | ○ | |
+
+- 인덱스: (`org_id`, `occurred_at`).
+- 조직의 데이터가 아니라 배포의 기록이다. 조직·팀 API로 읽지 못하고 조직 단위 이관(§11)에 넣지 않는다. 고치거나 지우는 코드가 없다(TEN-OPS-06).
 
 ## 5. core.module·core.calendar·core.audit·core.realtime
 

@@ -15,6 +15,7 @@ import reberu.core.access.ModuleSwitch;
 final class AccessDeclarations {
 
     static final String API_PREFIX = "/api/";
+    static final String OPERATOR_PREFIX = "/api/operator/";
     static final String ORG_ID = "orgId";
     static final String TEAM_ID = "teamId";
     static final String MODULE_SEGMENT = "mod";
@@ -55,6 +56,9 @@ final class AccessDeclarations {
                 }
                 if (scope == Scope.NONE && (has(pattern, ORG_ID) || has(pattern, TEAM_ID))) {
                     violations.add("조직·팀 경로인데 조직·팀 권한 아님: " + where);
+                }
+                if (pattern.startsWith(OPERATOR_PREFIX) != (access.value() == AccessLevel.OPERATOR)) {
+                    violations.add("운영자 권한과 /api/operator/ 경로는 함께(API-OPS-02): " + where);
                 }
                 if (scope == Scope.TEAM && has(pattern, ORG_ID)) {
                     violations.add("팀 권한 경로에 {orgId} 함께 있음(API-URL-02): " + where);
