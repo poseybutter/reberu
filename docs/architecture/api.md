@@ -1,7 +1,7 @@
 # API 목록
 
 > 버전: v0.24.0\
-> 수정일: 2026-11-25
+> 수정일: 2026-11-26
 
 브라우저가 부르는 REST API의 주소 체계, 공통 형식, v0.1 API 목록을 정한다. 권한 규칙은 [architecture/tenancy.md](tenancy.md) §9·§10, 보안 요구사항은 [architecture/security.md](security.md), 화면은 [product/screens.md](../product/screens.md), 엔티티는 [domain/model.md](../domain/model.md)를 따른다. 실시간 채널은 [architecture/realtime.md](realtime.md)가 맡는다. 요구사항 ID 접두어는 `API`다.
 
@@ -162,7 +162,7 @@
 | `POST` | `/api/me/orgs/{leaveOrgId}/leave` | 조직 나가기 → 조직 멤버십과 그 조직의 팀 멤버십 `LEFT`(사유 `SELF`, TEN-LEAVE-02) | 계정 | `204`, 내 멤버십이 `ACTIVE`·`SUSPENDED`가 아님 `404`, 조직 `ACTIVE` 아님 `409 READ_ONLY`, 정지됨 `403 FORBIDDEN_ACTION`, 마지막 관리자 `409 LAST_ADMIN_REQUIRED`(TEN-LEAVE-01~03) |
 | `POST` | `/api/me/teams/{leaveTeamId}/leave` | 팀 나가기 → 팀 멤버십 `LEFT`(사유 `SELF`, TEN-LEAVE-04) | 계정 | `204`, `404`·`409 READ_ONLY`·`403`·`409 LAST_ADMIN_REQUIRED`는 조직 나가기와 같은 기준(TEN-LEAVE-01·04) |
 | `GET` | `/api/me/withdrawal-check` | 탈퇴 전 판정(TEN-WD-01). 응답 `withdrawable`(넘겨야 하는 곳이 없음), `confirmText`(`탈퇴합니다`), 관리자를 넘겨야 하는 `transferOrgs`·`transferTeams`, 함께 보관될 `archiveOrgs`·`archiveTeams`. 조직 항목은 `orgId`, `name`, `state`(`ARCHIVED`면 복원한 뒤 넘김, TEN-WD-03), 팀 항목은 `orgId`, `orgName`, `teamId`, `name` | 계정 | D3 |
-| `POST` | `/api/me/withdraw` | 탈퇴. 본문 `confirmText`(`탈퇴합니다`), `orgNameConfirmations`(함께 보관될 조직마다 `{ orgId, name }`, 없으면 빈 목록). 판정과 처리는 한 트랜잭션(TEN-WD-02~08) | 계정 🔒 | `204`, 지금 세션 삭제. 확인 문구·조직 이름이 다르거나 같은 조직이 두 번이면 `400`, 보관될 조직 목록이 바뀜 `409 ALREADY_PROCESSED`, 넘겨야 하는 곳이 있음 `409 LAST_ADMIN_REQUIRED` |
+| `POST` | `/api/me/withdraw` | 탈퇴. 본문 `confirmText`(`탈퇴합니다`), `orgNameConfirmations`(함께 보관될 조직마다 `{ orgId, name }`, 없으면 빈 목록). 판정과 처리는 한 트랜잭션(TEN-WD-02~08) | 계정 🔒 | `204`, 지금 세션 삭제. 확인 문구(20자 이하)·조직 이름(40자 이하)이 길거나 다르거나 같은 조직이 두 번이면 `400`, 보관될 조직 목록이 바뀜 `409 ALREADY_PROCESSED`, 넘겨야 하는 곳이 있음 `409 LAST_ADMIN_REQUIRED` |
 
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |

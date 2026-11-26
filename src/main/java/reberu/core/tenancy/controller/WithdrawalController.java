@@ -2,6 +2,7 @@ package reberu.core.tenancy.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,9 +37,9 @@ class WithdrawalController {
     @PostMapping("/withdraw")
     @RequiresRecentAuth
     @Access(AccessLevel.ACCOUNT)
-    ResponseEntity<Void> withdraw(@AuthenticationPrincipal UUID accountId, @RequestBody WithdrawRequest body,
+    ResponseEntity<Void> withdraw(@AuthenticationPrincipal UUID accountId, @Valid @RequestBody WithdrawRequest body,
             HttpServletRequest request) {
-        withdrawals.withdraw(accountId, body.confirmText(), body.orgNameConfirmations());
+        withdrawals.withdraw(accountId, body.confirmText(), body.toOrgNames());
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();

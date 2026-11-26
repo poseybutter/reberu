@@ -237,12 +237,10 @@ public class InvitationService {
                 .forEach(invitation -> revokeOpen(invitation, actorId, at));
     }
 
-    void forget(UUID accountId, String email, Instant at) {
-        String normalized = email == null ? null : EmailAddresses.normalize(email);
-        boolean shared = normalized != null && accounts.idsByEmail(List.of(normalized))
-                .getOrDefault(normalized, Set.of()).stream().anyMatch(id -> !id.equals(accountId));
-        List<Invitation> rows = normalized == null || shared ? invitations.findForUpdateByAcceptedBy(accountId)
-                : invitations.findForUpdateByEmailOrAcceptedBy(normalized, accountId);
+    void forget(UUID accountId, String normalizedEmail, boolean emailShared, Instant at) {
+        List<Invitation> rows = normalizedEmail == null || emailShared
+                ? invitations.findForUpdateByAcceptedBy(accountId)
+                : invitations.findForUpdateByEmailOrAcceptedBy(normalizedEmail, accountId);
         for (Invitation invitation : rows) {
             if (OPEN_STATES.contains(invitation.state())) {
                 revokeOpen(invitation, accountId, at);

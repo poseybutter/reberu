@@ -33,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionTemplate;
 import reberu.TestcontainersConfiguration;
+import reberu.core.account.AccountState;
 import reberu.core.account.Accounts;
 import reberu.core.account.GoogleProfile;
 import reberu.core.auth.security.AccountAuthentication;
@@ -143,6 +144,89 @@ class WithdrawalTest {
 
         assertThat(invitation(pending)).isEqualTo("PENDING:member@example.com");
         assertThat(invitation(accepted)).isEqualTo("ACCEPTED:-");
+    }
+
+    @Test
+    @DisplayName("TEN-WD-07: 같은 이메일의 두 계정이 동시에 탈퇴하면 둘째는 첫째를 기다린 뒤 그 이메일로 온 대기 초대를 지움")
+    void forgetsSharedEmailUnderConcurrency() throws Exception {
+        UUID twin = newAccount("twin", "member@example.com");
+        String pending = insertInvitation(null, "member@example.com", "PENDING", null);
+
+        CountDownLatch held = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread holder = new Thread(() -> transactions.executeWithoutResult(status -> {
+            withdrawals.withdraw(member, CONFIRM, List.of());
+            held.countDown();
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            }
+            catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }));
+        holder.start();
+        assertThat(held.await(10, TimeUnit.SECONDS)).isTrue();
+
+        CountDownLatch started = new CountDownLatch(1);
+        CompletableFuture<MockHttpServletResponse> second = CompletableFuture.supplyAsync(() -> {
+            started.countDown();
+            try {
+                return withdraw(twin, CONFIRM, List.of());
+            }
+            catch (Exception failed) {
+                throw new IllegalStateException(failed);
+            }
+        });
+        assertThat(started.await(10, TimeUnit.SECONDS)).isTrue();
+        Thread.sleep(500);
+        assertThat(second.isDone()).as("잠금 대기").isFalse();
+        release.countDown();
+        holder.join();
+
+        assertThat(second.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(204);
+        assertThat(accountState(member)).isEqualTo("DELETED");
+        assertThat(accountState(twin)).isEqualTo("DELETED");
+        assertThat(invitation(pending)).isEqualTo("REVOKED:-");
+    }
+
+    @Test
+    @DisplayName("SEC-PRIV-04: 로그인이 계정을 읽은 뒤 탈퇴가 끝나도 로그인 기록이 탈퇴 결과를 덮어쓰지 않음")
+    void loginDoesNotOverwriteWithdrawal() {
+        String sub = jdbc.sql("SELECT google_sub FROM account WHERE id = :id").param("id", member.toString())
+                .query(String.class).single();
+
+        AccountState locked = transactions.execute(status -> {
+            UUID found = accounts.findByGoogleSub(sub).orElseThrow().id();
+            CompletableFuture.runAsync(() -> {
+                try {
+                    assertThat(withdraw(member, CONFIRM, List.of()).getStatus()).isEqualTo(204);
+                }
+                catch (Exception failed) {
+                    throw new IllegalStateException(failed);
+                }
+            }).join();
+            return accounts.recordLogin(found, new GoogleProfile(sub, "member@example.com", "member", null, null),
+                    Instant.now());
+        });
+
+        assertThat(locked).isEqualTo(AccountState.DELETED);
+        Map<String, Object> account = jdbc.sql("SELECT * FROM account WHERE id = :id")
+                .param("id", member.toString()).query().singleRow();
+        assertThat(account).containsEntry("state", "DELETED").containsEntry("email", null)
+                .containsEntry("display_name", null);
+        assertThat((String) account.get("google_sub")).matches("deleted:[0-9a-f]{64}");
+    }
+
+    @Test
+    @DisplayName("SEC-INPUT-01:확인 문구 20자, 조직 이름 확인 40자를 넘으면 잠그기 전에 400 TOO_LONG")
+    void rejectsTooLongConfirmations() throws Exception {
+        removeMember();
+
+        assertThat(fields(withdraw(admin, "가".repeat(21), confirmed())))
+                .containsExactly("confirmText:TOO_LONG");
+        assertThat(fields(withdraw(admin, CONFIRM, List.of(new OrgName(UUID.fromString(orgId), "가".repeat(41))))))
+                .containsExactly("orgNameConfirmations[0].name:TOO_LONG");
+        assertThat(accountState(admin)).isEqualTo("ACTIVE");
     }
 
     @Test

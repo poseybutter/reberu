@@ -19,7 +19,9 @@ public interface Accounts {
 
     Optional<AccountState> lockState(UUID accountId);
 
-    void recordLogin(UUID accountId, GoogleProfile profile, Instant at);
+    Optional<LockedAccount> lockWithEmailSharers(UUID accountId);
+
+    AccountState recordLogin(UUID accountId, GoogleProfile profile, Instant at);
 
     UUID createWithConsent(GoogleProfile profile, String termsVersion, String privacyVersion, Instant at);
 

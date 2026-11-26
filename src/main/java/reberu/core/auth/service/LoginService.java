@@ -46,7 +46,13 @@ public class LoginService {
         if (account.get().state() != AccountState.ACTIVE) {
             return LoginOutcome.rejected();
         }
-        accounts.recordLogin(account.get().id(), profile, clock.instant());
+        AccountState locked = accounts.recordLogin(account.get().id(), profile, clock.instant());
+        if (locked == AccountState.SUSPENDED) {
+            return LoginOutcome.suspended();
+        }
+        if (locked != AccountState.ACTIVE) {
+            return LoginOutcome.rejected();
+        }
         orgBootstrap.grantFirstAdmin(account.get().id(), profile.email());
         return LoginOutcome.signedIn(account.get().id(), authenticatedAt);
     }

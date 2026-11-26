@@ -12,9 +12,9 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
-import reberu.core.account.AccountProfile;
 import reberu.core.account.AccountState;
 import reberu.core.account.Accounts;
+import reberu.core.account.LockedAccount;
 import reberu.core.audit.ActivityEntry;
 import reberu.core.audit.ActivityLogs;
 import reberu.core.support.ErrorCode;
@@ -79,9 +79,9 @@ public class WithdrawalService {
             throw invalid("confirmText", FieldReason.NOT_ALLOWED_VALUE);
         }
         Map<UUID, String> confirmed = confirmations(orgNames);
-        if (accounts.lockState(accountId).filter(AccountState.ACTIVE::equals).isEmpty()) {
-            throw new ReberuException(ErrorCode.UNAUTHENTICATED);
-        }
+        LockedAccount account = accounts.lockWithEmailSharers(accountId)
+                .filter(locked -> locked.state() == AccountState.ACTIVE)
+                .orElseThrow(() -> new ReberuException(ErrorCode.UNAUTHENTICATED));
         Set<UUID> orgIds = relatedOrgIds(accountId);
         orgIds.forEach(organizations::findForUpdate);
         if (!orgIds.equals(relatedOrgIds(accountId))) {
@@ -103,7 +103,6 @@ public class WithdrawalService {
         }
 
         Instant now = clock.instant();
-        AccountProfile profile = accounts.profiles(Set.of(accountId)).get(accountId);
         endMemberships(accountId, orgIds, now);
         for (OrgItem org : judgment.archiveOrgs()) {
             abandon(organizations.findForUpdate(org.orgId()).orElseThrow(), accountId, now);
@@ -112,7 +111,7 @@ public class WithdrawalService {
             teamService.archiveLocked(team.orgId(), teams.findForUpdate(team.orgId(), team.teamId()).orElseThrow(),
                     accountId, now);
         }
-        invitations.forget(accountId, profile == null ? null : profile.email(), now);
+        invitations.forget(accountId, account.email(), account.emailShared(), now);
         accounts.withdraw(accountId, now);
     }
 
