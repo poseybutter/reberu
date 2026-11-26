@@ -31,6 +31,11 @@ class SessionConfiguration {
     }
 
     @Bean
+    AccountWithdrawnSessionRevoker accountWithdrawnSessionRevoker(JdbcAuthSessionRepository sessions) {
+        return new AccountWithdrawnSessionRevoker(sessions);
+    }
+
+    @Bean
     CookieSerializer cookieSerializer() {
         DefaultCookieSerializer serializer = new DefaultCookieSerializer();
         serializer.setCookieName(COOKIE_NAME);

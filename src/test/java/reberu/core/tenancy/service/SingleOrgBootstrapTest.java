@@ -291,6 +291,28 @@ class SingleOrgBootstrapTest {
         assertThat(new TenancyProperties(null, null, null).mode()).isEqualTo(DeploymentMode.MULTI_ORG);
     }
 
+    @Test
+    @DisplayName("TEN-WD-05: SINGLE_ORG에서 혼자 남은 조직 관리자가 탈퇴하면 조직은 보관하지 않고, 부트스트랩 이메일로 다시 관리자 지정")
+    void withdrawingLastAdminKeepsSingleOrg() throws Exception {
+        UUID leader = newAccount("leader", "leader@example.com");
+        assertThat(bootstrap.grantFirstAdmin(leader, "leader@example.com")).isTrue();
+        AccountAuthentication signedIn = new AccountAuthentication(leader, Instant.now());
+
+        mockMvc.perform(get("/api/me/withdrawal-check").with(authentication(signedIn)))
+                .andExpect(jsonPath("$.withdrawable").value(true))
+                .andExpect(jsonPath("$.archiveOrgs").isEmpty());
+        assertThat(mockMvc.perform(post("/api/me/withdraw").with(authentication(signedIn)).with(csrfToken())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"confirmText\":\"탈퇴합니다\"}"))
+                .andReturn().getResponse().getStatus()).isEqualTo(204);
+
+        assertThat(jdbc.sql("SELECT state FROM organization WHERE id = :id").param("id", ORG_ID)
+                .query(String.class).single()).isEqualTo("ACTIVE");
+        assertThat(bool(jdbc.sql("SELECT ownerless FROM organization WHERE id = :id").param("id", ORG_ID)
+                .query().singleValue())).isFalse();
+        UUID next = newAccount("next", "leader@example.com");
+        assertThat(bootstrap.grantFirstAdmin(next, "leader@example.com")).isTrue();
+    }
+
     private UUID newAccount(String name, String email) {
         return accounts.createWithConsent(profile(name, email), "v1", "v1", Instant.now());
     }

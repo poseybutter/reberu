@@ -1,7 +1,7 @@
 # 실시간 설계
 
-> 버전: v0.2.0\
-> 수정일: 2026-11-05
+> 버전: v0.3.0\
+> 수정일: 2026-11-25
 
 새로고침 없이 바뀌어야 하는 모든 상태의 전달 방식을 정한다. 화면별 실시간 항목은 [product/screens.md](../product/screens.md)에, 권한 확인 규칙은 [architecture/tenancy.md](tenancy.md)에, 보안 요구사항은 [architecture/security.md](security.md)에 있다. 이 문서는 그 셋을 실시간 채널에 적용하는 규칙이다.
 
@@ -164,8 +164,8 @@ flowchart TD
 | `quest.completed` | 퀘스트 자동 체크 | 팀, 퀘스트 ID, EXP | API 뒤 | 퀘스트 기록 | C3, B0 |
 | `invitation.received` | 새 초대 도착 | 초대 ID, 조직 이름, 팀 이름, 보낸 사람, 멤버 종류 | API 뒤 | 초대 | A0, A3 |
 | `join-request.decided` | 내 가입 요청 처리 | 대상(조직/팀), 결과(`ACTIVE`/`REJECTED`) | API 뒤 | 멤버십 | A2 |
-| `membership.removed` | 팀 멤버십 종료 | 팀, 이유(`REMOVED`/`SUSPENDED`/`LEFT`/`EXPIRED`/`TEAM_ARCHIVED`) | API 뒤 / 서버 | 멤버십 | 모든 화면 → A3 |
-| `org-membership.removed` | 조직 멤버십 종료 | 조직, 이유(`REMOVED`/`SUSPENDED`/`LEFT`/`EXPIRED`/`ORG_SUSPENDED`) | API 뒤 / 서버 | 멤버십 | 모든 화면 → A3 또는 A0 |
+| `membership.removed` | 팀 멤버십 종료 | 팀, 이유(`REMOVED`/`SUSPENDED`/`LEFT`/`EXPIRED`/`TEAM_ARCHIVED`/`ACCOUNT_DELETED`) | API 뒤 / 서버 | 멤버십 | 모든 화면 → A3 |
+| `org-membership.removed` | 조직 멤버십 종료 | 조직, 이유(`REMOVED`/`SUSPENDED`/`LEFT`/`EXPIRED`/`ORG_SUSPENDED`/`ACCOUNT_DELETED`) | API 뒤 / 서버 | 멤버십 | 모든 화면 → A3 또는 A0 |
 | `account.suspended` | 계정 정지 | 없음 | API 뒤 | 계정 | 모든 화면 → A1 |
 | `wave.received` | 동료가 손 흔들어 부름 | 보낸 사람 | 직접 | 알림으로 저장 | B0, B8 |
 | `admin.join-request.created` | 새 가입 요청(팀·조직 관리자에게만, RT-SCOPE-02) | 대상, 요청한 사람, 대기 수 | API 뒤 | 멤버십 | E1, E2, F5 |

@@ -194,4 +194,13 @@ class TenancyConfiguration {
                 activityLogs, transactions, Clock.systemUTC());
     }
 
+    @Bean
+    WithdrawalService withdrawalService(Accounts accounts, OrganizationRepository organizations,
+            OrgMembershipRepository orgMemberships, TeamRepository teams, TeamMembershipRepository teamMemberships,
+            OrgSettingsService orgSettings, TeamService teamService, InvitationService invitations,
+            ActivityLogs activityLogs, TenancyProperties properties, JdbcClient jdbc) {
+        return new WithdrawalService(accounts, organizations, orgMemberships, teams, teamMemberships, orgSettings,
+                teamService, invitations, activityLogs, properties, jdbc, Clock.systemUTC());
+    }
+
 }
