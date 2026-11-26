@@ -142,6 +142,7 @@ class OperatorTest {
         Map<String, String> rejected = new LinkedHashMap<>();
         rejected.put("   ", "REQUIRED");
         rejected.put("가".repeat(201), "TOO_LONG");
+        rejected.put(" " + "가".repeat(201) + " ", "TOO_LONG");
         rejected.put("첫 줄\n둘째 줄", "INVALID_FORMAT");
         rejected.put("신고자 reporter@example.com", "NOT_ALLOWED_VALUE");
         rejected.put("근거 https://example.com/report", "NOT_ALLOWED_VALUE");
@@ -152,7 +153,7 @@ class OperatorTest {
         }
         assertThat(fields(perform(post(path(orgId, "suspend")).contentType(MediaType.APPLICATION_JSON)
                 .content("{}"), OPERATOR))).containsExactly("reason:REQUIRED");
-        assertThat(suspend(OPERATOR, orgId, "가".repeat(200)).getStatus()).isEqualTo(204);
+        assertThat(suspend(OPERATOR, orgId, "  " + "가".repeat(200) + "  ").getStatus()).isEqualTo(204);
 
         jdbc.sql("UPDATE organization SET state = 'DELETED' WHERE id = :org").param("org", orgId).update();
         assertThat(suspend(OPERATOR, orgId, REASON).getStatus()).isEqualTo(404);
