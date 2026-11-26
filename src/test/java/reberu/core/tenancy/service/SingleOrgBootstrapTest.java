@@ -171,6 +171,22 @@ class SingleOrgBootstrapTest {
     }
 
     @Test
+    @DisplayName("TEN-OPS-02: SINGLE_ORG에서 운영자 API는 운영자 계정에게도 404이고 조직 상태 유지")
+    void operatorApisAreHidden() throws Exception {
+        AccountAuthentication operator = new AccountAuthentication(
+                UUID.fromString("00000000-0000-7000-8000-00000000a001"), Instant.now());
+
+        assertThat(mockMvc.perform(post("/api/operator/orgs/" + ORG_ID + "/suspend").with(authentication(operator))
+                        .with(csrfToken()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"점검\"}"))
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
+        assertThat(mockMvc.perform(post("/api/operator/orgs/" + ORG_ID + "/unsuspend")
+                        .with(authentication(operator)).with(csrfToken()))
+                .andReturn().getResponse().getStatus()).isEqualTo(404);
+        assertThat(jdbc.sql("SELECT state FROM organization").query(String.class).single()).isEqualTo("ACTIVE");
+    }
+
+    @Test
     @DisplayName("SINGLE_ORG: 로그인한 첫 관리자의 세션은 deploymentMode와 첫 화면 TEAM_PICKER(팀 없는 조직 멤버)")
     void signedInSessionShowsModeAndNext() throws Exception {
         UUID leader = newAccount("leader", "leader@example.com");

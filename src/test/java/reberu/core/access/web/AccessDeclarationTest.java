@@ -29,6 +29,8 @@ import reberu.core.access.ModuleSwitch;
 @Import(TestcontainersConfiguration.class)
 class AccessDeclarationTest {
 
+    private static final String OPERATOR_VIOLATION = "운영자 권한과 /api/operator/ 경로는 함께(API-OPS-02): ";
+
     private static final ModuleSwitch MODULES = new ModuleSwitch() {
 
         @Override
@@ -74,7 +76,7 @@ class AccessDeclarationTest {
     }
 
     @Test
-    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId, 같은 경로 조각 반복, 관리자·쓰기 API 손님 허용")
+    @DisplayName("ARCH-TEST-02 위반 사례: 선언 없음, 범위와 경로 불일치, 팀 경로에 orgId, 같은 경로 조각 반복, 관리자·쓰기 API 손님 허용, 운영자 권한과 경로 불일치")
     void detectsViolations() throws Exception {
         Map<RequestMappingInfo, HandlerMethod> handlers = new LinkedHashMap<>();
         handlers.put(info("/api/undeclared"), handler("undeclared"));
@@ -87,10 +89,15 @@ class AccessDeclarationTest {
         handlers.put(info("/api/orgs/{orgId}/admin-guest"), handler("orgAdminGuest"));
         handlers.put(info("/api/orgs/{orgId}/member-guest"), handler("orgMemberGuest"));
         handlers.put(info("/api/orgs/{orgId}/write-guest"), handler("orgMemberGuestWrite"));
+        handlers.put(info("/api/operator/thing"), handler("operator"));
+        handlers.put(info("/api/operator/account-thing"), handler("account"));
+        handlers.put(info("/api/operator-thing"), handler("operator"));
         handlers.put(info("/not-api/thing"), handler("undeclared"));
 
         assertThat(AccessDeclarations.violations(handlers, MODULES))
-                .hasSize(7)
+                .hasSize(9)
+                .anySatisfy(v -> assertThat(v).startsWith(OPERATOR_VIOLATION + "/api/operator/account-thing"))
+                .anySatisfy(v -> assertThat(v).startsWith(OPERATOR_VIOLATION + "/api/operator-thing"))
                 .anySatisfy(v -> assertThat(v).startsWith("손님 허용은 읽기 API에만: /api/orgs/{orgId}/write-guest"))
                 .anySatisfy(v -> assertThat(v).startsWith("손님 허용은 조직 멤버 권한에만: /api/orgs/{orgId}/admin-guest"))
                 .anySatisfy(v -> assertThat(v).startsWith("팀 권한인데 {teamId} 경로 없음: /api/x/{id}/x"))
@@ -192,6 +199,10 @@ class AccessDeclarationTest {
 
         @Access(AccessLevel.ACCOUNT)
         void account() {
+        }
+
+        @Access(AccessLevel.OPERATOR)
+        void operator() {
         }
 
         @Access(AccessLevel.ORG_ADMIN)

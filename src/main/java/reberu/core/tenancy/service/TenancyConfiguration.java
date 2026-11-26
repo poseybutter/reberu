@@ -99,6 +99,12 @@ class TenancyConfiguration {
     }
 
     @Bean
+    OperatorService operatorService(OrganizationRepository organizations, OrgMembershipRepository orgMemberships,
+            ActivityLogs activityLogs, JdbcClient jdbc) {
+        return new OperatorService(organizations, orgMemberships, activityLogs, jdbc, Clock.systemUTC());
+    }
+
+    @Bean
     InviteLinkService inviteLinkService(StateLocks locks, OrganizationRepository organizations,
             TeamRepository teams, InviteLinkRepository links, OrgMembershipRepository orgMemberships,
             TeamMembershipRepository teamMemberships, Accounts accounts, ActivityLogs activityLogs,

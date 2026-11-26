@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,15 +22,19 @@ class AccessConfiguration implements WebMvcConfigurer {
 
     private final MembershipDirectory directory;
     private final ModuleSwitch modules;
+    private final Operators operators;
 
-    AccessConfiguration(MembershipDirectory directory, ModuleSwitch modules) {
+    AccessConfiguration(MembershipDirectory directory, ModuleSwitch modules,
+            @Value("${reberu.operator.account-ids:}") List<String> operatorAccountIds) {
         this.directory = directory;
         this.modules = modules;
+        this.operators = Operators.parse(operatorAccountIds);
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AccessInterceptor(new AccessDecider(directory, modules, Clock.systemUTC())))
+        registry.addInterceptor(
+                        new AccessInterceptor(new AccessDecider(directory, modules, Clock.systemUTC()), operators))
                 .order(Ordered.HIGHEST_PRECEDENCE + 10);
     }
 

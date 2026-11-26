@@ -1,6 +1,6 @@
 # 테넌시·멤버십·권한
 
-> 버전: v0.30.0\
+> 버전: v0.31.0\
 > 수정일: 2026-11-26
 
 배포, 조직, 팀, 계정, 멤버십의 구조와 상태 전이, 가입 흐름, 권한, 데이터 격리를 정한다. 도메인 모델과 인가 구현의 기준이다. 보안 세부(토큰, 세션, 요청 제한)는 [architecture/security.md](security.md), 용어는 [README.md](../README.md) §4를 따른다.
@@ -753,7 +753,7 @@ flowchart TD
 | TEN-CTX-03 | 멤버십·역할·모듈 상태를 캐시하면, 상태가 바뀌는 즉시 캐시를 무효화한다. 무효화 전까지 옛 권한이 쓰이는 시간은 0이어야 한다(쓰기 전에 무효화) | 필수 |
 | TEN-CTX-04 | 모듈 코드는 확정된 지금 팀만 받는다. 모듈이 스스로 팀을 찾지 않는다 | 필수 |
 | TEN-CTX-05 | CSRF 실패(403), 최근 인증 필요(401 `REAUTH_REQUIRED`), 요청 제한(429)은 [architecture/security.md](security.md)를 따르며 1단계 전에 판정한다 | 필수 |
-| TEN-CTX-06 | 모든 `/api` 컨트롤러 메서드는 권한 수준 하나를 선언한다: `PUBLIC`, `SIGNUP_PENDING`, `ACCOUNT`(경로에 조직·팀 없음), `ORG_MEMBER`·`ORG_ADMIN`(`{orgId}` 경로, 1~4단계), `TEAM_VIEWER`·`TEAM_MEMBER`·`TEAM_ADMIN`(`{teamId}` 경로, 1~6단계). 쓰기 API는 쓰기 표시를 함께 단다(9단계). 판정은 요청 본문을 읽기 전에 한다 | 필수 |
+| TEN-CTX-06 | 모든 `/api` 컨트롤러 메서드는 권한 수준 하나를 선언한다: `PUBLIC`, `SIGNUP_PENDING`, `ACCOUNT`(경로에 조직·팀 없음), `OPERATOR`(`/api/operator/` 경로, TEN-OPS-02), `ORG_MEMBER`·`ORG_ADMIN`(`{orgId}` 경로, 1~4단계), `TEAM_VIEWER`·`TEAM_MEMBER`·`TEAM_ADMIN`(`{teamId}` 경로, 1~6단계). 쓰기 API는 쓰기 표시를 함께 단다(9단계). 판정은 요청 본문을 읽기 전에 한다 | 필수 |
 | TEN-CTX-07 | 조직 수준에서 손님은 4단계에서 `404`다(TEN-GUEST-05). 예외는 [architecture/api.md](api.md) 표에 "손님 가능"으로 적은 `ORG_MEMBER` API뿐이며, 권한 선언에 손님 허용(`guestAllowed`)을 함께 단다. 손님 허용은 `ORG_MEMBER`의 읽기 API에만 달 수 있고(쓰기 표시와 함께 쓸 수 없다), 어기면 서버가 시작하지 않는다. 조직 구성원이 `ORG_ADMIN` API를, 팀 멤버가 자기 역할보다 높은 팀 API를 부르면 볼 수 있는 대상이므로 10단계 `403 FORBIDDEN_ACTION`이다 | 필수 |
 | TEN-CTX-08 | 조직 경로 아래 팀 자원(`/api/orgs/{orgId}/teams/{teamId}/...`)은 조직 컨텍스트를 확정한 뒤 "조직 식별자 + 팀 식별자"로 찾는다. 다른 조직의 팀이면 `404`다 | 필수 |
 | TEN-CTX-09 | 9단계는 잠그기 전의 판정이라 판정과 잠금 사이에 보관될 수 있다. 조직이나 팀의 데이터를 바꾸는 서비스는 조직 행 → 팀 행 → 바꿀 행 순서로 잠근 뒤(TEN-MEM-06) 조직(팀 데이터면 팀도)이 아직 `ACTIVE`인지 다시 보고, 아니면 `409 READ_ONLY`다. 다시 보기는 버전 확인보다 먼저 한다. 조직 상태를 바꾸는 보관·복원도 조직 행을 잠그므로 이 확인과 직렬화된다 | 필수 |
@@ -1000,9 +1000,20 @@ flowchart LR
 | TEN-WD-07 | 내가 수락한 초대와 내 이메일로 온 초대는 이메일을 지우고, 그중 대기 중인 초대는 `REVOKED`로 바꾼다. 같은 이메일을 가진 다른 계정이 있으면 이메일로 온 초대는 그 계정의 것이기도 하므로 그대로 두고, 내가 수락한 초대만 이메일을 지운다. 다른 계정이 있는지는 TEN-WD-02의 잠금을 얻은 뒤의 DB 값으로 판정하므로, 같은 이메일의 두 계정이 동시에 탈퇴하면 나중 탈퇴가 이메일로 온 초대를 지운다 | 필수 |
 | TEN-WD-08 | 활동 기록: 조직마다 `ORG_MEMBER_WITHDRAWN`, 팀마다 `TEAM_MEMBER_WITHDRAWN`(전 값은 멤버십 상태, 후 값 `LEFT`), 보관은 `ORG_ARCHIVED`·`TEAM_ARCHIVED`, 관리자 없음 표시는 `ORG_ABANDONED`(전 값은 조직 상태, 후 값 `OWNERLESS`), 초대 취소는 `INVITATION_REVOKED`다. 행위자는 탈퇴한 계정 ID다(TEN-LOG-05) | 필수 |
 
+### 14.7 운영자의 조직 정지
+
+| ID | 요구사항 | 수준 |
+| --- | --- | --- |
+| TEN-OPS-01 | 운영자는 배포 설정 `reberu.operator.account-ids`(환경 변수 `OPERATOR_ACCOUNT_IDS`, 쉼표로 나눈 계정 ID)로 정한다. 이메일이 아니라 계정 ID로 정해, 같은 이메일을 가진 다른 계정이 운영자가 되지 않게 한다. 비우면 운영자가 없다. 계정 UUID가 아닌 값이 있으면 서버가 시작하지 않는다. 운영자 여부는 세션에 두지 않고 요청마다 목록과 견준다 | 필수 |
+| TEN-OPS-02 | 운영자 API는 `MULTI_ORG`에만 있다. `SINGLE_ORG`에서는 운영자 계정에게도 `404`다. 운영자 권한은 `/api/operator/` 아래의 API에만 선언하고, 그 아래의 API는 모두 운영자 권한을 선언한다. 어긋나면 서버가 시작하지 않는다(TEN-CTX-06). 운영자가 아니면 조직이 있든 없든 같은 `404`이고, 최근 인증은 그보다 먼저 판정한다(TEN-CTX-05) | 필수 |
+| TEN-OPS-03 | 정지는 조직 행을 잠근 뒤 `ACTIVE`·`ARCHIVED` 조직을 `SUSPENDED`로 바꾸고 정지 전 상태를 남긴다. 조직이 없거나 `DELETED`면 `404`, 이미 `SUSPENDED`면 `409 ALREADY_PROCESSED`, `DELETION_SCHEDULED`면 `409 READ_ONLY`다. 멤버십, 가입 요청, 이메일 초대, 초대 링크는 바꾸지 않는다. 정지된 동안에는 조직 상태 확인(§10 3단계, TEN-HOME-01)이 그 조직의 API·첫 화면·가입 경로를 막는다. 세션은 끊지 않는다 | 필수 |
+| TEN-OPS-04 | 해제는 `SUSPENDED` 조직을 `ACTIVE`로 바꾼다(§5.2). `SUSPENDED`가 아니면 `409 ALREADY_PROCESSED`다. `ACTIVE` 조직 관리자가 한 명도 없으면 `409 LAST_ADMIN_REQUIRED`로 막아 TEN-INV-05를 지킨다. 정지된 동안 유일한 조직 관리자가 탈퇴한 조직과 관리자 없음으로 표시된 보관 조직이 여기에 든다 | 필수 |
+| TEN-OPS-05 | 정지 사유는 앞뒤 공백을 뺀 1~200자다. 없으면 `REQUIRED`, 넘으면 `TOO_LONG`, 제어 문자가 있으면 `INVALID_FORMAT`, 이메일·주소·토큰 모양 값이 있으면 `NOT_ALLOWED_VALUE`로 `400`이다. 해제는 사유를 받지 않는다 | 필수 |
+| TEN-OPS-06 | 운영자 행동은 상태 변경과 같은 트랜잭션에서 운영 기록(`operator_action_log`: 운영자 계정 ID, 행동, 조직 ID, 사유, 시각)과 조직 활동 기록(`ORG_SUSPENDED`·`ORG_UNSUSPENDED`, 대상은 조직, 전·후 값은 조직 상태)에 남긴다. 조직 활동 기록에는 행위자와 사유를 남기지 않아, 조직 관리자가 운영자가 누구인지 알 수 없다. 운영 기록을 읽는 API는 없다 | 필수 |
+
 ## 15. 활동 기록
 
-활동 기록은 더하기만 한다. 고치거나 지우는 API가 없다([architecture/security.md](security.md) §13.5). 각 기록은 시각, 행위자(계정, 운영자, 서버), 행동, 대상, 바뀌기 전·후 값을 가진다.
+활동 기록은 더하기만 한다. 고치거나 지우는 API가 없다([architecture/security.md](security.md) §13.5). 각 기록은 시각, 행위자(계정, 서버. 운영자 행동은 행위자를 비운다, TEN-OPS-06), 행동, 대상, 바뀌기 전·후 값을 가진다.
 
 | 범위 | 기록하는 행동 |
 | --- | --- |
