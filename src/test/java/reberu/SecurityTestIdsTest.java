@@ -27,7 +27,8 @@ class SecurityTestIdsTest {
     private static final Path CHECKLIST_DOC = Path.of("docs/operations/release-checklist.md");
     private static final String STAGE = "v0.1";
     private static final Pattern STAGE_HEADING = Pattern.compile("^#### (v\\d+\\.\\d+)(?: 이후)? 보안 테스트$");
-    private static final Pattern TEST_ID = Pattern.compile("(?<![A-Z-])T-[A-Z]+(?:-[A-Z]+)*(?:-\\*)?(?![A-Z])");
+    private static final Pattern TEST_ID =
+            Pattern.compile("(?<![A-Za-z0-9-])T-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:-\\*)?");
     private static final Pattern CHECKLIST_ROW = Pattern.compile("^\\| `(T-[A-Z*-]+)` \\| (.+) \\|$");
 
     private static final Set<String> NOT_YET = Set.of("T-AUTHZ-MATRIX");
@@ -83,6 +84,30 @@ class SecurityTestIdsTest {
         }
 
         assertThat(documented).as("연결표를 아래처럼 고침:\n" + table(expected)).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("테스트 ID는 뒤에 붙은 숫자·소문자까지 한 토큰으로 읽어 틀린 ID를 놓치지 않음")
+    void readsWholeTokens() {
+        assertThat(ids("T-CSRF: 토큰 없는 요청")).containsExactly("T-CSRF");
+        assertThat(ids("T-CSRF2: 토큰 없는 요청")).containsExactly("T-CSRF2");
+        assertThat(ids("T-CSRFx와 T-AUTH-STATE-1")).containsExactly("T-CSRFx", "T-AUTH-STATE-1");
+        assertThat(ids("TEN-LINK-01·SEC-TOKEN-05·T-TOKEN: 상한")).containsExactly("T-TOKEN");
+        assertThat(ids("RT-EVT-02, GET-T-A, SEC-AUTHZ-10")).isEmpty();
+        assertThat(ids("| T-TOKEN-* | 토큰 |")).containsExactly("T-TOKEN-*");
+        assertThat(matches("T-TOKEN-*", "T-TOKEN")).isTrue();
+        assertThat(matches("T-TOKEN-*", "T-TOKEN-HASH")).isTrue();
+        assertThat(matches("T-TOKEN-*", "T-TOKENS")).isFalse();
+        assertThat(matches("T-CSRF", "T-CSRF2")).isFalse();
+    }
+
+    private static List<String> ids(String text) {
+        List<String> ids = new ArrayList<>();
+        Matcher matcher = TEST_ID.matcher(text);
+        while (matcher.find()) {
+            ids.add(matcher.group());
+        }
+        return ids;
     }
 
     private static String table(Map<String, String> rows) {
