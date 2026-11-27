@@ -132,6 +132,58 @@ class CheckDocLinksTest(unittest.TestCase):
 
         self.assertEqual(self.messages(), [])
 
+    def test_longer_fence_keeps_inner_fence_as_code(self):
+        self.write("docs/guide.md", """# 안내
+
+            ````markdown
+            ```markdown
+            [없음](nothing.md) SEC-AUTH-99
+            ```
+            [없음](nothing.md)
+            ````
+
+            ~~~
+            ```
+            [없음](nothing.md)
+            ~~~
+
+            ```
+            ``` 닫는 줄이 아님 [없음](nothing.md)
+            ```
+            [있어야 잡힘](nothing.md)
+            """)
+
+        self.assertEqual(self.messages(), ["docs/guide.md:18 링크가 가리키는 파일이 없다: nothing.md"])
+
+    def test_listed_prefix_without_definitions(self):
+        self.write("docs/README.md", """# 문서
+
+            | 접두어 | 영역 | 문서 |
+            | --- | --- | --- |
+            | `SEC` | 보안 | `rules.md` |
+            | `TEN` | 테넌시 | `tenancy.md` |
+
+            | 다른 표 | 값 |
+            | --- | --- |
+            | `ISO` | 표기 |
+            """)
+        self.write("docs/guide.md", "# 안내\n\nTEN-MEMBER-99, SEC-AUTH-01, ISO-8859-15\n")
+
+        self.assertEqual(self.messages(), ["docs/guide.md:3 정의가 없는 요구사항 ID: TEN-MEMBER-99"])
+
+    def test_markdown_outside_checked_documents(self):
+        self.write("POLICY.md", "# 정책\n\n## 1. 범위\n\n[없어도 검사 대상이 아님](nothing.md)\n")
+        self.write("docs/guide.md", """# 안내
+
+            [정책](../POLICY.md#1-범위) §1
+            [정책](../POLICY.md#없는-제목) §99
+            """)
+
+        self.assertEqual(self.messages(), [
+            "docs/guide.md:4 POLICY.md에 §99 절이 없다",
+            "docs/guide.md:4 링크가 가리키는 제목이 없다: ../POLICY.md#없는-제목",
+        ])
+
     def test_link_outside_repository(self):
         self.write("docs/guide.md", "# 안내\n\n[밖](../../outside.md)\n")
 

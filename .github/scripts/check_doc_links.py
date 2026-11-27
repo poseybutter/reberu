@@ -31,6 +31,11 @@ SECTION_NUMBER = re.compile(r"§\s?(\d+(?:\.\d+)*)")
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
 NUMBERED_HEADING = re.compile(r"^(\d+(?:\.\d+)*)\.?(?:\s|$)")
 CODE_SPAN = re.compile(r"`[^`]*`")
+FENCE = re.compile(r"(`{3,}|~{3,})")
+# 요구사항 ID 접두어 표(docs/README.md §2.2)의 머리 칸과 행
+PREFIX_INDEX = "docs/README.md"
+PREFIX_HEADER = re.compile(r"^\|\s*접두어\s*\|")
+PREFIX_ROW = re.compile(r"^\|\s*`([A-Z]{2,6})`\s*\|")
 SCHEME = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 
@@ -59,16 +64,18 @@ class Document:
 def without_code_blocks(text):
     """코드 블록 안은 빈 줄로 바꿔 줄 번호를 지킨다."""
     lines = []
-    fence = None
+    closing = None
     for line in text.replace("\r\n", "\n").split("\n"):
         stripped = line.lstrip()
-        marker = stripped[:3]
-        if fence is None and marker in ("```", "~~~"):
-            fence = marker
+        opening = FENCE.match(stripped)
+        if closing is None and opening:
+            # 닫는 줄은 같은 문자가 여는 줄 이상으로 이어지고 뒤에 공백만 있다
+            mark = opening.group(1)
+            closing = re.compile(rf"{re.escape(mark[0])}{{{len(mark)},}}\s*$")
             lines.append("")
-        elif fence is not None:
-            if stripped.startswith(fence):
-                fence = None
+        elif closing is not None:
+            if closing.match(stripped):
+                closing = None
             lines.append("")
         else:
             lines.append(line)
@@ -115,12 +122,31 @@ def check(root):
             first = f"{places[0][0]}:{places[0][1]}"
             for name, number in places[1:]:
                 errors.append((name, number, f"요구사항 ID 정의가 겹친다: {identifier} (먼저 정의한 곳 {first})"))
-    prefixes = {identifier.split("-")[0] for identifier in definitions}
+    # 정의가 하나도 남지 않은 영역의 참조도 잡도록 접두어 표를 함께 본다
+    prefixes = {identifier.split("-")[0] for identifier in definitions} | listed_prefixes(documents)
     for identifier, name, number in references:
         if identifier not in definitions and identifier.split("-")[0] in prefixes:
             errors.append((name, number, f"정의가 없는 요구사항 ID: {identifier}"))
 
     return documents, len(definitions), sorted(set(errors))
+
+
+def listed_prefixes(documents):
+    prefixes = set()
+    for document in documents:
+        if document.name != PREFIX_INDEX:
+            continue
+        in_table = False
+        for line in document.lines:
+            if PREFIX_HEADER.match(line):
+                in_table = True
+            elif in_table and not line.startswith("|"):
+                in_table = False
+            elif in_table:
+                row = PREFIX_ROW.match(line)
+                if row:
+                    prefixes.add(row.group(1))
+    return prefixes
 
 
 def expand(identifier, tail):
@@ -145,6 +171,9 @@ def check_links(root, document, number, line, by_path, errors):
             errors.append((document.name, number, f"링크가 가리키는 파일이 없다: {target}"))
             continue
         linked = by_path.get(destination)
+        if linked is None and destination.suffix.lower() == ".md" and destination.is_file():
+            # 검사 대상 밖의 Markdown도 제목과 절은 읽는다
+            linked = by_path[destination] = Document(root, destination)
         if linked is None:
             continue
         if fragment and urllib.parse.unquote(fragment).lower() not in linked.anchors:
