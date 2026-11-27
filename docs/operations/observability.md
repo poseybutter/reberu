@@ -1,7 +1,7 @@
 # 관측
 
 > 버전: v0.2.0\
-> 수정일: 2026-11-26
+> 수정일: 2026-11-27
 
 배포한 서버의 상태를 숫자로 보고, 문제가 생기면 경보를 받는 방법을 정한다. 결정의 근거는 [ADR-0017](../adr/0017-prometheus-grafana.md)이다. 로그 내용 규칙은 [architecture/security.md](../architecture/security.md) §13(SEC-LOG)을 따른다. 요구사항 ID 접두어는 `OPS`다.
 
@@ -49,7 +49,7 @@ flowchart LR
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | OPS-OBS-07 | 이벤트 지표는 구독자 식별자까지만 나눈다. 조직·팀별로 나누지 않는다(OPS-OBS-03). 구독자 식별자는 `클래스 이름.메서드 이름`이다. 미완료 발행 기록 수와 나이는 30초마다 DB에서 읽어 둔 값이다 | 필수 |
-| OPS-OBS-08 | 보안 지표는 실패 종류별로만 센다. 누가 실패했는지는 보안 로그에서 찾는다(SEC-LOG-04). 요청 제한 초과는 규칙 ID별로 센다. 권한 거부는 권한 판정이 거부한 요청만 세고, 없는 자원의 `404`는 세지 않는다 | 필수 |
+| OPS-OBS-08 | 보안 지표는 실패 종류별로만 센다. 누가 실패했는지는 보안 로그에서 찾는다(SEC-LOG-04). 요청 제한 초과는 규칙 ID별로 센다. 권한 거부는 권한 판정이 거부한 요청만 센다. 있는 조직·팀을 볼 수 없는 계정의 `404`(멤버 아님, 끝난 멤버십, 기한 지난 손님, 손님에게 닫힌 API, 팀 소속 아님, 운영자 아님)는 센다. 없는 자원, 형식이 틀린 ID, 정지·삭제된 조직, 꺼진 모듈의 `404`는 세지 않는다 | 필수 |
 
 앱이 직접 만드는 지표는 다음과 같다. Prometheus에서는 점이 밑줄로 바뀌고 횟수 지표에 `_total`이 붙는다.
 
@@ -86,14 +86,18 @@ HTTP·JVM·DB 지표는 Spring Boot가 만드는 것을 그대로 쓴다(`http.s
 | `MANAGEMENT_ADDRESS` | `127.0.0.1` | 관리 포트가 듣는 주소 |
 | `GRAFANA_ADMIN_PASSWORD` | 없음 | `observability` 프로필을 띄울 때만 필수(OPS-OBS-05) |
 
-1. `.env`에 `GRAFANA_ADMIN_PASSWORD`를 넣는다.
-2. 앱을 띄운다(`./gradlew bootRun`).
+1. `.env`에서 `# GRAFANA_ADMIN_PASSWORD=` 줄의 주석을 풀고 비밀번호를 넣는다.
+2. 앱을 띄운다(`./gradlew bootRun`). 지표가 나오는지는 `http://127.0.0.1:8081/actuator/prometheus`에서 먼저 볼 수 있다.
 3. `docker compose --profile observability up -d`로 Prometheus와 Grafana를 띄운다.
-4. `http://localhost:3000`에 `admin`과 넣은 비밀번호로 들어가 `reberu 개요` 대시보드를 본다. 수집 상태는 `http://localhost:9090/targets`에서 본다.
+4. `http://localhost:3000/d/reberu-overview`에 사용자 이름 `admin`과 넣은 비밀번호로 들어가 `reberu 개요` 대시보드를 본다. 수집 상태는 `http://localhost:9090/targets`에서 본다.
+5. 끌 때는 `docker compose --profile observability stop prometheus grafana`를 쓴다. `docker compose down -v`는 PostgreSQL 볼륨까지 지운다.
 
 - Prometheus는 컨테이너에서 `host.docker.internal:8081`로 앱의 관리 포트를 읽는다. Docker Desktop에서는 기본 주소 `127.0.0.1` 그대로 읽힌다.
 - 컨테이너가 호스트의 `127.0.0.1`에 닿지 않는 환경(Linux의 Docker Engine 등)에서는 `MANAGEMENT_ADDRESS`를 컨테이너망에서만 닿는 주소로 바꾼다. 모든 주소(`0.0.0.0`)로 열어야 하면 방화벽으로 외부 접근을 막는다(OPS-OBS-01).
-- Grafana는 처음 띄울 때의 `GRAFANA_ADMIN_PASSWORD`를 `grafana-data` 볼륨에 저장한다. 그 뒤에 `.env` 값을 바꿔도 비밀번호는 바뀌지 않으므로 Grafana 화면에서 바꾼다.
+- Grafana는 처음 띄울 때의 `GRAFANA_ADMIN_PASSWORD`를 `grafana-data` 볼륨에 저장한다. 그 뒤에 `.env` 값을 바꿔도 비밀번호는 바뀌지 않으므로 Grafana 화면에서 바꾸거나 `docker compose exec grafana grafana cli admin reset-admin-password "<새 비밀번호>"`로 맞춘다.
+- Grafana 컨테이너가 바로 꺼지면 `docker compose logs grafana`로 비밀번호 설정 안내가 나오는지 본다(OPS-OBS-05).
+- `targets`에서 `reberu`가 `DOWN`이면 앱이 꺼져 있거나 관리 포트가 수집 대상과 다르다.
+- 대시보드는 15초마다 수집한 값으로 그린다. 처음에는 1~2분 지나야 선이 보이고, 보안·이벤트 패널은 해당 일이 생기기 전까지 비어 있다.
 - 설정 파일은 `ops/prometheus/prometheus.yml`, `ops/grafana/provisioning/`, `ops/grafana/dashboards/`에 있다(OPS-OBS-09).
 
 ## 6. 단계
