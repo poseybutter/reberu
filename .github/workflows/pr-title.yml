@@ -25,10 +25,36 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          # 댓글을 못 달거나 못 지워도 판정은 바꾸지 않음
+          marker='<!-- reberu:pr-title-check -->'
+          existing="$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" || true)"
+
           if ! printf '%s' "$PR_TITLE" | grep -Eq '^(feat|fix|refactor|test|docs|ci|chore): [^ ]'; then
+            title="$(printf '%s' "$PR_TITLE" | tr -d '\r\n`' | cut -c1-200)"
+            body="$marker"$'\n''**PR 제목 검사 실패**'$'\n\n'
+            body+='```text'$'\n'"$title"$'\n''```'$'\n\n'
+            body+='제목은 `<type>: <요약>` 형식으로 씁니다. 콜론 뒤에 빈칸 하나를 두고 요약을 적습니다.'$'\n'
+            body+='- type: `feat`, `fix`, `refactor`, `test`, `docs`, `ci`, `chore` 가운데 하나'$'\n'
+            body+='- 예: `feat: 팀 초대 링크 추가`'$'\n\n'
+            body+='제목을 고치면 다시 검사하고, 통과하면 이 댓글은 지워집니다.'
+            first="$(printf '%s\n' "$existing" | head -n 1)"
+            if [ -n "$first" ]; then
+              gh api -X PATCH "repos/$GH_REPO/issues/comments/$first" -f body="$body" --silent || true
+              for id in $(printf '%s\n' "$existing" | tail -n +2); do
+                gh api -X DELETE "repos/$GH_REPO/issues/comments/$id" || true
+              done
+            else
+              gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" -f body="$body" --silent || true
+            fi
             echo "::error::PR 제목은 '<type>: <요약>' 형식이어야 합니다. type은 feat, fix, refactor, test, docs, ci, chore 중 하나입니다."
             exit 1
           fi
+
+          for id in $existing; do
+            gh api -X DELETE "repos/$GH_REPO/issues/comments/$id" || true
+          done
+
           type="${PR_TITLE%%:*}"
           current="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"
           for label in feat fix refactor test docs ci chore; do

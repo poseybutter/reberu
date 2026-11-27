@@ -19,11 +19,19 @@ concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
 
+# tee로 결과를 남겨도 검사 실패가 그대로 전해지도록 pipefail
+defaults:
+  run:
+    shell: bash
+
 jobs:
   doc-headers:
     name: 문서 머리말 검사
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      report: ${{ steps.report.outputs.report }}
+      total: ${{ steps.report.outputs.total }}
     steps:
       # 기준 브랜치와 비교하려면 전체 이력 필요
       - uses: actions/checkout@v7
@@ -35,7 +43,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python3 .github/scripts/check_doc_headers.py "$BASE_SHA" "$HEAD_SHA"
+        run: python3 .github/scripts/check_doc_headers.py "$BASE_SHA" "$HEAD_SHA" | tee "$RUNNER_TEMP/doc-headers.txt"
 
       # 머리말 검사가 실패해도 링크 검사 결과를 함께 보여 줌
       - name: 링크·요구사항 ID 검사 스크립트 확인
@@ -44,4 +52,87 @@ jobs:
 
       - name: 링크·절 참조·요구사항 ID 확인
         if: ${{ !cancelled() }}
-        run: python3 -B .github/scripts/check_doc_links.py
+        run: python3 -B .github/scripts/check_doc_links.py | tee "$RUNNER_TEMP/doc-links.txt"
+
+      # 댓글 job에 넘길 실패 줄. '::error file=경로,line=줄::이유'를 '경로:줄 이유'로 바꿈
+      - name: 실패 내용 모으기
+        id: report
+        if: ${{ failure() }}
+        run: |
+          cd "$RUNNER_TEMP"
+          touch doc-headers.txt doc-links.txt
+          { grep -h '^::error ' doc-headers.txt doc-links.txt || true; } \
+            | sed -E -e 's/^::error file=([^,:]+),line=([0-9]+)::/\1:\2 /' -e 's/^::error file=([^,:]+)::/\1 /' \
+            > doc-report.txt
+          delimiter="report-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+          {
+            echo "total=$(wc -l < doc-report.txt | tr -d ' ')"
+            echo "report<<$delimiter"
+            head -n 30 doc-report.txt
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+  # PR 코드를 실행하지 않는 job에만 쓰기 권한. 포크에서 온 PR은 쓰기 권한이 없어 건너뜀
+  comment:
+    name: 문서 검사 댓글
+    needs: doc-headers
+    if: >-
+      ${{ always()
+      && (needs.doc-headers.result == 'success' || needs.doc-headers.result == 'failure')
+      && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      # 검사 결과는 PR이 바꿀 수 있는 값이라 env로만 받고, 길이를 자르고, 코드 블록 안에만 넣음
+      - name: 실패 댓글 달기·지우기
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RESULT: ${{ needs.doc-headers.result }}
+          REPORT: ${{ needs.doc-headers.outputs.report }}
+          TOTAL: ${{ needs.doc-headers.outputs.total }}
+        run: |
+          marker='<!-- reberu:docs-check -->'
+          existing="$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id")"
+
+          if [ "$RESULT" = "success" ]; then
+            for id in $existing; do
+              gh api -X DELETE "repos/$GH_REPO/issues/comments/$id"
+            done
+            exit 0
+          fi
+
+          report="$(printf '%s\n' "$REPORT" | tr -d '\r`' | cut -c1-300 | head -n 30)"
+          shown="$(printf '%s\n' "$report" | grep -c . || true)"
+          case "$TOTAL" in
+            '' | *[!0-9]*) TOTAL="$shown" ;;
+          esac
+
+          body="$marker"$'\n''**문서 검사 실패**'$'\n\n'
+          if [ "$shown" -gt 0 ]; then
+            body+='```text'$'\n'"$report"$'\n''```'$'\n'
+            if [ "$TOTAL" -gt "$shown" ]; then
+              body+="나머지 $((TOTAL - shown))건은 Actions 로그에서 확인합니다."$'\n'
+            fi
+          else
+            body+='실패 줄을 읽지 못했습니다. Actions 로그에서 확인합니다.'$'\n'
+          fi
+          body+=$'\n''고치는 방법'$'\n'
+          body+='- 머리말: 고친 문서의 `> 버전`을 올리고 `> 수정일`을 커밋하는 날로 맞춥니다(`docs/README.md` §2.4).'$'\n'
+          body+='- 링크·요구사항 ID: 로컬에서 `python3 .github/scripts/check_doc_links.py`로 확인합니다(`docs/README.md` §2.5).'$'\n\n'
+          body+='고쳐서 통과하면 이 댓글은 지워집니다.'
+
+          first="$(printf '%s\n' "$existing" | head -n 1)"
+          if [ -n "$first" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$first" -f body="$body" --silent
+            for id in $(printf '%s\n' "$existing" | tail -n +2); do
+              gh api -X DELETE "repos/$GH_REPO/issues/comments/$id"
+            done
+          else
+            gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" -f body="$body" --silent
+          fi
