@@ -1,0 +1,666 @@
+{
+  "uid": "reberu-overview",
+  "title": "reberu 개요",
+  "tags": [
+    "reberu"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "HTTP",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "요청 수 (상태별)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 2,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (status) (rate(http_server_requests_seconds_count[5m]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "5xx 비율",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "(sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m])) or 0 * sum(rate(http_server_requests_seconds_count[5m]))) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.001)",
+          "legendFormat": "5xx",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "응답 시간 95번째 백분위 (경로 틀별)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 4,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, uri) (rate(http_server_requests_seconds_bucket[5m])))",
+          "legendFormat": "{{uri}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "JVM",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 5,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "힙 사용량",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(jvm_memory_used_bytes{area=\"heap\"})",
+          "legendFormat": "사용",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(jvm_memory_max_bytes{area=\"heap\"})",
+          "legendFormat": "최대",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "GC 멈춤 시간",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (gc) (rate(jvm_gc_pause_seconds_sum[5m]))",
+          "legendFormat": "{{gc}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "스레드",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 8,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 10
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "jvm_threads_live_threads",
+          "legendFormat": "전체",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "jvm_threads_daemon_threads",
+          "legendFormat": "데몬",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "DB 연결 풀",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 9,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "연결 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "hikaricp_connections_active",
+          "legendFormat": "사용 중",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "hikaricp_connections_idle",
+          "legendFormat": "대기 중인 연결",
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "hikaricp_connections_pending",
+          "legendFormat": "연결을 기다리는 요청",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "연결 대기 시간 (평균)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(hikaricp_connections_acquire_seconds_sum[5m]) / clamp_min(rate(hikaricp_connections_acquire_seconds_count[5m]), 0.001)",
+          "legendFormat": "대기",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "이벤트",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 27
+      },
+      "id": 12,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "미완료 발행 기록 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "reberu_events_incomplete",
+          "legendFormat": "미완료",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "가장 오래된 미완료 기록의 나이",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 14,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "reberu_events_incomplete_oldest_age_seconds",
+          "legendFormat": "나이",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "구독자별 실패 수",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 15,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (listener) (increase(reberu_events_listener_failures_total[5m]))",
+          "legendFormat": "{{listener}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "보안",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 16,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "거부 수 (종류별)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 17,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (kind) (increase(reberu_security_rejections_total[5m]))",
+          "legendFormat": "{{kind}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "요청 제한 초과 수 (규칙별)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "id": 18,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (rule) (increase(reberu_security_rate_limited_total[5m]))",
+          "legendFormat": "{{rule}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -37,6 +37,9 @@ public final class ListenerDeclarations {
             violations.add("구독 메서드는 이벤트 하나만 받음: " + where);
             return;
         }
+        if (method.getReturnType() != void.class) {
+            violations.add("구독 메서드 반환형은 void: " + where);
+        }
         if (owner.isEmpty()) {
             return;
         }

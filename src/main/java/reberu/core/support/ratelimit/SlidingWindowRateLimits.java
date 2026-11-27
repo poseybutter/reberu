@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import reberu.core.support.RateLimit;
 import reberu.core.support.RateLimitExceededException;
 import reberu.core.support.RateLimits;
+import reberu.core.support.SecurityMetrics;
 
 class SlidingWindowRateLimits implements RateLimits {
 
@@ -46,7 +47,7 @@ class SlidingWindowRateLimits implements RateLimits {
         }
         RateLimitProperties.Rule config = properties.rules().get(rule);
         if (permits > config.limit()) {
-            throw new RateLimitExceededException(rule, config.window());
+            throw exceeded(rule, config.window());
         }
         RateLimit.Key kind = key.startsWith(RateLimits.IP_PREFIX) ? RateLimit.Key.IP : RateLimit.Key.ACCOUNT;
         Pool pool = pools.get(rule).get(kind);
@@ -76,7 +77,7 @@ class SlidingWindowRateLimits implements RateLimits {
                     if (pool.lastCapLog.getAndAccumulate(logIndex, Math::max) < logIndex) {
                         securityLog.warn("요청 제한 키 상한 도달: rule={}, kind={}", rule.id(), kind);
                     }
-                    throw new RateLimitExceededException(rule, config.window());
+                    throw exceeded(rule, config.window());
                 }
                 Bucket created = newBucket(config.limit());
                 wait[0] = created.tryAcquire(config.limit(), permits, size, now);
@@ -88,8 +89,13 @@ class SlidingWindowRateLimits implements RateLimits {
             if (report[0]) {
                 securityLog.warn("요청 제한 초과: rule={}, key={}", rule.id(), maskKey(key));
             }
-            throw new RateLimitExceededException(rule, Duration.ofMillis(wait[0]));
+            throw exceeded(rule, Duration.ofMillis(wait[0]));
         }
+    }
+
+    static RateLimitExceededException exceeded(RateLimit rule, Duration retryAfter) {
+        SecurityMetrics.rateLimited(rule);
+        return new RateLimitExceededException(rule, retryAfter);
     }
 
     @Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")

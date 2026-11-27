@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import reberu.core.support.ErrorCode;
 import reberu.core.support.RateLimit;
 import reberu.core.support.RateLimitExceededException;
 import reberu.core.support.RateLimits;
+import reberu.core.support.SecurityMetrics;
 
 @ExtendWith(OutputCaptureExtension.class)
 class SlidingWindowRateLimitsTest {
@@ -430,6 +434,30 @@ class SlidingWindowRateLimitsTest {
             return results;
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("OPS-OBS-08: 요청 제한 초과는 규칙 ID로만 집계")
+    void countsExceededRequestsByRule() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        Metrics.addRegistry(registry);
+        try {
+            SlidingWindowRateLimits limits = limits(1, Duration.ofMinutes(1), 100);
+            limits.acquire(RateLimit.DEFAULT, "account:a");
+            limits.acquire(RateLimit.LOGIN, "ip:203.0.113.7");
+
+            rejected(limits, "account:a");
+            rejected(limits, "account:a");
+
+            assertThat(registry.get(SecurityMetrics.RATE_LIMITED)
+                    .tag(SecurityMetrics.RULE, RateLimit.DEFAULT.id()).counter().count()).isEqualTo(2);
+            assertThat(registry.get(SecurityMetrics.RATE_LIMITED).counters())
+                    .allSatisfy(counter -> assertThat(counter.getId().getTags()).extracting(Tag::getKey)
+                            .containsExactly(SecurityMetrics.RULE));
+        }
+        finally {
+            Metrics.removeRegistry(registry);
         }
     }
 

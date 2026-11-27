@@ -22,6 +22,8 @@ import reberu.core.auth.service.LoginService.LoginOutcome;
 import reberu.core.auth.session.AuthSession;
 import reberu.core.auth.session.SessionAuthentication;
 import reberu.core.auth.session.SessionIds;
+import reberu.core.support.SecurityMetrics;
+import reberu.core.support.SecurityMetrics.Rejection;
 
 class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailureHandler {
 
@@ -98,6 +100,7 @@ class LoginHandlers implements AuthenticationSuccessHandler, AuthenticationFailu
     private static void fail(HttpServletRequest request, HttpServletResponse response, String reason)
             throws IOException {
         log.info("로그인 실패: {}", reason);
+        SecurityMetrics.rejected(Rejection.LOGIN_FAILED);
         redirect(response, FAILED);
     }
 

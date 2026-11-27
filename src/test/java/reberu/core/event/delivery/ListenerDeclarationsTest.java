@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import reberu.core.access.AccessLevel.Scope;
@@ -47,16 +48,18 @@ class ListenerDeclarationsTest {
     };
 
     @Test
-    @DisplayName("ARCH-EVT-05 위반 사례: 팀 모듈이 팀 식별자 없는 이벤트, 조직 모듈이 조직 식별자 없는 이벤트, 인자 둘인 구독 메서드")
+    @DisplayName("ARCH-EVT-05·11 위반 사례: 팀 모듈이 팀 식별자 없는 이벤트, 조직 모듈이 조직 식별자 없는 이벤트, 인자 둘인 구독 메서드, 값을 돌려주는 구독 메서드")
     void detectsListenerViolations() {
         assertThat(ListenerDeclarations.violations(List.of(TeamOwned.class, OrgOwned.class, Unowned.class), MODULES))
-                .hasSize(3)
+                .hasSize(4)
                 .anySatisfy(v -> assertThat(v).isEqualTo("팀 모듈 구독자는 TeamScoped 이벤트만 받음(ARCH-EVT-05): "
                         + TeamOwned.class.getName() + ".onOrg"))
                 .anySatisfy(v -> assertThat(v).isEqualTo("조직 모듈 구독자는 OrgScoped 이벤트만 받음(ARCH-EVT-05): "
                         + OrgOwned.class.getName() + ".onPlain"))
                 .anySatisfy(v -> assertThat(v).isEqualTo("구독 메서드는 이벤트 하나만 받음: "
-                        + Unowned.class.getName() + ".onTwo"));
+                        + Unowned.class.getName() + ".onTwo"))
+                .anySatisfy(v -> assertThat(v).isEqualTo("구독 메서드 반환형은 void: "
+                        + Unowned.class.getName() + ".onFuture"));
     }
 
     record TeamEvent(UUID orgId, UUID teamId) implements TeamScoped {
@@ -104,6 +107,11 @@ class ListenerDeclarationsTest {
 
         @DomainEventListener
         void onTwo(PlainEvent event, PlainEvent other) {
+        }
+
+        @DomainEventListener
+        CompletableFuture<Void> onFuture(PlainEvent event) {
+            return CompletableFuture.completedFuture(null);
         }
 
     }

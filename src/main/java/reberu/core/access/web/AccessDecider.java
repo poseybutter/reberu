@@ -36,7 +36,7 @@ class AccessDecider {
         OrgView org = directory.org(orgId, accountId).orElseThrow(AccessDecider::notFound);
         OrgMember member = visibleMember(org, now);
         if (member.guest() && !access.guestAllowed()) {
-            throw notFound();
+            throw hidden();
         }
         if (!access.module().isEmpty() && !modules.enabledInOrg(orgId, access.module())) {
             throw notFound();
@@ -59,7 +59,7 @@ class AccessDecider {
         boolean member = teamMember != null && teamMember.active() && notExpired(teamMember.expiresAt(), now);
         boolean orgAdmin = orgMember.orgAdmin() && !orgMember.guest();
         if (!member && !orgAdmin) {
-            throw notFound();
+            throw hidden();
         }
         if (!access.module().isEmpty() && !modules.enabledInTeam(teamId, access.module())) {
             throw notFound();
@@ -80,7 +80,7 @@ class AccessDecider {
         }
         OrgMember member = org.member();
         if (member == null || !member.active() || (member.guest() && !notExpired(member.expiresAt(), now))) {
-            throw notFound();
+            throw hidden();
         }
         return member;
     }
@@ -116,6 +116,10 @@ class AccessDecider {
 
     static ReberuException notFound() {
         return new ReberuException(ErrorCode.NOT_FOUND);
+    }
+
+    static ReberuException hidden() {
+        return new AccessHiddenException();
     }
 
 }
