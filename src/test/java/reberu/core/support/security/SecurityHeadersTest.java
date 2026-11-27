@@ -45,7 +45,7 @@ class SecurityHeadersTest {
     JsonMapper jsonMapper;
 
     @Test
-    @DisplayName("200·400(방화벽 거부)·401·403·404·500 응답 모두 보안 헤더 6종")
+    @DisplayName("T-HDR: 200·400(방화벽 거부)·401·403·404·500 응답 모두 보안 헤더 6종")
     void everyResponseCarriesSecurityHeaders() throws Exception {
         List<MockHttpServletResponse> responses = List.of(
                 perform(get("/api/security-probe/ok").with(user("member")), 204),
@@ -88,7 +88,7 @@ class SecurityHeadersTest {
     }
 
     @Test
-    @DisplayName("다른 출처 preflight: 403, 허용 헤더 없음")
+    @DisplayName("T-HDR: 다른 출처 preflight는 403, 허용 헤더 없음")
     void crossOriginPreflightIsRejected() throws Exception {
         MockHttpServletResponse response = perform(options("/api/security-probe/ok")
                 .header(HttpHeaders.ORIGIN, OTHER_ORIGIN)
@@ -99,7 +99,7 @@ class SecurityHeadersTest {
     }
 
     @Test
-    @DisplayName("다른 출처 요청: 로그인 상태여도 403, 허용 헤더 없음")
+    @DisplayName("T-HDR: 다른 출처 요청은 로그인 상태여도 403, 허용 헤더 없음")
     void crossOriginRequestIsRejected() throws Exception {
         MockHttpServletResponse response = perform(get("/api/security-probe/ok")
                 .with(user("member")).header(HttpHeaders.ORIGIN, OTHER_ORIGIN), 403);
@@ -109,7 +109,7 @@ class SecurityHeadersTest {
     }
 
     @Test
-    @DisplayName("같은 출처 Origin 헤더 요청은 통과")
+    @DisplayName("T-HDR: 같은 출처 Origin 헤더 요청은 통과")
     void sameOriginRequestPasses() throws Exception {
         MockHttpServletResponse response = perform(get("/api/security-probe/ok")
                 .with(user("member")).header(HttpHeaders.ORIGIN, "http://localhost"), 204);

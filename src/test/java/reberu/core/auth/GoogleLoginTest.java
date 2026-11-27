@@ -94,7 +94,7 @@ class GoogleLoginTest {
     }
 
     @Test
-    @DisplayName("기존 계정 로그인: 세션 ID 교체, 이전 쿠키 무효, 돌아갈 경로로 이동")
+    @DisplayName("T-SESS-ROTATE: 기존 계정 로그인 시 세션 ID 교체, 이전 쿠키 무효, 돌아갈 경로로 이동")
     void existingAccountSignsInWithNewSessionId() {
         UUID accountId = existingAccount("sub-existing", "member@example.com");
         Login login = startLogin("/teams");
@@ -117,7 +117,7 @@ class GoogleLoginTest {
     }
 
     @Test
-    @DisplayName("첫 로그인: 동의 전 계정 없음, 가입 대기로 다른 API는 401 CONSENT_REQUIRED")
+    @DisplayName("T-AUTH-CONSENT: 첫 로그인은 동의 전 계정 없음, 가입 대기로 다른 API는 401 CONSENT_REQUIRED")
     void firstLoginWaitsForConsent() {
         Login login = startLogin(null);
 
@@ -136,7 +136,7 @@ class GoogleLoginTest {
     }
 
     @Test
-    @DisplayName("동의: 계정·동의 기록 생성, 세션 ID 교체, 지금 버전이 아니면 400")
+    @DisplayName("T-AUTH-CONSENT·T-SESS-ROTATE: 동의하면 계정·동의 기록 생성, 세션 ID 교체, 지금 버전이 아니면 400")
     void consentCreatesAccount() {
         signUpUntilConsent("sub-new", "new@example.com");
         String pendingSession = browser.cookie(TestBrowser.SESSION_COOKIE);
@@ -160,7 +160,7 @@ class GoogleLoginTest {
     }
 
     @Test
-    @DisplayName("동의 안 함: 계정 없음, 가입 대기·세션 삭제")
+    @DisplayName("T-AUTH-CONSENT: 동의하지 않으면 계정 없음, 가입 대기·세션 삭제")
     void declineCreatesNothing() {
         signUpUntilConsent("sub-new", "new@example.com");
 
@@ -302,7 +302,7 @@ class GoogleLoginTest {
     }
 
     @Test
-    @DisplayName("로그아웃은 CSRF 토큰 필요")
+    @DisplayName("T-CSRF: 로그아웃은 CSRF 토큰 필요")
     void logoutRequiresCsrf() {
         existingAccount("sub-existing", "member@example.com");
         Login login = startLogin(null);
