@@ -201,13 +201,15 @@ class ObservabilityTest {
         UUID member = accounts.createWithConsent(new GoogleProfile("sub-metrics-" + UUID.randomUUID(),
                 "metrics-member@example.com", "구성원", null, null), "v1", "v1", Instant.now());
         insertOrgMembership(orgId, member);
+        UUID outsider = accounts.createWithConsent(new GoogleProfile("sub-metrics-" + UUID.randomUUID(),
+                "metrics-outsider@example.com", "바깥 사람", null, null), "v1", "v1", Instant.now());
         double csrf = count(Rejection.CSRF_INVALID);
         double hidden = count(Rejection.ACCESS_HIDDEN);
         double forbidden = count(Rejection.ACCESS_FORBIDDEN);
 
         MockHttpServletResponse withoutToken = mockMvc.perform(post("/api/orgs")
                 .with(authentication(new AccountAuthentication(admin, Instant.now())))).andReturn().getResponse();
-        MockHttpServletResponse otherOrg = perform(get("/api/orgs/" + UUID.randomUUID()), admin);
+        MockHttpServletResponse otherOrg = perform(get("/api/orgs/" + orgId), outsider);
         MockHttpServletResponse adminOnly = perform(get("/api/orgs/" + orgId + "/invitations"), member);
         MockHttpServletResponse allowed = perform(get("/api/orgs/" + orgId), member);
 
@@ -218,6 +220,23 @@ class ObservabilityTest {
         assertThat(count(Rejection.CSRF_INVALID) - csrf).isEqualTo(1);
         assertThat(count(Rejection.ACCESS_HIDDEN) - hidden).isEqualTo(1);
         assertThat(count(Rejection.ACCESS_FORBIDDEN) - forbidden).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("OPS-OBS-08: 없는 조직과 닫힌 조직의 404는 권한 거부로 집계하지 않음")
+    void skipsMissingAndClosedOrgs() throws Exception {
+        String orgId = createOrg();
+        double hidden = count(Rejection.ACCESS_HIDDEN);
+
+        MockHttpServletResponse missing = perform(get("/api/orgs/" + UUID.randomUUID()), admin);
+        MockHttpServletResponse malformed = perform(get("/api/orgs/not-an-id"), admin);
+        jdbc.sql("UPDATE organization SET state = 'SUSPENDED' WHERE id = :org").param("org", orgId).update();
+        MockHttpServletResponse closed = perform(get("/api/orgs/" + orgId), admin);
+
+        assertThat(missing.getStatus()).isEqualTo(404);
+        assertThat(malformed.getStatus()).isEqualTo(404);
+        assertThat(closed.getStatus()).isEqualTo(404);
+        assertThat(count(Rejection.ACCESS_HIDDEN) - hidden).isZero();
     }
 
     private double count(Rejection kind) {

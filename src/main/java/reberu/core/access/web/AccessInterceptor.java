@@ -35,7 +35,7 @@ class AccessInterceptor implements HandlerInterceptor {
             decide(request, handler);
         }
         catch (ReberuException denied) {
-            if (denied.code() == ErrorCode.NOT_FOUND) {
+            if (denied instanceof AccessHiddenException) {
                 SecurityMetrics.rejected(Rejection.ACCESS_HIDDEN);
             }
             else if (denied.code() == ErrorCode.FORBIDDEN_ACTION) {
@@ -63,7 +63,7 @@ class AccessInterceptor implements HandlerInterceptor {
                     decider.team(access, accountId(), pathVariable(request, AccessDeclarations.TEAM_ID)));
             case NONE -> {
                 if (access.value() == AccessLevel.OPERATOR && !operators.contains(accountId())) {
-                    throw AccessDecider.notFound();
+                    throw AccessDecider.hidden();
                 }
             }
         }
