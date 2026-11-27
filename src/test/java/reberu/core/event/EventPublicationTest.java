@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -102,21 +104,22 @@ class EventPublicationTest {
 
         SampleListener.FAILING.remove(id);
 
-        try (ConfigurableApplicationContext restarted = startServer()) {
+        try (ConfigurableApplicationContext restarted = startServer("--reberu.events.retry.intervals=1s",
+                "--reberu.events.retry.check-interval=PT1S")) {
             await().atMost(WAIT).until(() -> isCompleted(restarted, id));
             assertThat(SampleListener.HANDLED).contains(id);
         }
     }
 
-    private static ConfigurableApplicationContext startServer() {
+    private static ConfigurableApplicationContext startServer(String... extra) {
+        List<String> arguments = new ArrayList<>(List.of("--spring.datasource.url=" + DATABASE.getJdbcUrl(),
+                "--spring.datasource.username=" + DATABASE.getUsername(),
+                "--spring.datasource.password=" + DATABASE.getPassword(),
+                "--spring.task.execution.shutdown.await-termination=true"));
+        arguments.addAll(List.of(extra));
         return new SpringApplicationBuilder(EventTestServer.class)
                 .web(WebApplicationType.NONE)
-                .run("--spring.datasource.url=" + DATABASE.getJdbcUrl(),
-                        "--spring.datasource.username=" + DATABASE.getUsername(),
-                        "--spring.datasource.password=" + DATABASE.getPassword(),
-                        "--spring.task.execution.shutdown.await-termination=true",
-                        "--reberu.events.retry.intervals=1s",
-                        "--reberu.events.retry.check-interval=PT1S");
+                .run(arguments.toArray(String[]::new));
     }
 
     private static void publishCommitted(ConfigurableApplicationContext context, UUID id) {
