@@ -26,9 +26,15 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           # 댓글을 못 달거나 못 지워도 판정은 바꾸지 않음
+          # 댓글 조회가 실패하면 있는 댓글을 모르는 것이므로 댓글은 건드리지 않음
           marker='<!-- reberu:pr-title-check -->'
-          existing="$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
-            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" || true)"
+          comments=known
+          if ! existing="$(gh api "repos/$GH_REPO/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id")"; then
+            comments=unknown
+            existing=""
+            echo "::warning::PR 댓글을 조회하지 못해 안내 댓글은 그대로 둡니다."
+          fi
 
           if ! printf '%s' "$PR_TITLE" | grep -Eq '^(feat|fix|refactor|test|docs|ci|chore): [^ ]'; then
             title="$(printf '%s' "$PR_TITLE" | tr -d '\r\n`' | cut -c1-200)"
@@ -39,7 +45,9 @@ jobs:
             body+='- 예: `feat: 팀 초대 링크 추가`'$'\n\n'
             body+='제목을 고치면 다시 검사하고, 통과하면 이 댓글은 지워집니다.'
             first="$(printf '%s\n' "$existing" | head -n 1)"
-            if [ -n "$first" ]; then
+            if [ "$comments" = unknown ]; then
+              :
+            elif [ -n "$first" ]; then
               gh api -X PATCH "repos/$GH_REPO/issues/comments/$first" -f body="$body" --silent || true
               for id in $(printf '%s\n' "$existing" | tail -n +2); do
                 gh api -X DELETE "repos/$GH_REPO/issues/comments/$id" || true
