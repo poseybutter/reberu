@@ -1,7 +1,7 @@
 # 도메인 모델
 
-> 버전: v0.20.0\
-> 수정일: 2026-11-26
+> 버전: v0.21.0\
+> 수정일: 2026-11-27
 
 엔티티, 관계, 제약, 소속, 멱등 키를 정한다. 논리 모델이며 실제 DDL은 Flyway 마이그레이션에서 쓴다. 규칙의 근거는 [domain/rules.md](rules.md), 상태 전이는 [architecture/tenancy.md](../architecture/tenancy.md) §5, DB 이식성은 [architecture/tenancy.md](../architecture/tenancy.md) §11.4, 단위와 패키지는 [architecture/modules.md](../architecture/modules.md) §3을 따른다. 요구사항 ID 접두어는 `DOM`이다.
 
@@ -72,6 +72,7 @@
 | 세션 | `auth_session` | 계정 | core.auth |
 | 가입 대기 세션 | `auth_pending_signup` | 계정(만들기 전) | core.auth |
 | 중복 요청 방지 키 | `api_idempotency_key` | 계정 | core.support |
+| 주기 작업 잠금 | `scheduled_job_lock` | 배포 | core.support |
 | 조직 | `organization` | 조직 | core.tenancy |
 | 확인한 도메인 | `verified_domain` | 조직 | core.tenancy |
 | 조직 멤버십 | `org_membership` | 조직 | core.tenancy |
@@ -238,6 +239,20 @@ erDiagram
 - 키 행은 실제 처리와 같은 트랜잭션에서 넣는다. 같은 키의 두 번째 요청은 첫 요청이 끝날 때까지 기다린 뒤 저장된 응답을 받는다. 처리가 실패하거나 성공이 아닌 응답이면 키 행도 롤백되어 같은 키로 다시 보낼 수 있다(FE-MUT-02).
 - 만료된 키로 다시 오면 새 요청으로 처리한다.
 - 만료된 행은 서버 작업이 지운다(§1.4).
+
+### scheduled_job_lock
+
+서버가 여러 대일 때 주기 작업 한 바퀴를 한 서버만 돌게 한다([architecture/modules.md](../architecture/modules.md) ARCH-EVT-12).
+
+| 필드 | 타입 | 필수 | 설명 |
+| --- | --- | --- | --- |
+| `job_name` | `TEXT(60)` | ○ | 작업 이름. 기본 키. 코드 상수이고 사용자 입력이 아니다 |
+| `locked_until` | `UTC_TIMESTAMP` | ○ | 이 시각까지 잡혀 있다. 지났으면 누구나 잡을 수 있다 |
+| `locked_by` | `UUID` | ○ | 잡은 서버가 시작할 때 만든 값. 호스트 이름 같은 환경 정보는 담지 않는다 |
+
+- 잡기는 `locked_until`이 지난 행을 고치는 조건부 `UPDATE` 한 문장이다. 처음 쓰는 작업은 행을 넣고, 기본 키가 겹치면 못 잡은 것으로 본다(TEN-DB-07).
+- 한 바퀴가 끝나면 잡은 서버가 `locked_until`을 지금으로 돌린다. 다른 서버가 넘겨받은 잠금은 건드리지 않는다.
+- 행은 작업 이름마다 하나이고 지우지 않는다.
 
 ## 4. core.tenancy
 
@@ -480,7 +495,7 @@ erDiagram
 | ID | 요구사항 | 수준 |
 | --- | --- | --- |
 | DOM-LIB-01 | 라이브러리가 쓰는 표(`event_publication`)는 라이브러리가 DB마다 제공하는 열 구조를 그대로 따른다. DDL은 Flyway DB별 위치에 두고(TEN-DB-01), 라이브러리의 자동 스키마 생성은 끈다 | 필수 |
-| DOM-LIB-02 | 앱 코드는 라이브러리 표를 직접 조회하거나 고치지 않는다. 라이브러리 API로만 다룬다 | 필수 |
+| DOM-LIB-02 | 앱 코드는 라이브러리 표를 직접 조회하거나 고치지 않는다. 라이브러리 API로만 다룬다. 예외는 지표용 읽기 전용 집계 하나이고(미완료 기록 수와 가장 오래된 기록의 시각, OPS-OBS-07), `reberu.core.event.delivery` 안에만 둔다 | 필수 |
 
 ### notification
 
