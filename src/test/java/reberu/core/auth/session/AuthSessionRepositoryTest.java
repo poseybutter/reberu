@@ -56,7 +56,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("DB에 세션 ID 원문 없이 SHA-256 해시만 저장")
+    @DisplayName("T-SESS-STORE: DB에 세션 ID 원문 없이 SHA-256 해시만 저장")
     void storesOnlyHash() {
         AuthSession session = signedIn(ACCOUNT);
 
@@ -69,7 +69,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("원문으로 DB를 찾을 수 없고, DB의 해시 값으로는 세션을 찾을 수 없음")
+    @DisplayName("T-SESS-STORE: 원문으로 DB를 찾을 수 없고, DB의 해시 값으로는 세션을 찾을 수 없음")
     void storedValuesCannotBeUsedAsSessionId() {
         AuthSession session = signedIn(ACCOUNT);
         String storedHash = jdbc.sql("SELECT session_id_hash FROM auth_session").query(String.class).single();
@@ -84,7 +84,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("정해진 속성 밖의 이름·타입 저장 거부")
+    @DisplayName("T-SESS-STORE: 정해진 속성 밖의 이름·타입 저장 거부")
     void rejectsUnknownAttributes() {
         AuthSession session = repository.createSession();
 
@@ -98,7 +98,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("세션 ID 재발급: 이전 행 삭제, 이전 ID로 찾을 수 없음")
+    @DisplayName("T-SESS-ROTATE: 세션 ID 재발급 시 이전 행 삭제, 이전 ID로 찾을 수 없음")
     void changingIdRemovesOldRow() {
         AuthSession session = signedIn(ACCOUNT);
         String oldId = session.getId();
@@ -179,7 +179,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("계정당 동시 세션 상한 10개, 넘으면 가장 오래된 세션 삭제")
+    @DisplayName("T-SESS-STORE: 계정당 동시 세션 상한 10개, 넘으면 가장 오래된 세션 삭제")
     void concurrentSessionLimitDropsOldest() {
         List<AuthSession> sessions = new ArrayList<>();
         for (int i = 0; i < 11; i++) {
@@ -196,7 +196,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("로그인 진행 값: state가 맞을 때 한 번만 사용")
+    @DisplayName("T-SESS-STORE: 로그인 진행 값은 state가 맞을 때 한 번만 사용")
     void loginProgressIsUsedOnce() {
         AuthSession session = withLogin();
 
@@ -209,7 +209,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("로그인 진행 값: 10분 뒤 무효")
+    @DisplayName("T-SESS-STORE: 로그인 진행 값은 10분 뒤 무효")
     void loginProgressExpiresAfterTenMinutes() {
         AuthSession session = withLogin();
 
@@ -219,7 +219,7 @@ class AuthSessionRepositoryTest {
     }
 
     @Test
-    @DisplayName("로그인 진행 값: 동시에 두 번 써도 한 번만 성공")
+    @DisplayName("T-SESS-STORE: 로그인 진행 값은 동시에 두 번 써도 한 번만 성공")
     void loginProgressIsUsedOnceUnderConcurrency() throws Exception {
         AuthSession session = withLogin();
         CountDownLatch start = new CountDownLatch(1);

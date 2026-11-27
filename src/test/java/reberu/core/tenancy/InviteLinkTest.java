@@ -85,7 +85,7 @@ class InviteLinkTest {
     }
 
     @Test
-    @DisplayName("SEC-TOKEN-01·02·TEN-LINK-04: 토큰은 32바이트 base64url, 주소에만 한 번 담기고 DB에는 SHA-256 해시만 저장")
+    @DisplayName("SEC-TOKEN-01·02·TEN-LINK-04·T-TOKEN: 토큰은 32바이트 base64url, 주소에만 한 번 담기고 DB에는 SHA-256 해시만 저장")
     void createsLinkWithHashedToken() throws Exception {
         JsonNode created = json(create(teamAdmin, teamId, link(false, "TEAM_MEMBER", null, 5)), 201);
 
@@ -113,7 +113,7 @@ class InviteLinkTest {
     }
 
     @Test
-    @DisplayName("TEN-LINK-02·03·SEC-TOKEN-04·07: 승인 여부·역할·기한·횟수가 규칙에 맞지 않으면 400, 링크를 만들지 않음")
+    @DisplayName("TEN-LINK-02·03·SEC-TOKEN-04·07·T-TOKEN: 승인 여부·역할·기한·횟수가 규칙에 맞지 않으면 400, 링크를 만들지 않음")
     void rejectsInvalidInput() throws Exception {
         assertThat(fields(create(teamAdmin, teamId, link(null, null, null, null))))
                 .containsExactly("approvalRequired:REQUIRED", "role:REQUIRED", "maxUses:REQUIRED");
@@ -219,7 +219,7 @@ class InviteLinkTest {
     }
 
     @Test
-    @DisplayName("SEC-TOKEN-04: 끄기는 한 번만, 두 번째는 409, 다시 켜는 길 없음")
+    @DisplayName("SEC-TOKEN-04·T-TOKEN: 끄기는 한 번만, 두 번째는 409, 다시 켜는 길 없음")
     void disablesLink() throws Exception {
         String linkId = linkId(create(teamAdmin, teamId, link(false, "VIEWER", null, 3)));
 

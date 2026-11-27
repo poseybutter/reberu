@@ -67,5 +67,6 @@ docker compose --profile observability up -d
 
 - [기여 가이드](CONTRIBUTING.md) · Git, 릴리스, 코드·테스트 규칙
 - [관측](docs/operations/observability.md) · 지표, 대시보드, 경보
+- [릴리스 점검](docs/operations/release-checklist.md) · 단계별 완료 기준과 테스트 연결표
 
 [전체 문서 목록](docs/README.md)

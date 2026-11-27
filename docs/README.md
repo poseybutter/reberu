@@ -1,6 +1,6 @@
 # reberu 문서
 
-> 버전: v0.7.0\
+> 버전: v0.8.0\
 > 수정일: 2026-11-27
 
 reberu의 제품·도메인·아키텍처 기준 문서다. 도메인 모델, API 명세, 구현, 테스트는 이 문서들을 근거로 삼는다. 진행 상황은 문서에 쓰지 않고 이슈와 커밋으로 관리한다.
@@ -28,7 +28,8 @@ docs/
 │   ├── api.md               REST API 주소 체계, 공통 형식, API 목록
 │   └── frontend.md          화면 구성, 상태, 보안 경계 새로고침, 배포 판, 화면 보안
 ├── operations/            어떻게 운영하는가 — 배포 뒤 상태 확인
-│   └── observability.md     지표 수집, 대시보드, 경보
+│   ├── observability.md     지표 수집, 대시보드, 경보
+│   └── release-checklist.md 단계별 완료 기준과 테스트 연결표
 ├── adr/                   왜 그렇게 정했는가 — 설계 결정 기록
 │   ├── README.md            ADR 목록과 템플릿
 │   └── NNNN-제목.md         결정 하나에 문서 하나
@@ -64,7 +65,8 @@ docs/
 9. [architecture/api.md](architecture/api.md): API 목록
 10. [architecture/frontend.md](architecture/frontend.md): 화면 쪽 구조와 규칙
 11. [operations/observability.md](operations/observability.md): 지표와 경보
-12. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
+12. [operations/release-checklist.md](operations/release-checklist.md): 단계를 마칠 때 확인한 것
+13. [product/flows.md](product/flows.md), [product/spaces.md](product/spaces.md), [product/screens.md](product/screens.md): 사용자 경험
 
 ## 2. 작성 규칙
 

@@ -45,7 +45,7 @@ class CsrfTest {
     JsonMapper jsonMapper;
 
     @Test
-    @DisplayName("토큰 없는 POST·PUT·PATCH·DELETE: 403 CSRF_INVALID")
+    @DisplayName("T-CSRF: 토큰 없는 POST·PUT·PATCH·DELETE는 403 CSRF_INVALID")
     void changingRequestsWithoutTokenAreRejected() throws Exception {
         for (MockHttpServletRequestBuilder request : changingRequests()) {
             MockHttpServletResponse response = perform(request.with(user("member")), 403);
@@ -55,7 +55,7 @@ class CsrfTest {
     }
 
     @Test
-    @DisplayName("쿠키와 다른 토큰·쿠키만 있고 헤더 없음: 403 CSRF_INVALID")
+    @DisplayName("T-CSRF: 쿠키와 다른 토큰·쿠키만 있고 헤더 없으면 403 CSRF_INVALID")
     void mismatchedTokenIsRejected() throws Exception {
         String token = issuedToken();
 
@@ -72,7 +72,7 @@ class CsrfTest {
     }
 
     @Test
-    @DisplayName("쿠키와 같은 토큰을 헤더로 보내면 통과")
+    @DisplayName("T-CSRF: 쿠키와 같은 토큰을 헤더로 보내면 통과")
     void matchingTokenPasses() throws Exception {
         String token = issuedToken();
 

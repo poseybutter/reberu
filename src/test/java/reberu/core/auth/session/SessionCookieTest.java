@@ -53,7 +53,7 @@ class SessionCookieTest {
     }
 
     @Test
-    @DisplayName("세션 쿠키: __Host- 이름, HttpOnly·Secure·SameSite=Lax·Path=/, Domain·만료 시각 없음")
+    @DisplayName("T-SESS-COOKIE: 세션 쿠키는 __Host- 이름, HttpOnly·Secure·SameSite=Lax·Path=/, Domain·만료 시각 없음")
     void sessionCookieAttributes() throws Exception {
         String setCookie = sessionCookieHeader(get("/session-probe/login?account=" + ACCOUNT, null));
 
@@ -83,7 +83,7 @@ class SessionCookieTest {
     }
 
     @Test
-    @DisplayName("세션 ID 재발급: 새 쿠키 발급, 이전 쿠키 무효")
+    @DisplayName("T-SESS-ROTATE: 세션 ID 재발급 시 새 쿠키 발급, 이전 쿠키 무효")
     void changedSessionIdInvalidatesOldCookie() throws Exception {
         String oldCookie = cookieValue(get("/session-probe/login?account=" + ACCOUNT, null));
 

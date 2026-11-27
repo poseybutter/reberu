@@ -109,7 +109,7 @@ class ReauthTest {
     }
 
     @Test
-    @DisplayName("재인증: prompt=login·max_age=0, 세션 ID 교체, 인증 시각 갱신 뒤 최근 인증 API 통과")
+    @DisplayName("T-SESS-ROTATE: 재인증은 prompt=login·max_age=0, 세션 ID 교체, 인증 시각 갱신 뒤 최근 인증 API 통과")
     void reauthRefreshesAuthentication() {
         signIn(Instant.now().minus(Duration.ofHours(2)));
         String sessionBefore = browser.cookie(TestBrowser.SESSION_COOKIE);
