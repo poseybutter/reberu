@@ -1,6 +1,6 @@
 # 모듈 구조
 
-> 버전: v0.8.1\
+> 버전: v0.9.0\
 > 수정일: 2026-11-27
 
 백엔드 코드를 core, 고정 기능, 모듈로 나누는 경계와 의존 방향, 모듈 사이의 소통 방식, 모듈 계약, 경계 검증을 정한다. 기능 구성은 [product/overview.md](../product/overview.md) §5, 모듈 활성화 규칙은 [architecture/tenancy.md](tenancy.md) §13, 결정의 근거는 [ADR-0002](../adr/0002-core-and-modules.md), [ADR-0014](../adr/0014-module-architecture.md), [ADR-0016](../adr/0016-spring-modulith-events.md)을 따른다. 요구사항 ID 접두어는 `ARCH`다.
@@ -151,14 +151,27 @@ sequenceDiagram
 | ARCH-EVT-01 | 도메인 이벤트는 원인 변경과 같은 트랜잭션에서 이벤트 저장소에 기록한다. 원인 변경이 롤백되면 이벤트도 없다 | 필수 |
 | ARCH-EVT-02 | 구독자 처리는 원인 트랜잭션이 커밋된 뒤, 구독자마다 별도 트랜잭션에서 한다. 한 구독자의 실패가 원인 변경과 다른 구독자를 되돌리지 않는다 | 필수 |
 | ARCH-EVT-03 | 모든 구독자는 멱등이다. 같은 이벤트를 두 번 받아도 결과가 같다(예: EXP 원장의 멱등 키, [domain/rules.md](../domain/rules.md) §6) | 필수 |
-| ARCH-EVT-04 | 실패한 전달은 간격을 늘려 다시 시도하고, 정해진 횟수를 넘으면 운영 로그에 남기고 멈춘다. 서버를 다시 켜도 미처리 이벤트는 이어서 전달한다 | 필수 |
+| ARCH-EVT-04 | 실패한 전달은 간격을 늘려 다시 시도하고, 정해진 횟수를 넘으면 운영 로그에 남기고 멈춘다. 서버를 다시 켜도 미처리 이벤트는 이어서 전달한다. 간격과 횟수는 아래 재시도 표를 따른다 | 필수 |
 | ARCH-EVT-05 | 이벤트는 팀 또는 조직 식별자를 반드시 담는다. 범위가 있는 이벤트 레코드는 `reberu.core.event`의 `TeamScoped`(`orgId()`, `teamId()`) 또는 `OrgScoped`(`orgId()`)를 구현한다. 전달기는 구독자의 모듈이 그 범위에서 켜져 있을 때만 전달하고, 꺼져 있으면 구독 메서드를 부르지 않고 완료로 기록한다(TEN-MOD-01). 구독자가 어느 모듈인지는 구독 클래스의 패키지로 정한다(§5.1). 모듈 밖(core·고정 기능) 구독자는 확인 없이 받는다 | 필수 |
 | ARCH-EVT-06 | 이벤트 본문은 불변 레코드이고, 다른 단위의 엔티티가 아니라 식별자와 값만 담는다 | 필수 |
 | ARCH-EVT-07 | 실시간 메시지([architecture/realtime.md](realtime.md))는 도메인 이벤트의 구독자 하나로 보낸다. 실시간 전송 실패가 도메인 처리를 되돌리지 않는다 | 필수 |
-| ARCH-EVT-08 | 이벤트 저장소는 세 DB에서 같게 동작해야 한다([architecture/tenancy.md](tenancy.md) §11.4). 처리된 이벤트는 보관 기간이 지나면 정리한다 | 필수 |
+| ARCH-EVT-08 | 이벤트 저장소는 세 DB에서 같게 동작해야 한다([architecture/tenancy.md](tenancy.md) §11.4). 처리된 이벤트는 보관 기간이 지나면 정리한다. 하루 한 번(03:47 UTC) 완료한 지 보관 기간이 지난 기록만 지우고, 미완료 기록은 오래돼도 지우지 않는다 | 필수 |
 | ARCH-EVT-09 | 이벤트 레코드는 JSON으로 직렬화할 수 있는 값만 담고, 이름과 필드를 공개 계약으로 다룬다. 필드를 지우거나 뜻을 바꾸지 않고 더하기만 한다. 나중에 외부 메시지 브로커로 내보낼 때 레코드를 고치지 않기 위해서다(§4.2) | 필수 |
 | ARCH-EVT-10 | 발행하는 쪽은 Spring의 이벤트 발행 인터페이스만 쓰고, 구독하는 쪽은 core가 정한 구독 표시 `@DomainEventListener`(`reberu.core.event`)만 쓴다. 이벤트 저장소 구현의 클래스를 업무 코드에서 직접 부르지 않는다. `reberu.core.event` 밖에서 Spring Modulith 이벤트 클래스, `@TransactionalEventListener`, `@EventListener`를 쓰면 경계 테스트가 실패한다 | 필수 |
 | ARCH-EVT-11 | 구독 메서드는 이벤트 하나만 받고 값을 돌려주지 않는다(`void`). 돌려준 값으로 나중에 알리는 실패는 전달 실패로 세지 못한다(OPS-OBS-07). `TEAM` 모듈 구독자는 `TeamScoped`, `ORG` 모듈 구독자는 `OrgScoped` 이벤트만 받는다. 어기면 서버가 시작하지 않는다 | 필수 |
+| ARCH-EVT-12 | 재시도와 정리는 서버가 여러 대여도 겹치지 않는다. 재시도 한 바퀴(목록 읽기부터 재제출 표시까지)는 주기 작업 잠금([domain/model.md](../domain/model.md) §3 `scheduled_job_lock`)을 잡은 서버 하나만 돈다. 못 잡은 서버는 그 바퀴를 건너뛴다. 잡은 서버가 멈추면 잠금 기한이 지난 뒤 다른 서버가 넘겨받는다. 라이브러리의 재제출 표시만으로는 다른 서버가 읽어 둔 목록으로 한 번 더 보내는 것을 막지 못한다. 잠금 시각은 앱 시계로 넣으므로 서버 사이 시계 차이는 잠금 기한보다 작아야 한다. 정리는 같은 조건의 삭제라 겹쳐도 결과가 같아 잠그지 않는다 | 필수 |
+| ARCH-EVT-13 | 재시도 차례는 마지막으로 전달을 시작한 시각에 그 차례의 간격을 더해 정한다. 실패 상태인 기록만 다시 보낸다. 전달 중에 서버가 멈춰 발행됨·처리 중·재제출됨 상태로 10분 넘게 머문 기록은 1분마다 실패 상태로 바꿔 재시도 대상에 넣는다. 서버를 다시 켤 때 미완료 기록을 한꺼번에 다시 보내지 않는다 | 필수 |
+| ARCH-EVT-14 | 재시도를 다 쓴 기록은 지우지 않고 실패 상태로 둔다. 운영 로그에는 서버마다 기록 하나에 한 번, 발행 기록 ID·이벤트 타입·시도 횟수만 남기고 이벤트 본문은 남기지 않는다. 포기한 기록 수는 지표로 낸다([operations/observability.md](../operations/observability.md) §3) | 필수 |
+
+재시도와 정리 값은 다음과 같다.
+
+| 값 | 기본값 | 설정 |
+| --- | --- | --- |
+| 재시도 간격 | 1분 → 5분 → 30분 → 2시간 → 12시간. 재시도 5번, 첫 전달까지 모두 6번 | `reberu.events.retry.intervals` |
+| 재시도 확인 간격 | 30초 | `reberu.events.retry.check-interval` |
+| 재시도 작업 잠금 기한 | 2분 | 코드 상수 |
+| 멈춘 기록 판정 | 상태마다 10분, 확인 간격 1분 | `spring.modulith.events.staleness.*` |
+| 완료 기록 보관 기간 | 30일. 1일보다 짧으면 서버가 시작하지 않는다 | `reberu.events.retention`(`EVENT_PUBLICATION_RETENTION`) |
 
 ### 4.2 외부 메시지 브로커로 옮기는 경로
 
@@ -292,7 +305,7 @@ flowchart TD
 | ARCH-TEST-05 | 모듈 하나를 빼고 빌드·테스트(모듈 수만큼). 빼도 나머지가 통과 | CI 정기 작업 | 권장 |
 | ARCH-TEST-06 | 이벤트 구독자 멱등: 같은 이벤트 두 번 전달 시 결과 같음 | 통합 테스트 | 필수 |
 | ARCH-TEST-07 | 테스트용 가짜 모듈로 등록·허용·켜기·끄기·제거(PRD-MVP-12) | 통합 테스트 | 필수 |
-| ARCH-TEST-08 | 이벤트 발행 기록: 원인 롤백 시 기록 없음, 구독자 실패 시 미완료로 남고 다시 보내면 완료, 서버를 다시 켜도 미완료 기록을 이어서 전달 | 통합 테스트(세 DB) | 필수 |
+| ARCH-TEST-08 | 이벤트 발행 기록: 원인 롤백 시 기록 없음, 구독자 실패 시 미완료로 남고 다시 보내면 완료, 서버를 다시 켜도 미완료 기록을 이어서 전달, 간격 전에는 다시 보내지 않고 횟수를 넘으면 멈춤, 서버 둘이 함께 재시도해도 한 번만 전달, 주기 작업 잠금은 한 서버만 잡고 기한 뒤 넘겨받음, 보관 기간이 지난 완료 기록만 삭제 | 통합 테스트(세 DB) | 필수 |
 
 - Spring Modulith는 기본으로 최상위 패키지 바로 아래 패키지를 한 단위로 본다. `reberu.core.*`와 `reberu.module.*`의 하위 패키지를 각각 한 단위로 다루도록 단위 선언을 명시한다.
 
@@ -308,4 +321,4 @@ flowchart TD
 - Spring Modulith 2.1.x를 쓴다. 2.1.2는 Spring Boot 4.1.2를 기준으로 만든 판이고, 이벤트 발행 기록 표를 PostgreSQL, MySQL, MariaDB마다 제공한다([ADR-0016](../adr/0016-spring-modulith-events.md)).
 - 이벤트 발행 기록 표의 DDL은 우리 Flyway 마이그레이션에 둔다. 라이브러리의 자동 스키마 생성은 쓰지 않는다(DOM-LIB-01).
 - 단위 감지는 명시 선언 방식(`spring.modulith.detection-strategy: explicitly-annotated`)이다. 단위마다 `package-info.java`에 `@ApplicationModule`을 두고, 고정 기능과 모듈은 `allowedDependencies`로 §3.1의 허용 의존을 선언한다.
-- 구독자는 비동기로 처리한다(`@EnableAsync`). 서버를 다시 켜면 미완료 기록을 다시 보낸다(`spring.modulith.events.republish-outstanding-events-on-restart`).
+- 구독자는 비동기로 처리한다(`@EnableAsync`). 미완료 기록은 재시도 작업이 이어서 보낸다(ARCH-EVT-13). 라이브러리의 재시작 때 다시 보내기(`spring.modulith.events.republish-outstanding-events-on-restart`)는 끈다.

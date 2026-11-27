@@ -107,6 +107,23 @@ class EventMetricsTest {
         assertThat(listeners).isPositive();
     }
 
+    @Test
+    @DisplayName("ARCH-EVT-04·08·14: 실제 서버에 재시도·정리 작업과 포기한 기록 수 지표 등록, 기본 간격은 다섯 단계·보관 30일")
+    void registersRetryAndCleanup() {
+        EventDeliveryProperties properties = context.getBean(EventDeliveryProperties.class);
+
+        assertThat(context.getBeansOfType(EventRetry.class)).hasSize(1);
+        assertThat(context.getBeansOfType(EventPublicationCleanup.class)).hasSize(1);
+        assertThat(registry.get(EventRetry.EXHAUSTED).gauge().value()).isZero();
+        assertThat(properties.retry().intervals()).containsExactly(Duration.ofMinutes(1), Duration.ofMinutes(5),
+                Duration.ofMinutes(30), Duration.ofHours(2), Duration.ofHours(12));
+        assertThat(properties.retention()).isEqualTo(Duration.ofDays(30));
+        assertThat(context.getEnvironment().getProperty("spring.modulith.events.republish-outstanding-events-on-restart",
+                Boolean.class)).isFalse();
+        assertThat(context.getEnvironment().getProperty("spring.modulith.events.staleness.processing", Duration.class))
+                .isEqualTo(Duration.ofMinutes(10));
+    }
+
     private double failures() {
         return registry.counter(DeliveryFailureMeter.FAILURES, DeliveryFailureMeter.LISTENER, "SampleListener.on")
                 .count();

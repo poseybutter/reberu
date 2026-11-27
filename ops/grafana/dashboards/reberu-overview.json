@@ -478,6 +478,15 @@
           "expr": "reberu_events_incomplete",
           "legendFormat": "미완료",
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "reberu_events_exhausted",
+          "legendFormat": "전달 포기",
+          "refId": "B"
         }
       ]
     },

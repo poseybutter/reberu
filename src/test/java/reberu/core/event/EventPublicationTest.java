@@ -26,6 +26,8 @@ import org.springframework.modulith.events.IncompleteEventPublications;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.JdbcDatabaseContainer;
 import reberu.TestcontainersConfiguration;
+import reberu.core.event.delivery.EventRetryConfiguration;
+import reberu.core.support.joblock.JobLockConfiguration;
 
 class EventPublicationTest {
 
@@ -112,7 +114,9 @@ class EventPublicationTest {
                 .run("--spring.datasource.url=" + DATABASE.getJdbcUrl(),
                         "--spring.datasource.username=" + DATABASE.getUsername(),
                         "--spring.datasource.password=" + DATABASE.getPassword(),
-                        "--spring.task.execution.shutdown.await-termination=true");
+                        "--spring.task.execution.shutdown.await-termination=true",
+                        "--reberu.events.retry.intervals=1s",
+                        "--reberu.events.retry.check-interval=PT1S");
     }
 
     private static void publishCommitted(ConfigurableApplicationContext context, UUID id) {
@@ -155,7 +159,8 @@ class EventPublicationTest {
 
     @Configuration(proxyBeanMethods = false)
     @EnableAutoConfiguration
-    @Import({DomainEventConfiguration.class, SampleListener.class})
+    @Import({DomainEventConfiguration.class, EventRetryConfiguration.class, JobLockConfiguration.class,
+            SampleListener.class})
     static class EventTestServer {
     }
 

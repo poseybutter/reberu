@@ -86,7 +86,7 @@ class ObservabilityFilesTest {
                 "prometheus");
         assertThat(expressions).contains("http_server_requests_seconds", "jvm_memory_used_bytes",
                 "hikaricp_connections_pending", "reberu_events_incomplete_oldest_age_seconds",
-                "reberu_events_listener_failures_total", "reberu_security_rejections_total",
+                "reberu_events_listener_failures_total", "reberu_events_exhausted", "reberu_security_rejections_total",
                 "reberu_security_rate_limited_total");
     }
 
