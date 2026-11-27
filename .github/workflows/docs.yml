@@ -4,7 +4,12 @@ on:
   pull_request:
     paths:
       - "docs/**"
+      - "README.md"
+      - "CONTRIBUTING.md"
+      - "AGENTS.md"
       - ".github/scripts/check_doc_headers.py"
+      - ".github/scripts/check_doc_links.py"
+      - ".github/scripts/test_check_doc_links.py"
       - ".github/workflows/docs.yml"
 
 permissions:
@@ -31,3 +36,12 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: python3 .github/scripts/check_doc_headers.py "$BASE_SHA" "$HEAD_SHA"
+
+      # 머리말 검사가 실패해도 링크 검사 결과를 함께 보여 줌
+      - name: 링크·요구사항 ID 검사 스크립트 확인
+        if: ${{ !cancelled() }}
+        run: python3 -B .github/scripts/test_check_doc_links.py
+
+      - name: 링크·절 참조·요구사항 ID 확인
+        if: ${{ !cancelled() }}
+        run: python3 -B .github/scripts/check_doc_links.py

@@ -38,3 +38,6 @@ out/
 
 ### Local secrets ###
 .env
+
+### Python ###
+__pycache__/
